@@ -21,3 +21,10 @@ COVERAGE per file type:
 QUERYING: Use getByTestId/queryByTestId. Add testID props to interactive and key elements in Views.
 
 ASSERTIONS: Use @testing-library/jest-dom matchers (toBeInTheDocument, not.toBeInTheDocument). Check tracker calls with toHaveBeenCalledWith.
+
+WORKFLOW — always follow this order:
+1. DIFF: run `rtk git diff main...HEAD --name-only` then `rtk git diff main...HEAD` to understand every changed file and line before writing any test.
+2. MAP: for each changed file, list every new/modified branch, state, handler, and edge case that needs a test.
+3. WRITE: cover all cases — all discriminated union states (NOT_ASKED/LOADING/DATA_READY/ERROR), all conditionals, all interactions and tracking calls.
+4. RUN: `rtk jest path/to/__tests__/` — all tests must pass before finishing.
+5. COVERAGE: `rtk jest --coverage path/to/feature/` — Lines, Branches, Functions, Statements all must be ≥ 93%. Add tests until threshold is met. Never finish below 93%.

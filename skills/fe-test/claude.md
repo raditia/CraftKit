@@ -82,9 +82,41 @@ describe('ViewBusMobileSearchForm', () => {
 
 ## Steps to follow
 
-1. Read the file under test and any existing `__tests__/` files
-2. Identify what is already tested vs. missing coverage
-3. Write tests for untested branches (focus on: loading/error/data states, user interactions, tracking calls)
-4. Ensure all `@traveloka/*` external hooks are mocked — never let them call real implementations
+### 1. Understand what changed
+Find the base branch and diff against it:
+```bash
+rtk git log --oneline main...HEAD        # commits on this branch
+rtk git diff main...HEAD --name-only     # files changed
+rtk git diff main...HEAD                 # full diff
+```
+If base branch is not `main`, detect it: `git remote show origin | grep 'HEAD branch'`.
 
-At the end, list any testing patterns you encountered that aren't covered above as **Suggested skill updates**.
+### 2. Map changed code to test cases
+For every changed file in the diff:
+- Read the file and its `__tests__/` folder
+- List every changed function, branch, state transition, and edge case introduced by the diff
+- Note which cases are already covered and which are missing
+
+### 3. Write tests for all uncovered cases
+Cover every code path introduced or modified by the diff:
+- All discriminated union states (`NOT_ASKED`, `LOADING`, `DATA_READY`, `ERROR`)
+- Every conditional branch (`if/else`, ternary, optional chaining fallback)
+- All user interactions and their side effects (handlers, tracking calls)
+- Error boundaries and error states
+
+### 4. Run tests and fix failures
+```bash
+rtk jest path/to/__tests__/FileName.test.tsx
+```
+All tests must pass before proceeding. Fix failures — do not skip or comment out.
+
+### 5. Verify coverage ≥ 93%
+```bash
+rtk jest --coverage path/to/feature/
+```
+Check `Lines`, `Branches`, `Functions`, `Statements` — all must be ≥ 93%.
+If below threshold, identify uncovered lines from the report and add missing test cases. Repeat until passing.
+
+### 6. Done
+Report: tests added, pass/fail count, final coverage numbers.
+List any testing patterns you encountered not covered above as **Suggested skill updates**.

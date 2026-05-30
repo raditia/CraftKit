@@ -39,3 +39,11 @@ beforeEach(() => {
 Use `getByTestId` / `queryByTestId` — add `testID` props to key elements in View components.
 
 ## Never let @traveloka hooks run real implementations in tests.
+
+## Workflow — always follow this order
+
+1. **Diff first:** `rtk git diff main...HEAD --name-only` then `rtk git diff main...HEAD` — understand every changed file and line before writing any test.
+2. **Map cases:** for each changed file, list every new/modified branch, state, handler, and edge case.
+3. **Write tests** covering all of them — all discriminated union states, all conditionals, all interactions and tracking calls.
+4. **Run:** `rtk jest path/to/__tests__/` — all must pass.
+5. **Coverage:** `rtk jest --coverage path/to/feature/` — Lines, Branches, Functions, Statements all ≥ 93%. Add tests until threshold is met.
