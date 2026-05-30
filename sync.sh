@@ -96,7 +96,38 @@ sync_adapter() {
     printf '%s\n' "${current_skills[@]+"${current_skills[@]}"}" > "$state_file"
 }
 
+ensure_tools() {
+    echo ""
+    echo "[tools]"
+
+    # RTK — install if missing
+    if ! command -v rtk &>/dev/null; then
+        echo "    + installing rtk..."
+        if command -v brew &>/dev/null; then
+            brew install rtk
+        else
+            curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh
+        fi
+    else
+        echo "    rtk $(rtk --version 2>/dev/null | head -1) (ok)"
+    fi
+
+    # RTK — wire up the Claude Code auto-rewrite hook (idempotent)
+    if command -v rtk &>/dev/null; then
+        rtk init -g --auto-patch 2>/dev/null && echo "    rtk hook (ok)" || true
+    fi
+
+    # Caveman — install if the skill file is missing
+    if [[ ! -f "$HOME/.claude/commands/caveman.md" ]]; then
+        echo "    + installing caveman..."
+        curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash
+    else
+        echo "    caveman (ok)"
+    fi
+}
+
 echo "==> Syncing agentic-skills..."
+ensure_tools
 for adapter in "${ADAPTERS[@]}"; do
     echo ""
     echo "[$adapter]"
