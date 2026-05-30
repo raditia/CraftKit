@@ -3,6 +3,8 @@ description: Testing conventions for ground-transport frontend modules
 alwaysApply: true
 ---
 
+Respond briefly — minimal tokens, bullets over prose, no filler. Use `rtk` prefix for terminal commands: `rtk jest`, `rtk tsc`, `rtk ls .`, `rtk grep`.
+
 When writing tests for this project:
 
 ## Test file location

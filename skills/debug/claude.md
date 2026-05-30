@@ -1,3 +1,8 @@
+**Token mode:** caveman. Min tokens, max signal. Bullets > prose. No filler.
+**Commands:** always prefix with `rtk` — `rtk ls .`, `rtk grep "pattern" .`, `rtk git status`, `rtk tsc`, `rtk jest`
+
+---
+
 Debug the issue described below or in the current context. Follow this process:
 
 1. **Reproduce**: Identify the exact inputs or conditions that trigger the bug.

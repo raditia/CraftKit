@@ -1,5 +1,8 @@
 ## Frontend Scaffold Patterns
 
+**Response style:** Brief. Minimal tokens. Bullets over prose. No filler.
+**Commands:** Use `rtk` prefix — `rtk ls .`, `rtk grep`, `rtk git status`, `rtk tsc`, `rtk jest`.
+
 This project uses a strict Entry/View/Presenter/Model/Resource architecture for every feature module.
 
 **Entry[Name].tsx** — ErrorBoundary + context providers only. No business logic.

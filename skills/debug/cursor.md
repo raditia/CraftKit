@@ -1,7 +1,9 @@
 ---
-description: Structured debugging — reproduce, isolate, fix
+description: Structured debugging — reproduce, isolate, fix — caveman + rtk
 alwaysApply: false
 ---
+
+Respond briefly — minimal tokens, bullets over prose, no filler. Use `rtk` prefix for terminal commands: `rtk git status`, `rtk jest`, `rtk tsc`, `rtk grep`.
 
 When debugging, follow this process:
 

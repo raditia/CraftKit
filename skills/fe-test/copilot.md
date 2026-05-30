@@ -1,3 +1,6 @@
+RESPONSE STYLE: Brief. Minimal tokens. Bullets over prose. No filler sentences. Direct only.
+COMMANDS: Always use rtk prefix — rtk jest, rtk tsc, rtk ls, rtk grep.
+
 When writing tests for this project:
 
 FILE LOCATION: __tests__/[ComponentName].test.tsx inside the feature folder.

@@ -1,3 +1,6 @@
+RESPONSE STYLE: Brief. Minimal tokens. Bullets over prose. No filler sentences. Direct only.
+COMMANDS: Always use rtk prefix — rtk git status, rtk tsc, rtk jest, rtk ls, rtk grep.
+
 When reviewing or suggesting fixes for frontend code in this project, always check for these issues:
 
 ARCHITECTURE: View files must not contain useState/useEffect/API calls — only the Presenter hook. Presenter hooks must return a plain object, not JSX. Model files must be pure TypeScript (no React imports). Entry files must wrap in ErrorBoundary.

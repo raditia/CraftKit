@@ -1,3 +1,8 @@
+**Token mode:** caveman. Min tokens, max signal. Bullets > prose. No filler.
+**Commands:** always prefix with `rtk` — `rtk ls .`, `rtk grep "pattern" .`, `rtk git status`, `rtk tsc`, `rtk jest`
+
+---
+
 Scaffold a new frontend feature module. Before generating any code, read the codebase around the target location to confirm naming conventions, token usage, and existing patterns — then apply them exactly.
 
 ---

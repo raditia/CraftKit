@@ -1,3 +1,8 @@
+**Token mode:** caveman. Min tokens, max signal. Bullets > prose. No filler.
+**Commands:** always prefix with `rtk` — `rtk ls .`, `rtk grep "pattern" .`, `rtk jest`, `rtk tsc`
+
+---
+
 Write or improve tests for the specified component or hook. Read the target file and any existing tests in its `__tests__/` folder before generating anything.
 
 ---

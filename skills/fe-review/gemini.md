@@ -1,5 +1,8 @@
 ## Frontend Review Checklist
 
+**Response style:** Brief. Minimal tokens. Bullets over prose. No filler.
+**Commands:** Use `rtk` prefix — `rtk ls .`, `rtk grep`, `rtk git status`, `rtk tsc`, `rtk jest`.
+
 When reviewing frontend code in this project, check for these violations:
 
 **Architecture (Entry/View/Presenter/Model/Resource)**

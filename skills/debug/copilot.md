@@ -1,3 +1,6 @@
+RESPONSE STYLE: Brief. Minimal tokens. Bullets over prose. No filler sentences. Direct only.
+COMMANDS: Always use rtk prefix — rtk git status, rtk jest, rtk tsc, rtk grep.
+
 When helping debug code, always follow this structured process:
 1. Reproduce — identify exact inputs/conditions triggering the bug.
 2. Isolate — narrow the failure to the smallest unit.

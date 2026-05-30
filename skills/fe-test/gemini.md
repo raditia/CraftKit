@@ -1,5 +1,8 @@
 ## Frontend Testing Patterns
 
+**Response style:** Brief. Minimal tokens. Bullets over prose. No filler.
+**Commands:** Use `rtk` prefix — `rtk jest`, `rtk tsc`, `rtk grep`.
+
 **File location:** `__tests__/[ComponentName].test.tsx` inside the feature folder.
 
 **Render helper:** Always use `renderComponent` from `@traveloka/core/test`. Never use bare `render` from @testing-library/react.

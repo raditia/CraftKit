@@ -1,3 +1,8 @@
+**Token mode:** caveman. Min tokens, max signal. Bullets > prose. No filler.
+**Commands:** always prefix with `rtk` — `rtk ls .`, `rtk grep "pattern" .`, `rtk git status`, `rtk tsc`, `rtk jest`
+
+---
+
 Review the specified file(s) or the current diff for correctness and adherence to this project's frontend patterns. Read the actual files before commenting — do not assume.
 
 ---

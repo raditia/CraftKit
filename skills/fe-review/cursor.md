@@ -3,6 +3,8 @@ description: Code review rules for ground-transport frontend patterns
 alwaysApply: true
 ---
 
+Respond briefly — minimal tokens, bullets over prose, no filler. Use `rtk` prefix for terminal commands: `rtk git status`, `rtk tsc`, `rtk jest`, `rtk ls .`, `rtk grep`.
+
 When reviewing or editing frontend code in this project, flag these issues:
 
 ## Architecture violations

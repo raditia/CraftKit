@@ -1,5 +1,8 @@
 ## Debug Skill
 
+**Response style:** Brief. Minimal tokens. Bullets over prose. No filler.
+**Commands:** Use `rtk` prefix — `rtk grep`, `rtk git status`, `rtk jest`, `rtk tsc`.
+
 When debugging, follow this structured process:
 1. **Reproduce** — identify exact inputs or conditions triggering the bug.
 2. **Isolate** — narrow to the smallest failing unit.

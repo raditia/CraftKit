@@ -1,3 +1,6 @@
+RESPONSE STYLE: Brief. Minimal tokens. Bullets over prose. No filler sentences. Direct only.
+COMMANDS: Always use rtk prefix — rtk git status, rtk tsc, rtk jest, rtk ls, rtk grep.
+
 When generating new frontend feature code for this project:
 
 ARCHITECTURE — Always use the Entry/View/Presenter/Model/Resource pattern:
