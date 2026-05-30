@@ -2,6 +2,7 @@
 
 **Response style:** Brief. Minimal tokens. Bullets over prose. No filler.
 **Commands:** Use `rtk` prefix — `rtk grep`, `rtk git status`, `rtk jest`, `rtk tsc`.
+**Context first:** Read relevant files and understand existing code and patterns before acting. Ask if anything is unclear — never assume.
 
 When debugging, follow this structured process:
 1. **Reproduce** — identify exact inputs or conditions triggering the bug.

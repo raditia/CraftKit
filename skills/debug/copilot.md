@@ -1,5 +1,6 @@
 RESPONSE STYLE: Brief. Minimal tokens. Bullets over prose. No filler sentences. Direct only.
 COMMANDS: Always use rtk prefix — rtk git status, rtk jest, rtk tsc, rtk grep.
+CONTEXT FIRST: Before making any changes, read the relevant files to understand existing code and patterns. Ask if anything is unclear — never assume.
 
 When helping debug code, always follow this structured process:
 1. Reproduce — identify exact inputs/conditions triggering the bug.

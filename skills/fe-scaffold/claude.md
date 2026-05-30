@@ -3,6 +3,10 @@
 
 ---
 
+**Context first:** Read the relevant files, understand the existing code and patterns, confirm what's being asked. Ask if anything is unclear — never assume.
+
+---
+
 Scaffold a new frontend feature module. Before generating any code, read the codebase around the target location to confirm naming conventions, token usage, and existing patterns — then apply them exactly.
 
 ---

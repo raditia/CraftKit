@@ -3,6 +3,10 @@
 
 ---
 
+**Context first:** Read the relevant files, understand the existing code and patterns, confirm what's being asked. Ask if anything is unclear — never assume.
+
+---
+
 Write or improve tests for the specified component or hook. Read the target file and any existing tests in its `__tests__/` folder before generating anything.
 
 ---

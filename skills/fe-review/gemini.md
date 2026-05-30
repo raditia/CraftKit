@@ -2,6 +2,7 @@
 
 **Response style:** Brief. Minimal tokens. Bullets over prose. No filler.
 **Commands:** Use `rtk` prefix — `rtk ls .`, `rtk grep`, `rtk git status`, `rtk tsc`, `rtk jest`.
+**Context first:** Read relevant files and understand existing code and patterns before acting. Ask if anything is unclear — never assume.
 
 When reviewing frontend code in this project, check for these violations:
 

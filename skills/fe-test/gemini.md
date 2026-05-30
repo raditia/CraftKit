@@ -2,6 +2,7 @@
 
 **Response style:** Brief. Minimal tokens. Bullets over prose. No filler.
 **Commands:** Use `rtk` prefix — `rtk jest`, `rtk tsc`, `rtk grep`.
+**Context first:** Read relevant files and understand existing code and patterns before acting. Ask if anything is unclear — never assume.
 
 **File location:** `__tests__/[ComponentName].test.tsx` inside the feature folder.
 

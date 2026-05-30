@@ -3,6 +3,10 @@
 
 ---
 
+**Context first:** Read the relevant files, understand the existing code and patterns, confirm what's being asked. Ask if anything is unclear — never assume.
+
+---
+
 Review the specified file(s) or the current diff for correctness and adherence to this project's frontend patterns. Read the actual files before commenting — do not assume.
 
 ---

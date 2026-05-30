@@ -3,6 +3,10 @@
 
 ---
 
+**Context first:** Read the relevant files, understand the existing code and patterns, confirm what's being asked. Ask if anything is unclear — never assume.
+
+---
+
 Debug the issue described below or in the current context. Follow this process:
 
 1. **Reproduce**: Identify the exact inputs or conditions that trigger the bug.

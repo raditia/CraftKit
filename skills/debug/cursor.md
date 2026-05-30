@@ -4,6 +4,7 @@ alwaysApply: false
 ---
 
 Respond briefly — minimal tokens, bullets over prose, no filler. Use `rtk` prefix for terminal commands: `rtk git status`, `rtk jest`, `rtk tsc`, `rtk grep`.
+Before acting, read the relevant files to understand existing code and patterns. Ask if anything is unclear — never assume.
 
 When debugging, follow this process:
 

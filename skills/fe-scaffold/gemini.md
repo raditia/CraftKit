@@ -2,6 +2,7 @@
 
 **Response style:** Brief. Minimal tokens. Bullets over prose. No filler.
 **Commands:** Use `rtk` prefix — `rtk ls .`, `rtk grep`, `rtk git status`, `rtk tsc`, `rtk jest`.
+**Context first:** Read relevant files and understand existing code and patterns before acting. Ask if anything is unclear — never assume.
 
 This project uses a strict Entry/View/Presenter/Model/Resource architecture for every feature module.
 
