@@ -5,6 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `rtk jest`, `rtk tsc`, `rtk lint`, `rtk grep "pattern" .`
+**Model:** everyday — escalate if coverage cannot reach 93% and root cause is non-obvious
 
 ---
 

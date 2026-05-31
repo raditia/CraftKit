@@ -5,6 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `rtk tsc`, `rtk jest`, `rtk lint`, `rtk grep "pattern" .`
+**Model:** everyday — escalate if simplification touches > 500 lines or requires deep type system reasoning
 
 ---
 

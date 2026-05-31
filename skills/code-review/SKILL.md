@@ -5,6 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `rtk lint`, `rtk tsc`, `rtk git diff`, `rtk grep "pattern" .`
+**Model:** everyday — escalate for security-sensitive changes or architecture decisions with significant tradeoffs
 
 ---
 

@@ -117,6 +117,39 @@ Every skill has a verification step. A task is not complete until verification p
 
 ---
 
+## Model routing
+
+Use the everyday model by default. Escalate when you detect genuine uncertainty — not as a reflex.
+
+| AI | Everyday | Escalate to |
+|---|---|---|
+| Claude Code | `claude-sonnet-4-6` | `claude-opus-4-7` |
+| Gemini CLI | `gemini-2.5-flash` | `gemini-2.5-pro` |
+| Cursor | claude-sonnet / gpt-4o | claude-opus / o1 |
+| Copilot | `gpt-4o` | `o1` / `o3` |
+
+### Escalation triggers
+Escalate when you genuinely cannot proceed with high confidence:
+- Architecture decision with significant, non-obvious tradeoffs
+- Security-sensitive code with unclear threat model
+- Debugging with no clear hypothesis after 2 isolation attempts
+- Refactor touching > 5 interdependent files with complex type constraints
+- Unsure whether an approach is correct after reading all available context
+
+Do NOT escalate for: straightforward feature work, clear bug fixes, test writing, simple refactors, pattern adherence checks.
+
+### Escalation format
+```
+ESCALATE:
+Reason: [specific thing you're uncertain about]
+Recommended: [higher model name]
+Claude Code: /model claude-opus-4-7 → re-invoke the skill
+Gemini:      gemini --model gemini-2.5-pro
+Cursor/Copilot: switch model in the model picker, then retry
+```
+
+---
+
 ## Skill rules
 
 1. **Check which skill applies before starting.** Skills encode processes that prevent common mistakes.

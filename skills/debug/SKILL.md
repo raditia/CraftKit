@@ -5,6 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `rtk grep "pattern" .`, `rtk git status`, `rtk tsc`, `rtk jest`
+**Model:** everyday — escalate after 2 failed hypotheses with no clear root cause
 
 ---
 

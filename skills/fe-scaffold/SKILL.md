@@ -5,6 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `rtk ls .`, `rtk grep "pattern" .`, `rtk git status`, `rtk tsc`, `rtk jest`
+**Model:** everyday — escalate if feature requires novel architecture not covered by EVPMR
 
 ---
 

@@ -5,6 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `rtk git diff`, `rtk git log`, `rtk git status`, `rtk ls .`
+**Model:** everyday — escalate if diff spans > 10 files with complex interdependencies
 
 ---
 
