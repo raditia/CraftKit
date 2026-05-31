@@ -230,7 +230,13 @@ ensure_tools() {
 }
 
 echo "==> Syncing agentic-skills..."
-ensure_tools
+
+# Tool installation is interactive (caveman prompts, rtk patches shell profile).
+# Only run from install.sh (explicit setup), never from the post-merge hook.
+if [[ "${AGENTIC_SETUP:-0}" == "1" ]]; then
+    ensure_tools
+fi
+
 for adapter in "${ADAPTERS[@]}"; do
     echo ""
     echo "[$adapter]"
