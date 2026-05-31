@@ -223,7 +223,7 @@ ensure_tools() {
     # Caveman — install if the skill file is missing
     if [[ ! -f "$HOME/.claude/commands/caveman.md" ]]; then
         echo "    + installing caveman..."
-        curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash
+        curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash -s -- --non-interactive
     else
         echo "    caveman (ok)"
     fi
