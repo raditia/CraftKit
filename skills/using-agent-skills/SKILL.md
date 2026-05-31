@@ -22,28 +22,30 @@ These load automatically on every session:
 
 ## Skill discovery
 
-When a task arrives, apply the corresponding skill:
+### Orchestrator commands (multi-skill workflows — use these first)
+
+These run multiple skills automatically in the right sequence. Match natural language to the right one:
+
+| User says | Run |
+|-----------|-----|
+| "build feature X", "create a new screen", "implement X", "scaffold a module" | `/build` |
+| "help me review", "review the changes", "code review", "LGTM check" | `/review` |
+| "something is broken", "fix this bug", "this crashes", "why is X not working" | `/fix` |
+| "get this ready to merge", "ship this", "prepare for PR", "is this ready?" | `/ship` |
+
+### Individual skills (use when task is narrower than a full workflow)
 
 ```
 Task arrives
-  ├── Need context on what's being built? ──────────→ /fe-context
-  ├── Creating a new feature module?  ──────────────→ /fe-scaffold
-  ├── Reviewing code quality / arch / security? ────→ /code-review
-  ├── Reviewing frontend patterns (EVPMR)? ─────────→ /fe-review
+  ├── Need context only? ────────────────────────────→ /fe-context
+  ├── Scaffold only (existing context)? ────────────→ /fe-scaffold
+  ├── EVPMR pattern review only? ────────────────────→ /fe-review
   ├── Designing component / hook structure? ─────────→ /fe-patterns
   ├── Performance bottleneck (waterfall, bundle)? ──→ /fe-performance
-  ├── Writing or improving tests? ──────────────────→ /fe-test
+  ├── Writing or improving tests only? ────────────→ /fe-test
   ├── Code too complex or hard to read? ────────────→ /code-simplify
-  └── Something broke? ─────────────────────────────→ /debug
+  └── 5-axis quality review only? ──────────────────→ /code-review
 ```
-
-Multiple skills can apply. Typical sequences:
-```
-/fe-context → /fe-scaffold → /fe-review → /code-review → /fe-test
-```
-For a PR review: `/fe-context → /code-review → /fe-review`
-For a bug fix: `/fe-context → /debug → /fe-test`
-After messy implementation: `/code-simplify → /fe-review → /fe-test`
 
 ---
 

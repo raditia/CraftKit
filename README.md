@@ -49,24 +49,27 @@ Optional: `jq` for Copilot VS Code settings integration.
 Skills are split into two tiers by `alwaysApply` in the frontmatter:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  alwaysApply: true  →  RULES (auto-loaded, no invocation)       │
-├─────────────────────────────────────────────────────────────────┤
-│  Claude Code  │  ~/.claude/CLAUDE.md          (managed section) │
-│  Cursor       │  ~/.cursor/rules/<skill>.mdc  (alwaysApply:true)│
-│  Copilot      │  ~/.agentic-skills/copilot/<skill>.md           │
-│  Gemini CLI   │  ~/GEMINI.md                  (managed section) │
-└─────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│  alwaysApply: true  →  RULES (auto-loaded every session)               │
+├────────────────────────────────────────────────────────────────────────┤
+│  Claude Code  │  ~/.claude/CLAUDE.md                  (managed section)│
+│  Cursor       │  ~/.cursor/rules/<skill>.mdc           (alwaysApply:true)│
+│  Copilot      │  codeGeneration.instructions           (inline + chat) │
+│               │  reviewSelection.instructions          (review chat)   │
+│  Gemini CLI   │  ~/GEMINI.md                          (managed section)│
+└────────────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────────┐
-│  alwaysApply: false  →  COMMANDS (invoked explicitly)           │
-├─────────────────────────────────────────────────────────────────┤
-│  Claude Code  │  ~/.claude/commands/<skill>.md  →  /<skill>     │
-│  Cursor       │  ~/.cursor/rules/<skill>.mdc  (alwaysApply:false)│
-│  Copilot      │  ~/.agentic-skills/copilot/<skill>.md           │
-│  Gemini CLI   │  ~/GEMINI.md                  (managed section) │
-└─────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│  alwaysApply: false  →  COMMANDS (invoked by slash cmd or natural lang)│
+├────────────────────────────────────────────────────────────────────────┤
+│  Claude Code  │  ~/.claude/commands/<skill>.md  →  /<skill>            │
+│  Cursor       │  ~/.cursor/rules/<skill>.mdc    (alwaysApply:false)    │
+│  Copilot      │  codeGeneration.instructions    (say skill name / ask) │
+│  Gemini CLI   │  ~/GEMINI.md                    (managed section)      │
+└────────────────────────────────────────────────────────────────────────┘
 ```
+
+> **Copilot Chat note:** `alwaysApply: true` skills load in both code generation and review chat. `alwaysApply: false` skills (including orchestrators) are in context — trigger them by saying what you want in natural language ("build feature X", "help me review"). `using-agent-skills` routes natural language to the right skill automatically.
 
 State tracking in `~/.agentic-skills-state/` — one file per adapter, one skill name per line.
 
@@ -115,26 +118,37 @@ Escalation is reserved for genuine uncertainty — architecture decisions with n
 | [`karpathy-guidelines`](skills/karpathy-guidelines/SKILL.md) | Coding discipline: think before coding, simplicity first, surgical changes, goal-driven execution. |
 | [`using-agent-skills`](skills/using-agent-skills/SKILL.md) | Skill routing, model selection, core operating behaviors, failure modes. |
 
-### Frontend — on demand
+### Orchestrators — natural language workflow commands
 
-Designed for React / React Native / Next.js with the EVPMR architecture pattern.
+Say what you want in plain language. These commands bundle the right skills automatically — no need to invoke each one manually.
+
+| Command | Say… | What it runs |
+|---------|------|--------------|
+| [`/build`](skills/build/SKILL.md) | "build feature X", "create a new screen for X", "implement X" | fe-context → fe-scaffold → fe-patterns + fe-performance → fe-review → fe-test |
+| [`/review`](skills/review/SKILL.md) | "help me review the changes", "review this", "LGTM check" | fe-context → code-review (5-axis) → fe-review (EVPMR) |
+| [`/fix`](skills/fix/SKILL.md) | "something is broken", "fix this bug", "this crashes" | fe-context → debug → fe-test |
+| [`/ship`](skills/ship/SKILL.md) | "get this ready to merge", "ship this", "prepare for PR" | fe-test → coverage gate → tsc → lint → review |
+
+### Frontend — individual skills
+
+Use when a task is narrower than a full workflow (e.g. just writing tests, or just reviewing patterns).
 
 | Skill | When to use | Escalate if |
 |-------|-------------|-------------|
-| [`fe-context`](skills/fe-context/SKILL.md) | Always first — generates `docs/context.md` from branch diff | Diff spans > 10 interdependent files |
-| [`fe-scaffold`](skills/fe-scaffold/SKILL.md) | Creating a new feature module (5-file EVPMR structure) | Novel architecture outside EVPMR |
-| [`fe-review`](skills/fe-review/SKILL.md) | Review for EVPMR pattern, TypeScript, styling, ESLint | Architectural conflicts with non-obvious resolution |
-| [`fe-patterns`](skills/fe-patterns/SKILL.md) | Composition patterns, hooks discipline, state location, data fetching | Novel state architecture with non-obvious tradeoffs |
+| [`fe-context`](skills/fe-context/SKILL.md) | Load project context only | Diff spans > 10 interdependent files |
+| [`fe-scaffold`](skills/fe-scaffold/SKILL.md) | Create a new feature module (5-file EVPMR structure) | Novel architecture outside EVPMR |
+| [`fe-review`](skills/fe-review/SKILL.md) | EVPMR pattern review only | Architectural conflicts with non-obvious resolution |
+| [`fe-patterns`](skills/fe-patterns/SKILL.md) | Composition patterns, hooks discipline, state location | Novel state architecture with non-obvious tradeoffs |
 | [`fe-performance`](skills/fe-performance/SKILL.md) | Waterfall elimination, bundle size, re-renders, RN & Next.js perf | Lighthouse regressions with non-obvious root cause |
 | [`fe-test`](skills/fe-test/SKILL.md) | Write/improve tests — enforces ≥ 93% coverage | Can't reach 93%, root cause unclear |
 
-### General — on demand
+### General — individual skills
 
 | Skill | When to use | Escalate if |
 |-------|-------------|-------------|
-| [`code-review`](skills/code-review/SKILL.md) | Before any merge — 5-axis review (correctness, readability, architecture, security, performance) | Security-sensitive changes or major arch tradeoffs |
+| [`code-review`](skills/code-review/SKILL.md) | 5-axis quality review (correctness, readability, architecture, security, performance) | Security-sensitive changes or major arch tradeoffs |
 | [`code-simplify`](skills/code-simplify/SKILL.md) | Code is working but too complex or hard to read | Refactor > 500 lines or deep type system reasoning |
-| [`debug`](skills/debug/SKILL.md) | Something is broken — structured reproduce → isolate → fix | No clear hypothesis after 2 isolation attempts |
+| [`debug`](skills/debug/SKILL.md) | Structured reproduce → isolate → fix | No clear hypothesis after 2 isolation attempts |
 
 ---
 
@@ -148,30 +162,24 @@ These apply to every task automatically — no invocation, no commands to rememb
 Every session
       │
       ├─► karpathy-guidelines  — think before coding, simplicity, surgical changes
-      ├─► fe-rules             — EVPMR constraints, TypeScript, styling, tracking
-      └─► using-agent-skills   — skill routing, model selection, core behaviors
+      ├─► fe-rules             — EVPMR constraints, TypeScript, styling, tracking + React correctness
+      └─► using-agent-skills   — skill routing, natural language → orchestrator mapping
 ```
 
-### On-demand sequences
+### Orchestrator workflow
 
 ```
-New feature
-  /fe-context → /fe-scaffold → /fe-review → /code-review → /fe-test
+"build feature X"
+  /build  →  fe-context → fe-scaffold → (fe-patterns + fe-performance during coding) → fe-review → fe-test
 
-PR / code review
-  /fe-context → /code-review → /fe-review
+"help me review the changes"
+  /review  →  fe-context → code-review → fe-review
 
-Bug fix
-  /fe-context → /debug → /fe-test
+"something is broken / fix this"
+  /fix  →  fe-context → debug → fe-test
 
-Refactor / simplify
-  /fe-context → /code-simplify → /fe-review → /fe-test
-
-Performance investigation
-  /fe-context → /fe-performance → /fe-test
-
-Component / hook design question
-  /fe-context → /fe-patterns → /fe-review
+"get this ready to merge"
+  /ship  →  fe-test → coverage gate → tsc → lint → review
 ```
 
 ### How `fe-context` feeds all skills
