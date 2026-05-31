@@ -220,21 +220,12 @@ ensure_tools() {
         rtk init -g --auto-patch 2>/dev/null && echo "    rtk hook (ok)" || true
     fi
 
-    # Caveman — install if missing. --only claude prevents caveman from running
-    # `npx skills add` inside this repo directory (which would create skills/caveman*
-    # symlinks that our sync picks up as first-party skills).
-    if [[ ! -f "$HOME/.claude/commands/caveman.md" ]]; then
-        echo "    + installing caveman..."
-        curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash -s -- --non-interactive --only claude
-    else
-        echo "    caveman (ok)"
-    fi
 }
 
 echo "==> Syncing agentic-skills..."
 
-# Tool installation is interactive (caveman prompts, rtk patches shell profile).
-# Only run from install.sh (explicit setup), never from the post-merge hook.
+# RTK patches shell profile and is interactive — only run from install.sh,
+# never from the post-merge hook.
 if [[ "${AGENTIC_SETUP:-0}" == "1" ]]; then
     ensure_tools
 fi

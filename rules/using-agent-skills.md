@@ -3,7 +3,6 @@ name: using-agent-skills
 description: Skill routing, model selection, core operating behaviors, and failure modes. Always active.
 ---
 
-**Token mode:** caveman. Min tokens, max signal. Bullets > prose. No filler.
 **Commands:** always prefix with `rtk` — `rtk git status`, `rtk git diff`, `rtk tsc`, `rtk jest`, `rtk lint`
 
 ---
@@ -15,6 +14,7 @@ description: Skill routing, model selection, core operating behaviors, and failu
 Loaded from `rules/` automatically on every session:
 - `karpathy-guidelines` — think before coding, simplicity, surgical changes, goal-driven
 - `fe-rules` — EVPMR layer constraints, TypeScript, styling, React correctness, tracking
+- `caveman` — output compression: terse, accurate, no filler (full mode by default)
 - `using-agent-skills` — this file: routing, behaviors, severity labels
 
 ---

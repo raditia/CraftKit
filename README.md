@@ -127,6 +127,7 @@ Loaded automatically from `rules/` on every session. Never call these — they'r
 
 | Rule | What it enforces |
 |------|-----------------|
+| [`caveman`](rules/caveman.md) | Output compression: terse responses, no filler, full accuracy — lite/full/ultra modes |
 | [`fe-rules`](rules/fe-rules.md) | EVPMR layer constraints, TypeScript strict mode, styling tokens, React correctness, tracking |
 | [`karpathy-guidelines`](rules/karpathy-guidelines.md) | Coding discipline: think before coding, simplicity first, surgical changes, goal-driven execution |
 | [`using-agent-skills`](rules/using-agent-skills.md) | Skill routing, model selection, severity labels, core operating behaviors, failure modes |
@@ -342,7 +343,6 @@ git push
 
 | Tool | Purpose | Auto-installed |
 |------|---------|----------------|
-| [RTK](https://github.com/rtk-ai/rtk) | Compresses shell commands to save AI input tokens | Yes, on every `git pull` |
-| [Caveman](https://github.com/JuliusBrussee/caveman) | Compresses AI response output tokens | Yes, on every `git pull` |
+| [RTK](https://github.com/rtk-ai/rtk) | Compresses shell commands to save AI input tokens | Yes, on first `bash install.sh` |
 
-All shell commands in skills are prefixed with `rtk` — RTK rewrites them transparently so the AI sees short tokens while the shell runs the full command.
+Output compression is handled by the [`caveman`](rules/caveman.md) rule — no external tool needed. All shell commands in skills are prefixed with `rtk` — RTK rewrites them transparently so the AI sees short tokens while the shell runs the full command.
