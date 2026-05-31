@@ -41,6 +41,7 @@ Task arrives
   ├── EVPMR pattern review only? ──────────────────→ /fe-review
   ├── Designing component / hook structure? ────────→ /fe-patterns
   ├── Performance bottleneck (waterfall, bundle)? ──→ /fe-performance
+  ├── Accessibility (labels, roles, focus, a11y)? ──→ /fe-a11y
   ├── Writing or improving tests only? ────────────→ /fe-test
   └── Review or simplify code quality? ────────────→ /code-quality
 ```

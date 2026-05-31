@@ -153,6 +153,7 @@ Invoke when a task is narrower than a full workflow. All prefixed `fe-` — futu
 | [`fe-review`](skills/fe-review/SKILL.md) | EVPMR pattern review only | Architectural conflicts with non-obvious resolution |
 | [`fe-patterns`](skills/fe-patterns/SKILL.md) | Composition patterns, hooks discipline, state location | Novel state architecture with non-obvious tradeoffs |
 | [`fe-performance`](skills/fe-performance/SKILL.md) | Waterfall elimination, bundle size, re-renders, RN & Next.js perf | Lighthouse regressions with non-obvious root cause |
+| [`fe-a11y`](skills/fe-a11y/SKILL.md) | Accessible labels, roles, focus management, dynamic announcements, reduced motion — RN & Next.js | Complex focus flows spanning multiple routes |
 | [`fe-test`](skills/fe-test/SKILL.md) | Write/improve tests — enforces ≥ 93% coverage | Can't reach 93%, root cause unclear |
 
 ### General skills — on demand
