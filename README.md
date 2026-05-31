@@ -84,7 +84,7 @@ Three tiers by source directory — no frontmatter flag needed:
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-> **Copilot Chat:** rules load in both code generation and review chat. Skills and commands are in context — trigger by natural language. `using-agent-skills` (a rule) routes requests to the right skill automatically.
+> **Copilot Chat:** No custom slash commands — Copilot only supports built-in `/explain`, `/fix`, `/tests` etc. Skills are loaded as context files and triggered by natural language: "write tests for this", "review for EVPMR violations", "scaffold a new feature". The `using-agent-skills` rule (always active) routes requests to the right skill automatically.
 
 State tracking in `~/.agentic-skills-state/` — one file per adapter, one skill name per line.
 
