@@ -11,6 +11,15 @@ alwaysApply: true
 
 # Using Agent Skills
 
+## Always active (no invocation needed)
+
+These load automatically on every session:
+- `/karpathy-guidelines` — think before coding, simplicity, surgical changes, goal-driven
+- `/fe-rules` — EVPMR layer constraints, TypeScript, styling, tracking rules
+- `/using-agent-skills` — this file: routing + core behaviors
+
+---
+
 ## Skill discovery
 
 When a task arrives, apply the corresponding skill:

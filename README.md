@@ -45,13 +45,22 @@ Optional: `jq` for Copilot VS Code settings integration.
 
 ## Where skills land
 
+Skills are split by `alwaysApply` value:
+
 ```
-SKILL.md
+alwaysApply: true  (rules — auto-loaded)
    │
-   ├─► Claude Code   ~/.claude/commands/<skill>.md       → invoked as /<skill>
-   ├─► Cursor        ~/.cursor/rules/<skill>.mdc          → applied as user rule
-   ├─► Copilot       ~/.agentic-skills/copilot/<skill>.md → registered in VS Code settings.json
-   └─► Gemini CLI    ~/GEMINI.md (managed section)        → loaded as global context
+   ├─► Claude Code   ~/.claude/CLAUDE.md (managed section)
+   ├─► Cursor        ~/.cursor/rules/<skill>.mdc  (alwaysApply: true in frontmatter)
+   ├─► Copilot       ~/.agentic-skills/copilot/<skill>.md → VS Code settings.json
+   └─► Gemini CLI    ~/GEMINI.md (managed section)
+
+alwaysApply: false  (commands — invoked explicitly)
+   │
+   ├─► Claude Code   ~/.claude/commands/<skill>.md  → invoked as /<skill>
+   ├─► Cursor        ~/.cursor/rules/<skill>.mdc  (alwaysApply: false)
+   ├─► Copilot       ~/.agentic-skills/copilot/<skill>.md → VS Code settings.json
+   └─► Gemini CLI    ~/GEMINI.md (managed section)
 ```
 
 State tracking in `~/.agentic-skills-state/` — one file per adapter, one skill name per line.
@@ -90,20 +99,22 @@ These skills are designed for React / React Native / Next.js with the Entry/View
 
 ### Always active — no invocation needed
 
-These skills have `alwaysApply: true` and load automatically on every session.
+`alwaysApply: true` — these load automatically on every session. In Claude Code they are written to `~/.claude/CLAUDE.md` so they apply without any slash command.
 
 | Skill | Description |
 |-------|-------------|
-| [`karpathy-guidelines`](skills/karpathy-guidelines/SKILL.md) | Behavioral rules applied to every task: think before coding, simplicity first, surgical changes, goal-driven execution. Derived from Andrej Karpathy's LLM coding pitfalls. |
+| [`fe-rules`](skills/fe-rules/SKILL.md) | Always-on EVPMR constraints: View/Presenter/Model/Resource/Entry layer rules, TypeScript strict mode, styling tokens, tracking. The AI enforces these on every frontend task. |
+| [`karpathy-guidelines`](skills/karpathy-guidelines/SKILL.md) | Behavioral rules: think before coding, simplicity first, surgical changes, goal-driven execution. Derived from Andrej Karpathy's LLM coding pitfalls. |
 | [`using-agent-skills`](skills/using-agent-skills/SKILL.md) | Skill routing, core operating behaviors, and failure modes. The meta-layer that ties all skills together. |
 
 ---
 
 ## Skill workflow
 
-Always active (automatic, every session):
+Always active (automatic, every session — no invocation needed):
 ```
 karpathy-guidelines  ←─ think before coding, simplicity, surgical changes, goal-driven
+fe-rules             ←─ EVPMR layer constraints, TypeScript, styling, tracking
 using-agent-skills   ←─ skill routing, core behaviors, failure modes
 ```
 
