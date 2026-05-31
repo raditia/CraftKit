@@ -40,16 +40,15 @@ read_state() {
     fi
 }
 
-# Collects skill names that have a file for the given adapter into _current_skills
+# Collects skill names that have a SKILL.md (shared across all adapters)
 read_current_skills() {
-    local adapter="$1"
     _current_skills=()
     if [[ ! -d "$SKILLS_DIR" ]]; then return; fi
     for skill_dir in "$SKILLS_DIR"/*/; do
         [[ -d "$skill_dir" ]] || continue
         local skill_name
         skill_name="$(basename "$skill_dir")"
-        if [[ -f "$skill_dir/${adapter}.md" ]]; then
+        if [[ -f "$skill_dir/SKILL.md" ]]; then
             _current_skills+=("$skill_name")
         fi
     done
@@ -63,7 +62,7 @@ sync_adapter() {
     read_state "$adapter"
     local installed_skills=("${_state_skills[@]+"${_state_skills[@]}"}")
 
-    read_current_skills "$adapter"
+    read_current_skills
     local current_skills=("${_current_skills[@]+"${_current_skills[@]}"}")
 
     # Remove skills that were installed but are no longer in the repo
@@ -75,9 +74,9 @@ sync_adapter() {
         fi
     done
 
-    # Install or update all current skills
+    # Install or update all current skills (all adapters share SKILL.md)
     for skill in "${current_skills[@]+"${current_skills[@]}"}"; do
-        local source_file="$SKILLS_DIR/$skill/${adapter}.md"
+        local source_file="$SKILLS_DIR/$skill/SKILL.md"
         local dest
         dest="$("get_${adapter}_dest" "$skill")"
 
