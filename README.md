@@ -17,25 +17,31 @@ git pull
                    │       ├─► RTK     (token compression for AI input)
                    │       └─► Caveman (token compression for AI output)
                    │
-                   ├─► sync_adapter()        ← skills/*/SKILL.md
-                   │       ├─► checks alwaysApply in frontmatter
-                   │       ├─► installs new / updated skills to correct destination
+                   ├─► sync_rules_adapter()     ← rules/*.md
+                   │       ├─► always installed as always-on rules
+                   │       ├─► installs new / updated rules
+                   │       └─► removes rules deleted from repo
+                   │
+                   ├─► sync_adapter()           ← skills/*/SKILL.md
+                   │       ├─► installed as on-demand commands
+                   │       ├─► installs new / updated skills
                    │       └─► removes skills deleted from repo
                    │
                    ├─► sync_commands_adapter()  ← commands/*.md
-                   │       ├─► always installed as on-demand commands (never rules)
+                   │       ├─► installed as on-demand commands (workflow orchestrators)
                    │       ├─► installs new / updated commands
                    │       └─► removes commands deleted from repo
                    │
-                   └─► finalize_<adapter>()  ← integrity check for managed files
+                   └─► finalize_<adapter>()     ← integrity check for managed files
 ```
 
-Two separate namespaces — both synced automatically on every `git pull`:
+Three namespaces — all synced automatically on every `git pull`:
 
-| Directory | Purpose | Type |
-|-----------|---------|------|
-| `skills/` | Specific, single-purpose capabilities | Rules (`alwaysApply: true`) or commands |
-| `commands/` | Workflow orchestrators that chain multiple skills | Always on-demand commands |
+| Directory | Purpose | Invocation |
+|-----------|---------|------------|
+| `rules/` | Always-on behavioral rules and constraints | Never — auto-loaded every session |
+| `skills/` | Specific, single-purpose capabilities | On-demand (slash command or natural language) |
+| `commands/` | Workflow orchestrators that chain multiple skills | On-demand (slash command or natural language) |
 
 ---
 
@@ -54,32 +60,31 @@ Optional: `jq` for Copilot VS Code settings integration.
 
 ---
 
-## Where skills land
+## Where content lands
 
-Skills are split into two tiers by `alwaysApply` in the frontmatter:
+Three tiers by source directory — no frontmatter flag needed:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│  alwaysApply: true  →  RULES (auto-loaded every session)               │
+│  rules/  →  ALWAYS-ON (auto-loaded every session, never invoked)       │
 ├────────────────────────────────────────────────────────────────────────┤
 │  Claude Code  │  ~/.claude/CLAUDE.md                  (managed section)│
-│  Cursor       │  ~/.cursor/rules/<skill>.mdc           (alwaysApply:true)│
-│  Copilot      │  codeGeneration.instructions           (inline + chat) │
-│               │  reviewSelection.instructions          (review chat)   │
+│  Cursor       │  ~/.cursor/rules/<name>.mdc           (alwaysApply:true)│
+│  Copilot      │  codeGeneration.instructions + reviewSelection          │
 │  Gemini CLI   │  ~/GEMINI.md                          (managed section)│
 └────────────────────────────────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────────────────────────────────┐
-│  alwaysApply: false  →  COMMANDS (invoked by slash cmd or natural lang)│
+│  skills/ and commands/  →  ON-DEMAND (slash cmd or natural language)   │
 ├────────────────────────────────────────────────────────────────────────┤
-│  Claude Code  │  ~/.claude/commands/<skill>.md  →  /<skill>            │
-│  Cursor       │  ~/.cursor/rules/<skill>.mdc    (alwaysApply:false)    │
-│  Copilot      │  codeGeneration.instructions    (say skill name / ask) │
-│  Gemini CLI   │  ~/GEMINI.md                    (managed section)      │
+│  Claude Code  │  ~/.claude/commands/<name>.md  →  /<name>              │
+│  Cursor       │  ~/.cursor/rules/<name>.mdc    (alwaysApply:false)     │
+│  Copilot      │  codeGeneration.instructions   (say skill name / ask)  │
+│  Gemini CLI   │  ~/GEMINI.md                   (managed section)       │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-> **Copilot Chat note:** `alwaysApply: true` skills load in both code generation and review chat. `alwaysApply: false` skills (including orchestrators) are in context — trigger them by saying what you want in natural language ("build feature X", "help me review"). `using-agent-skills` routes natural language to the right skill automatically.
+> **Copilot Chat:** rules load in both code generation and review chat. Skills and commands are in context — trigger by natural language. `using-agent-skills` (a rule) routes requests to the right skill automatically.
 
 State tracking in `~/.agentic-skills-state/` — one file per adapter, one skill name per line.
 
@@ -118,46 +123,45 @@ Escalation is reserved for genuine uncertainty — architecture decisions with n
 
 ## Skills
 
-### Always active — no invocation needed
+### Rules — always active, never invoked
 
-`alwaysApply: true` — loaded automatically on every session. In Claude Code these go into `~/.claude/CLAUDE.md`, not slash commands.
+Loaded automatically from `rules/` on every session. Never call these — they're always present.
 
-| Skill | What it enforces |
-|-------|-----------------|
-| [`fe-rules`](skills/fe-rules/SKILL.md) | EVPMR layer constraints, TypeScript strict mode, styling tokens, tracking rules. The AI follows these on every frontend task. |
-| [`karpathy-guidelines`](skills/karpathy-guidelines/SKILL.md) | Coding discipline: think before coding, simplicity first, surgical changes, goal-driven execution. |
-| [`using-agent-skills`](skills/using-agent-skills/SKILL.md) | Skill routing, model selection, core operating behaviors, failure modes. |
+| Rule | What it enforces |
+|------|-----------------|
+| [`fe-rules`](rules/fe-rules.md) | EVPMR layer constraints, TypeScript strict mode, styling tokens, React correctness, tracking |
+| [`karpathy-guidelines`](rules/karpathy-guidelines.md) | Coding discipline: think before coding, simplicity first, surgical changes, goal-driven execution |
+| [`using-agent-skills`](rules/using-agent-skills.md) | Skill routing, model selection, severity labels, core operating behaviors, failure modes |
 
 ### Orchestrators — natural language workflow commands
 
-Say what you want in plain language. These commands bundle the right skills automatically — no need to invoke each one manually.
+Say what you want in plain language. These bundle the right skills automatically.
 
 | Command | Say… | What it runs |
 |---------|------|--------------|
-| [`/build`](skills/build/SKILL.md) | "build feature X", "create a new screen for X", "implement X" | fe-context → fe-scaffold → fe-patterns + fe-performance → fe-review → fe-test |
-| [`/review`](skills/review/SKILL.md) | "help me review the changes", "review this", "LGTM check" | fe-context → code-review (5-axis) → fe-review (EVPMR) |
-| [`/fix`](skills/fix/SKILL.md) | "something is broken", "fix this bug", "this crashes" | fe-context → debug → fe-test |
-| [`/ship`](skills/ship/SKILL.md) | "get this ready to merge", "ship this", "prepare for PR" | fe-test → coverage gate → tsc → lint → review |
+| [`/build`](commands/build.md) | "build feature X", "create a new screen", "implement X" | fe-context → fe-scaffold → fe-patterns + fe-performance → fe-review → fe-test |
+| [`/review`](commands/review.md) | "help me review", "review the changes", "LGTM check" | fe-context → code-quality (5-axis) → fe-review (EVPMR) |
+| [`/fix`](commands/fix.md) | "something is broken", "fix this bug", "this crashes" | fe-context → debug → fe-test |
+| [`/ship`](commands/ship.md) | "get this ready to merge", "ship this", "prepare for PR" | fe-test → coverage → tsc → lint → review |
 
-### Frontend — individual skills
+### Frontend skills — on demand
 
-Use when a task is narrower than a full workflow (e.g. just writing tests, or just reviewing patterns).
+Invoke when a task is narrower than a full workflow. All prefixed `fe-` — future domain skills follow the same convention (e.g. `be-` for backend).
 
 | Skill | When to use | Escalate if |
 |-------|-------------|-------------|
-| [`fe-context`](skills/fe-context/SKILL.md) | Load project context only | Diff spans > 10 interdependent files |
-| [`fe-scaffold`](skills/fe-scaffold/SKILL.md) | Create a new feature module (5-file EVPMR structure) | Novel architecture outside EVPMR |
+| [`fe-context`](skills/fe-context/SKILL.md) | Generate `docs/context.md` from branch diff | Diff spans > 10 interdependent files |
+| [`fe-scaffold`](skills/fe-scaffold/SKILL.md) | Create a new 5-file EVPMR feature module | Novel architecture outside EVPMR |
 | [`fe-review`](skills/fe-review/SKILL.md) | EVPMR pattern review only | Architectural conflicts with non-obvious resolution |
 | [`fe-patterns`](skills/fe-patterns/SKILL.md) | Composition patterns, hooks discipline, state location | Novel state architecture with non-obvious tradeoffs |
 | [`fe-performance`](skills/fe-performance/SKILL.md) | Waterfall elimination, bundle size, re-renders, RN & Next.js perf | Lighthouse regressions with non-obvious root cause |
 | [`fe-test`](skills/fe-test/SKILL.md) | Write/improve tests — enforces ≥ 93% coverage | Can't reach 93%, root cause unclear |
 
-### General — individual skills
+### General skills — on demand
 
 | Skill | When to use | Escalate if |
 |-------|-------------|-------------|
-| [`code-review`](skills/code-review/SKILL.md) | 5-axis quality review (correctness, readability, architecture, security, performance) | Security-sensitive changes or major arch tradeoffs |
-| [`code-simplify`](skills/code-simplify/SKILL.md) | Code is working but too complex or hard to read | Refactor > 500 lines or deep type system reasoning |
+| [`code-quality`](skills/code-quality/SKILL.md) | Review (5-axis) or simplify complex code — two modes in one skill | Security-sensitive review, or refactor > 500 lines |
 | [`debug`](skills/debug/SKILL.md) | Structured reproduce → isolate → fix | No clear hypothesis after 2 isolation attempts |
 
 ---
@@ -166,30 +170,30 @@ Use when a task is narrower than a full workflow (e.g. just writing tests, or ju
 
 ### Always-active layer
 
-These apply to every task automatically — no invocation, no commands to remember:
+Rules load automatically — no commands, no invocation:
 
 ```
 Every session
       │
       ├─► karpathy-guidelines  — think before coding, simplicity, surgical changes
-      ├─► fe-rules             — EVPMR constraints, TypeScript, styling, tracking + React correctness
-      └─► using-agent-skills   — skill routing, natural language → orchestrator mapping
+      ├─► fe-rules             — EVPMR constraints, TypeScript, styling, React correctness
+      └─► using-agent-skills   — skill routing, severity labels, core behaviors
 ```
 
 ### Orchestrator workflow
 
 ```
 "build feature X"
-  /build  →  fe-context → fe-scaffold → (fe-patterns + fe-performance during coding) → fe-review → fe-test
+  /build  →  fe-context → fe-scaffold → (fe-patterns + fe-performance) → fe-review → fe-test
 
 "help me review the changes"
-  /review  →  fe-context → code-review → fe-review
+  /review  →  fe-context → code-quality (review mode) → fe-review
 
 "something is broken / fix this"
   /fix  →  fe-context → debug → fe-test
 
 "get this ready to merge"
-  /ship  →  fe-test → coverage gate → tsc → lint → review
+  /ship  →  fe-test → coverage → tsc → lint → review
 ```
 
 ### How `fe-context` feeds all skills
@@ -267,29 +271,45 @@ type AsyncData<T> =
 
 **Never manually edit or delete installed skill files** in `~/.claude/`, `~/.cursor/`, or VS Code settings. All installs, updates, and removals are managed by `sync.sh` — editing installed files directly will be overwritten on the next sync.
 
-### Adding a skill
+### Adding a rule (always-on)
+
+1. Create `rules/<name>.md` in this repo
+2. Commit and push
+
+Rules load automatically on every session — users never invoke them.
+
+**Frontmatter** (no `alwaysApply` — location implies always-on):
+```yaml
+---
+name: rule-name
+description: What this rule enforces
+---
+```
+
+### Adding a skill (on-demand)
 
 1. Create `skills/<name>/SKILL.md` in this repo
-2. Commit and push — end users get it on the next `git pull`
+2. Commit and push — end users invoke it by name or natural language
+
+Follow the `fe-` prefix convention for domain-specific skills (e.g. `fe-context`, `be-auth`).
 
 **Frontmatter:**
 ```yaml
 ---
 name: skill-name
 description: One-line description shown in skill discovery
-alwaysApply: false   # true → always-active rule (CLAUDE.md / Cursor always-rule)
-                     # false → on-demand command (slash command / natural language)
+alwaysApply: false
 ---
 ```
 
 ### Adding a command (workflow orchestrator)
 
-Commands live in `commands/` — they chain multiple skills and are always installed as on-demand commands (never rules).
-
 1. Create `commands/<name>.md` in this repo
 2. Commit and push
 
-**Frontmatter** (no `alwaysApply` — commands are always on-demand):
+Commands chain multiple skills — they orchestrate, not duplicate.
+
+**Frontmatter** (no `alwaysApply`):
 ```yaml
 ---
 name: command-name

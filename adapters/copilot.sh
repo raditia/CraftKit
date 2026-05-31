@@ -88,6 +88,27 @@ uninstall_copilot_skill() {
     rm -f "$dest"
 }
 
+get_copilot_rule_dest() {
+    echo "$COPILOT_SKILLS_DIR/${1}.md"
+}
+
+install_copilot_rule() {
+    local name="$1"
+    local source_file="$2"
+    local dest="$COPILOT_SKILLS_DIR/${name}.md"
+    mkdir -p "$COPILOT_SKILLS_DIR"
+    cp "$source_file" "$dest"
+    _register_copilot_file "$dest" "$_CODEGEN_KEY"
+    _register_copilot_file "$dest" "$_REVIEW_KEY"
+}
+
+uninstall_copilot_rule() {
+    local dest="$COPILOT_SKILLS_DIR/${1}.md"
+    _unregister_copilot_file "$dest" "$_CODEGEN_KEY"
+    _unregister_copilot_file "$dest" "$_REVIEW_KEY"
+    rm -f "$dest"
+}
+
 get_copilot_command_dest() {
     echo "$COPILOT_SKILLS_DIR/${1}.md"
 }

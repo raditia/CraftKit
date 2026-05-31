@@ -27,35 +27,7 @@ Runs in two passes: general quality first, then EVPMR-specific. Report all findi
 
 ## Step 2 — General review (5-axis)
 
-Review every changed file on these axes:
-
-**Correctness**
-- Logic is correct for all inputs, including edge cases
-- No off-by-one, no missing null checks at system boundaries
-- Async errors handled — no unhandled Promise rejections
-- Side effects are intentional and reversible
-
-**Readability**
-- Names reveal intent — no abbreviations, no single-letter variables beyond loop indices
-- Functions do one thing — if you can't name it simply, it does too much
-- No comments explaining WHAT — only WHY (non-obvious constraints, workarounds)
-
-**Architecture**
-- No coupling between layers that shouldn't know about each other
-- New abstractions earn their complexity — three similar lines beats a premature abstraction
-- Dependencies flow in the right direction
-
-**Security**
-- No secrets, tokens, or PII in source or logs
-- User input validated at system boundaries
-- No SQL/command injection vectors
-- Auth checks present on every protected route and Server Action
-
-**Performance**
-- No sequential awaits where `Promise.all` would do
-- No `useEffect` + fetch for application data (use React Query)
-- No inline style objects in React Native components
-- No barrel imports for heavy packages
+Run the `/code-quality` skill in **review mode** — applies all five axes (correctness, readability, architecture, security, performance) and change sizing.
 
 ---
 

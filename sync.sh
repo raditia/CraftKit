@@ -8,6 +8,7 @@ fi
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STATE_DIR="$HOME/.agentic-skills-state"
+RULES_DIR="$REPO_DIR/rules"
 SKILLS_DIR="$REPO_DIR/skills"
 COMMANDS_DIR="$REPO_DIR/commands"
 
@@ -52,6 +53,16 @@ read_current_skills() {
         if [[ -f "$skill_dir/SKILL.md" ]]; then
             _current_skills+=("$skill_name")
         fi
+    done
+}
+
+# Collects rule names from rules/*.md
+read_current_rules() {
+    _current_rules=()
+    if [[ ! -d "$RULES_DIR" ]]; then return; fi
+    for f in "$RULES_DIR"/*.md; do
+        [[ -f "$f" ]] || continue
+        _current_rules+=("$(basename "$f" .md)")
     done
 }
 
@@ -104,6 +115,47 @@ sync_adapter() {
 
     # Persist new state
     printf '%s\n' "${current_skills[@]+"${current_skills[@]}"}" > "$state_file"
+}
+
+sync_rules_adapter() {
+    local adapter="$1"
+    local state_file="$STATE_DIR/${adapter}-rules"
+    local changed=0
+
+    local installed_rules=()
+    if [[ -f "$state_file" ]]; then
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && installed_rules+=("$line")
+        done < "$state_file"
+    fi
+
+    read_current_rules
+    local current_rules=("${_current_rules[@]+"${_current_rules[@]}"}")
+
+    # Remove rules that were installed but no longer exist in rules/
+    for rule in "${installed_rules[@]+"${installed_rules[@]}"}"; do
+        if ! contains "$rule" "${current_rules[@]+"${current_rules[@]}"}"; then
+            echo "    - removing rule: $rule"
+            "uninstall_${adapter}_rule" "$rule"
+            changed=1
+        fi
+    done
+
+    # Install or update all current rules
+    for rule in "${current_rules[@]+"${current_rules[@]}"}"; do
+        local source_file="$RULES_DIR/${rule}.md"
+        local dest
+        dest="$("get_${adapter}_rule_dest" "$rule")"
+        if [[ ! -f "$dest" ]] || ! diff -q "$source_file" "$dest" &>/dev/null; then
+            echo "    + rule: $rule"
+            "install_${adapter}_rule" "$rule" "$source_file"
+            changed=1
+        fi
+    done
+
+    [[ $changed -eq 0 ]] && echo "    rules: (up to date)"
+
+    printf '%s\n' "${current_rules[@]+"${current_rules[@]}"}" > "$state_file"
 }
 
 sync_commands_adapter() {
@@ -182,6 +234,7 @@ ensure_tools
 for adapter in "${ADAPTERS[@]}"; do
     echo ""
     echo "[$adapter]"
+    sync_rules_adapter "$adapter"
     sync_adapter "$adapter"
     sync_commands_adapter "$adapter"
     if declare -f "finalize_${adapter}" &>/dev/null; then

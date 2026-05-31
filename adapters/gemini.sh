@@ -127,6 +127,10 @@ uninstall_gemini_skill() {
     fi
 }
 
+get_gemini_rule_dest()    { get_gemini_dest "$1"; }
+install_gemini_rule()     { install_gemini_skill "$@"; }
+uninstall_gemini_rule()   { uninstall_gemini_skill "$@"; }
+
 get_gemini_command_dest() { get_gemini_dest "$1"; }
 install_gemini_command()   { install_gemini_skill "$@"; }
 uninstall_gemini_command() { uninstall_gemini_skill "$@"; }

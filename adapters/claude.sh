@@ -86,6 +86,29 @@ with open(md_path, 'w') as f:
 PYEOF
 }
 
+get_claude_rule_dest() {
+    echo "$CLAUDE_RULES_DIR/${1}.md"
+}
+
+install_claude_rule() {
+    local name="$1"
+    local source_file="$2"
+    mkdir -p "$CLAUDE_RULES_DIR"
+    cp "$source_file" "$CLAUDE_RULES_DIR/${name}.md"
+    _rebuild_claude_md
+    rm -f "$CLAUDE_COMMANDS_DIR/${name}.md"
+}
+
+uninstall_claude_rule() {
+    local name="$1"
+    rm -f "$CLAUDE_RULES_DIR/${name}.md"
+    if compgen -G "$CLAUDE_RULES_DIR/*.md" &>/dev/null; then
+        _rebuild_claude_md
+    else
+        _remove_claude_md_section
+    fi
+}
+
 get_claude_command_dest() {
     echo "$CLAUDE_COMMANDS_DIR/${1}.md"
 }

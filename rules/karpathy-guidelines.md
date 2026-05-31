@@ -1,10 +1,9 @@
 ---
 name: karpathy-guidelines
 description: Behavioral rules to reduce common LLM coding mistakes. Always active — applies to every skill and task.
-alwaysApply: true
 ---
 
-> Derived from [Andrej Karpathy's observations](https://x.com/karpathy/status/2015883857489522876) on LLM coding pitfalls. Adapted for this project's EVPMR architecture and tooling.
+> Derived from Andrej Karpathy's observations on LLM coding pitfalls. Adapted for this project's EVPMR architecture and tooling.
 >
 > **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
