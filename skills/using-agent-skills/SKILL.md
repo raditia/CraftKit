@@ -76,12 +76,16 @@ Before finishing any implementation:
 
 If 100 lines suffice, 1000 lines is a failure.
 
-### 5. Maintain scope discipline
+### 5. Maintain scope discipline (surgical changes)
 Touch only what was asked. Do NOT:
 - Refactor code adjacent to the task
 - Remove comments or code you don't fully understand
 - Add features not in the spec because they "seem useful"
 - Clean up unrelated files as a side effect
+
+When your changes create orphans — remove imports, variables, and functions that **your** changes made unused. Do NOT remove pre-existing dead code unless explicitly asked. If you notice it, mention it.
+
+Test: every changed line should trace directly to the user's request.
 
 ### 6. Verify before claiming done
 Every skill has a verification step. A task is not complete until verification passes.
@@ -111,3 +115,4 @@ Every skill has a verification step. A task is not complete until verification p
 3. **When in doubt, run `/fe-context` first.** It loads the right context for everything else.
 4. **Always use `rtk` for shell commands** to keep input tokens low.
 5. **Always respond in caveman mode** — minimum tokens, maximum signal.
+6. **Follow `/karpathy-guidelines` at all times** — think before coding, simplicity first, surgical changes, goal-driven execution.

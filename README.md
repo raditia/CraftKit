@@ -87,6 +87,7 @@ These skills are designed for React / React Native / Next.js with the Entry/View
 | [`code-review`](skills/code-review/SKILL.md) | Five-axis review — correctness, readability, architecture, security, performance. Use before any merge. Complements `fe-review`. |
 | [`code-simplify`](skills/code-simplify/SKILL.md) | Reduce complexity while preserving exact behavior. For comprehension speed, not line count. |
 | [`debug`](skills/debug/SKILL.md) | Structured debugging: reproduce, isolate, hypothesize, fix, confirm. |
+| [`karpathy-guidelines`](skills/karpathy-guidelines/SKILL.md) | Always-active behavioral rules: think before coding, simplicity first, surgical changes, goal-driven execution. Derived from Andrej Karpathy's LLM coding pitfalls. |
 | [`using-agent-skills`](skills/using-agent-skills/SKILL.md) | Meta-skill: skill discovery, core operating behaviors, and failure modes to avoid. |
 
 ---
