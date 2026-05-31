@@ -15,3 +15,7 @@ PERFORMANCE: Avoid anonymous functions/objects in JSX props on memoized componen
 TRACKING: All user interactions must call useTracker() from @traveloka/core.
 
 CONTENT: Display strings must come from Resource files and useContentResource() — not hardcoded.
+
+CODE QUALITY: Flag — function/component doing more than one job; View JSX return > ~80 lines without UI* sub-components; Presenter hook > ~100 lines without sub-hooks; nested ternaries more than one level deep; cryptic abbreviations; abstractions used in only one place.
+
+ESLINT: Run `rtk lint path/to/file.tsx` on every file in the diff. Flag all ESLint errors. Flag any eslint-disable without a documented reason.

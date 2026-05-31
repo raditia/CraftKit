@@ -39,3 +39,18 @@ When reviewing or editing frontend code in this project, flag these issues:
 - User interaction without a `useTracker()` call.
 - Hardcoded display strings not sourced from `Resource*.ts` + `useContentResource()`.
 - Missing `<ErrorBoundary>` in Entry component.
+
+## Code quality violations
+
+- A function or component that does more than one job (needs "and" to describe it).
+- View JSX return > ~80 lines without extracting `UI*` sub-components.
+- Presenter hook > ~100 lines without splitting into sub-hooks.
+- Nested ternaries more than one level deep.
+- Cryptic abbreviations or single-letter variable names outside trivial loops.
+- Helper functions or abstractions used in only one place.
+
+## ESLint
+
+- Run `rtk lint path/to/file.tsx` on every file in the diff.
+- Flag any remaining ESLint errors.
+- Flag any `// eslint-disable` without a documented reason in the same comment.

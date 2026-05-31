@@ -28,3 +28,4 @@ WORKFLOW — always follow this order:
 3. WRITE: cover all cases — all discriminated union states (NOT_ASKED/LOADING/DATA_READY/ERROR), all conditionals, all interactions and tracking calls.
 4. RUN: `rtk jest path/to/__tests__/` — all tests must pass before finishing.
 5. COVERAGE: `rtk jest --coverage path/to/feature/` — Lines, Branches, Functions, Statements all must be ≥ 93%. Add tests until threshold is met. Never finish below 93%.
+6. ESLINT: `rtk lint path/to/__tests__/FileName.test.tsx` on every test file written. Fix all errors. No eslint-disable without a documented reason.

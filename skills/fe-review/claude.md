@@ -68,6 +68,21 @@ Review the specified file(s) or the current diff for correctness and adherence t
 - [ ] External hooks mocked with `jest.mock('@traveloka/...')`
 - [ ] Uses `renderComponent` from `@traveloka/core/test`, not bare `render`
 
+### Code quality
+
+- [ ] **Single responsibility:** each function/component does one job. Flag anything that does two things.
+- [ ] **View length:** JSX return block > ~80 lines without extraction into `UI*` sub-components
+- [ ] **Presenter length:** hook body > ~100 lines without splitting into focused sub-hooks
+- [ ] **No nested ternaries:** more than one level deep — flag and suggest extraction
+- [ ] **Readable names:** flag abbreviations, single-letter variables (outside trivial loops), or unclear function names
+- [ ] **No unnecessary abstraction:** flag helper functions or HOCs created for only one call site
+
+### ESLint
+
+- [ ] Run `rtk lint path/to/changed/file.tsx` on every file in the diff
+- [ ] Zero ESLint errors — flag any that remain
+- [ ] No `// eslint-disable` without a documented reason in the same comment
+
 ---
 
 ## Output format

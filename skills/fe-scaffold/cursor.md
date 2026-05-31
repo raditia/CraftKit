@@ -54,3 +54,15 @@ type AsyncData<T> =
 ## Tracking
 
 Add `useTracker()` from `@traveloka/core` for user interaction events.
+
+## Code quality
+
+- **Single responsibility:** one function/component = one job. If you need "and" to describe it, split it.
+- **View length:** JSX return > ~80 lines → extract as `UI[Name][Section].tsx` in the same folder.
+- **Presenter length:** hook body > ~100 lines → split into sub-hooks (e.g. `usePresenter[Name]Data`, `usePresenter[Name]Handlers`).
+- **No over-engineering:** only split when genuinely complex. No abstractions for single-use code.
+- **Readable names:** full words. `isSubmitting` not `isSub`. No nested ternaries — extract to a variable or sub-component.
+
+## ESLint
+
+After every change, run `rtk lint path/to/file.tsx` on each modified file. Fix all errors. Never add `// eslint-disable` without a documented reason in the same comment.

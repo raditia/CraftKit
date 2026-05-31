@@ -103,7 +103,16 @@ All files live in one folder named `[kebab-case-feature]/`. File naming: `[Role]
 
 ---
 
-## Step 5 — Tracking
+## Step 5 — Code quality
+
+- **Single responsibility:** every function and component does one thing. If you need "and" to describe it, split it.
+- **View length:** JSX return block > ~80 lines → extract sections as `UI[Name][Section].tsx` in the same folder. The parent View orchestrates, not implements.
+- **Presenter length:** hook body > ~100 lines → split into focused sub-hooks (e.g. `usePresenter[Name]Data`, `usePresenter[Name]Handlers`). The main hook composes them.
+- **No over-engineering:** only split when complexity genuinely warrants it. No abstractions for single-use code.
+- **Readable names:** full words, no cryptic abbreviations. `isSubmitting` not `isSub`, `handleSearchPress` not `onPress1`.
+- **No nested ternaries:** more than one level deep → extract to a variable or a `UI*` sub-component.
+
+## Step 6 — Tracking
 
 If the feature has user interactions, add tracker calls using `useTracker()` from `@traveloka/core`:
 ```ts
@@ -116,6 +125,8 @@ track('FEATURE_NAME', 'ACTION', { ...payload });
 
 ## After generating
 
-- List each file created with its path
-- Note any assumptions made about naming or token choices
-- If you noticed patterns in the codebase not covered above, list them as **Suggested skill updates** at the end
+- Run `rtk lint path/to/changed/file.tsx` on every file created or modified. Fix all errors before finishing.
+- Do not add `// eslint-disable` without a specific documented reason in the same comment.
+- List each file created with its path.
+- Note any assumptions made about naming or token choices.
+- If you noticed patterns in the codebase not covered above, list them as **Suggested skill updates** at the end.

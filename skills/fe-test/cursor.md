@@ -48,3 +48,4 @@ Use `getByTestId` / `queryByTestId` — add `testID` props to key elements in Vi
 3. **Write tests** covering all of them — all discriminated union states, all conditionals, all interactions and tracking calls.
 4. **Run:** `rtk jest path/to/__tests__/` — all must pass.
 5. **Coverage:** `rtk jest --coverage path/to/feature/` — Lines, Branches, Functions, Statements all ≥ 93%. Add tests until threshold is met.
+6. **ESLint:** `rtk lint path/to/__tests__/FileName.test.tsx` on every test file written. Fix all errors. No `eslint-disable` without a documented reason.

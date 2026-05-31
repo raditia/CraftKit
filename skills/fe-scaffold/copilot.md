@@ -23,3 +23,12 @@ TYPESCRIPT — strict mode is enforced:
 - Type component props as `type Props = { ... }` above the component.
 
 TRACKING — add useTracker() from @traveloka/core for user interaction events.
+
+CODE QUALITY:
+- Single responsibility: one function/component = one job. If you need "and" to describe it, split it.
+- View JSX return > ~80 lines: extract sections as UI[Name][Section].tsx in the same folder.
+- Presenter hook > ~100 lines: split into sub-hooks (usePresenter[Name]Data, usePresenter[Name]Handlers).
+- No over-engineering: only split when genuinely complex. No abstractions for single-use code.
+- Readable names: full words, no abbreviations. No nested ternaries — extract to variable or sub-component.
+
+ESLINT: After every change, run `rtk lint path/to/file.tsx` on each modified file. Fix all errors. Never add eslint-disable without a documented reason.

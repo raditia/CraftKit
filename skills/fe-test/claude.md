@@ -127,6 +127,9 @@ rtk jest --coverage path/to/feature/
 Check `Lines`, `Branches`, `Functions`, `Statements` — all must be ≥ 93%.
 If below threshold, identify uncovered lines from the report and add missing test cases. Repeat until passing.
 
-### 6. Done
+### 6. ESLint
+Run `rtk lint path/to/__tests__/FileName.test.tsx` on every test file written or modified. Fix all errors before finishing. No `// eslint-disable` without a documented reason.
+
+### 7. Done
 Report: tests added, pass/fail count, final coverage numbers.
 List any testing patterns you encountered not covered above as **Suggested skill updates**.

@@ -30,3 +30,16 @@ When reviewing frontend code in this project, check for these violations:
 **Missing patterns**
 - User interactions without useTracker() calls
 - Display strings hardcoded in View instead of sourced from Resource + useContentResource()
+
+**Code quality violations**
+- Function or component doing more than one job
+- View JSX return > ~80 lines without extracting `UI*` sub-components
+- Presenter hook > ~100 lines without splitting into sub-hooks
+- Nested ternaries more than one level deep
+- Cryptic abbreviations or unclear names
+- Abstractions (helpers, HOCs) used in only one place
+
+**ESLint**
+- Run `rtk lint path/to/file.tsx` on every file in the diff
+- Flag all ESLint errors
+- Flag any `eslint-disable` without a documented reason
