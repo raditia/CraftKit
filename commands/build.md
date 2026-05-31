@@ -1,7 +1,6 @@
 ---
 name: build
 description: Full feature build workflow — orchestrates fe-context, fe-scaffold, fe-patterns, fe-performance, fe-review, fe-test in sequence. Use when building a new feature or screen.
-alwaysApply: false
 ---
 
 **Commands:** `rtk git diff`, `rtk tsc`, `rtk jest`, `rtk lint`

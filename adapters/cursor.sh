@@ -19,3 +19,7 @@ uninstall_cursor_skill() {
     local skill_name="$1"
     rm -f "$CURSOR_RULES_DIR/${skill_name}.mdc"
 }
+
+get_cursor_command_dest() { get_cursor_dest "$1"; }
+install_cursor_command()   { install_cursor_skill "$@"; }
+uninstall_cursor_command() { uninstall_cursor_skill "$@"; }

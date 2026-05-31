@@ -86,6 +86,21 @@ with open(md_path, 'w') as f:
 PYEOF
 }
 
+get_claude_command_dest() {
+    echo "$CLAUDE_COMMANDS_DIR/${1}.md"
+}
+
+install_claude_command() {
+    local name="$1"
+    local source_file="$2"
+    mkdir -p "$CLAUDE_COMMANDS_DIR"
+    cp "$source_file" "$CLAUDE_COMMANDS_DIR/${name}.md"
+}
+
+uninstall_claude_command() {
+    rm -f "$CLAUDE_COMMANDS_DIR/${1}.md"
+}
+
 get_claude_dest() {
     local skill_name="$1"
     if _claude_is_rule "$skill_name"; then

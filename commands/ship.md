@@ -1,7 +1,6 @@
 ---
 name: ship
 description: Pre-merge readiness workflow — orchestrates fe-test (coverage gate), code-review (5-axis), and fe-review (EVPMR). Use when preparing a branch for PR.
-alwaysApply: false
 ---
 
 **Commands:** `rtk jest`, `rtk tsc`, `rtk lint`, `rtk git diff`

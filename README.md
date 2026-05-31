@@ -17,15 +17,25 @@ git pull
                    │       ├─► RTK     (token compression for AI input)
                    │       └─► Caveman (token compression for AI output)
                    │
-                   └─► sync_adapter()  ← runs for each AI model
-                           │
-                           ├─► reads skills/*/SKILL.md
-                           ├─► checks alwaysApply in frontmatter
-                           ├─► installs new / updated skills to correct destination
-                           └─► removes skills deleted from repo
+                   ├─► sync_adapter()        ← skills/*/SKILL.md
+                   │       ├─► checks alwaysApply in frontmatter
+                   │       ├─► installs new / updated skills to correct destination
+                   │       └─► removes skills deleted from repo
+                   │
+                   ├─► sync_commands_adapter()  ← commands/*.md
+                   │       ├─► always installed as on-demand commands (never rules)
+                   │       ├─► installs new / updated commands
+                   │       └─► removes commands deleted from repo
+                   │
+                   └─► finalize_<adapter>()  ← integrity check for managed files
 ```
 
-Each skill is a single `SKILL.md`. All AI models read from it — no per-model duplication.
+Two separate namespaces — both synced automatically on every `git pull`:
+
+| Directory | Purpose | Type |
+|-----------|---------|------|
+| `skills/` | Specific, single-purpose capabilities | Rules (`alwaysApply: true`) or commands |
+| `commands/` | Workflow orchestrators that chain multiple skills | Always on-demand commands |
 
 ---
 
@@ -260,10 +270,9 @@ type AsyncData<T> =
 ### Adding a skill
 
 1. Create `skills/<name>/SKILL.md` in this repo
-2. Commit and push
-3. End users get the skill automatically on the next `git pull`
+2. Commit and push — end users get it on the next `git pull`
 
-**Frontmatter fields:**
+**Frontmatter:**
 ```yaml
 ---
 name: skill-name
@@ -273,19 +282,39 @@ alwaysApply: false   # true → always-active rule (CLAUDE.md / Cursor always-ru
 ---
 ```
 
-### Updating a skill
+### Adding a command (workflow orchestrator)
 
-Edit `skills/<name>/SKILL.md`, commit, and push. `sync.sh` diffs the source against the installed copy on every run — changed files are re-installed automatically.
+Commands live in `commands/` — they chain multiple skills and are always installed as on-demand commands (never rules).
 
-### Removing a skill
+1. Create `commands/<name>.md` in this repo
+2. Commit and push
 
-Delete `skills/<name>/` from the repo, commit, and push. On the next `git pull`, `sync.sh` compares the repo's current skill list against its state file (`~/.agentic-skills-state/<adapter>`), detects the removal, and uninstalls the skill from every AI tool — including removing it from `~/.claude/CLAUDE.md` if it was a rule.
-
+**Frontmatter** (no `alwaysApply` — commands are always on-demand):
+```yaml
+---
+name: command-name
+description: What this workflow does and when to use it
+---
 ```
+
+### Updating a skill or command
+
+Edit the file, commit, and push. `sync.sh` diffs source against installed copy — changed files are re-installed automatically.
+
+### Removing a skill or command
+
+Delete the file/folder from the repo, commit, and push. On the next `git pull`, `sync.sh` detects the removal via state files and uninstalls from every AI tool automatically.
+
+```bash
+# Remove a skill
 git rm -r skills/<name>/
-git commit -m "remove skill: <name>"
+
+# Remove a command
+git rm commands/<name>.md
+
+git commit -m "remove: <name>"
 git push
-# end users: git pull → sync runs → skill removed from all AI tools
+# end users: git pull → sync runs → removed from all AI tools
 ```
 
 ---

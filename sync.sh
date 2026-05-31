@@ -9,6 +9,7 @@ fi
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STATE_DIR="$HOME/.agentic-skills-state"
 SKILLS_DIR="$REPO_DIR/skills"
+COMMANDS_DIR="$REPO_DIR/commands"
 
 mkdir -p "$STATE_DIR"
 
@@ -54,6 +55,16 @@ read_current_skills() {
     done
 }
 
+# Collects command names from commands/*.md
+read_current_commands() {
+    _current_commands=()
+    if [[ ! -d "$COMMANDS_DIR" ]]; then return; fi
+    for f in "$COMMANDS_DIR"/*.md; do
+        [[ -f "$f" ]] || continue
+        _current_commands+=("$(basename "$f" .md)")
+    done
+}
+
 sync_adapter() {
     local adapter="$1"
     local state_file="$STATE_DIR/$adapter"
@@ -93,12 +104,47 @@ sync_adapter() {
 
     # Persist new state
     printf '%s\n' "${current_skills[@]+"${current_skills[@]}"}" > "$state_file"
+}
 
-    # Post-loop integrity check — adapters that maintain a managed file (CLAUDE.md,
-    # GEMINI.md) can define finalize_<adapter> to detect and repair drift.
-    if declare -f "finalize_${adapter}" &>/dev/null; then
-        "finalize_${adapter}"
+sync_commands_adapter() {
+    local adapter="$1"
+    local state_file="$STATE_DIR/${adapter}-commands"
+    local changed=0
+
+    local installed_commands=()
+    if [[ -f "$state_file" ]]; then
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && installed_commands+=("$line")
+        done < "$state_file"
     fi
+
+    read_current_commands
+    local current_commands=("${_current_commands[@]+"${_current_commands[@]}"}")
+
+    # Remove commands that were installed but no longer exist in commands/
+    for cmd in "${installed_commands[@]+"${installed_commands[@]}"}"; do
+        if ! contains "$cmd" "${current_commands[@]+"${current_commands[@]}"}"; then
+            echo "    - removing command: $cmd"
+            "uninstall_${adapter}_command" "$cmd"
+            changed=1
+        fi
+    done
+
+    # Install or update all current commands
+    for cmd in "${current_commands[@]+"${current_commands[@]}"}"; do
+        local source_file="$COMMANDS_DIR/${cmd}.md"
+        local dest
+        dest="$("get_${adapter}_command_dest" "$cmd")"
+        if [[ ! -f "$dest" ]] || ! diff -q "$source_file" "$dest" &>/dev/null; then
+            echo "    + command: $cmd"
+            "install_${adapter}_command" "$cmd" "$source_file"
+            changed=1
+        fi
+    done
+
+    [[ $changed -eq 0 ]] && echo "    commands: (up to date)"
+
+    printf '%s\n' "${current_commands[@]+"${current_commands[@]}"}" > "$state_file"
 }
 
 ensure_tools() {
@@ -137,6 +183,10 @@ for adapter in "${ADAPTERS[@]}"; do
     echo ""
     echo "[$adapter]"
     sync_adapter "$adapter"
+    sync_commands_adapter "$adapter"
+    if declare -f "finalize_${adapter}" &>/dev/null; then
+        "finalize_${adapter}"
+    fi
 done
 echo ""
 echo "Sync complete."

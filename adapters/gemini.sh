@@ -126,3 +126,7 @@ uninstall_gemini_skill() {
         _remove_gemini_section
     fi
 }
+
+get_gemini_command_dest() { get_gemini_dest "$1"; }
+install_gemini_command()   { install_gemini_skill "$@"; }
+uninstall_gemini_command() { uninstall_gemini_skill "$@"; }

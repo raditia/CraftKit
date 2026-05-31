@@ -1,7 +1,6 @@
 ---
 name: fix
 description: Bug fix workflow — orchestrates fe-context, debug (reproduce → isolate → fix), and fe-test to verify the fix holds. Use when something is broken.
-alwaysApply: false
 ---
 
 **Commands:** `rtk jest`, `rtk tsc`, `rtk lint`, `rtk grep "pattern" .`

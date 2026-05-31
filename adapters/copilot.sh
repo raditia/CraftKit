@@ -87,3 +87,22 @@ uninstall_copilot_skill() {
     _unregister_copilot_file "$dest" "$_REVIEW_KEY"
     rm -f "$dest"
 }
+
+get_copilot_command_dest() {
+    echo "$COPILOT_SKILLS_DIR/${1}.md"
+}
+
+install_copilot_command() {
+    local name="$1"
+    local source_file="$2"
+    local dest="$COPILOT_SKILLS_DIR/${name}.md"
+    mkdir -p "$COPILOT_SKILLS_DIR"
+    cp "$source_file" "$dest"
+    _register_copilot_file "$dest" "$_CODEGEN_KEY"
+}
+
+uninstall_copilot_command() {
+    local dest="$COPILOT_SKILLS_DIR/${1}.md"
+    _unregister_copilot_file "$dest" "$_CODEGEN_KEY"
+    rm -f "$dest"
+}
