@@ -30,6 +30,8 @@ Task arrives
   ├── Creating a new feature module?  ──────────────→ /fe-scaffold
   ├── Reviewing code quality / arch / security? ────→ /code-review
   ├── Reviewing frontend patterns (EVPMR)? ─────────→ /fe-review
+  ├── Designing component / hook structure? ─────────→ /fe-patterns
+  ├── Performance bottleneck (waterfall, bundle)? ──→ /fe-performance
   ├── Writing or improving tests? ──────────────────→ /fe-test
   ├── Code too complex or hard to read? ────────────→ /code-simplify
   └── Something broke? ─────────────────────────────→ /debug

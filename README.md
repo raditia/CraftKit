@@ -124,6 +124,8 @@ Designed for React / React Native / Next.js with the EVPMR architecture pattern.
 | [`fe-context`](skills/fe-context/SKILL.md) | Always first — generates `docs/context.md` from branch diff | Diff spans > 10 interdependent files |
 | [`fe-scaffold`](skills/fe-scaffold/SKILL.md) | Creating a new feature module (5-file EVPMR structure) | Novel architecture outside EVPMR |
 | [`fe-review`](skills/fe-review/SKILL.md) | Review for EVPMR pattern, TypeScript, styling, ESLint | Architectural conflicts with non-obvious resolution |
+| [`fe-patterns`](skills/fe-patterns/SKILL.md) | Composition patterns, hooks discipline, state location, data fetching | Novel state architecture with non-obvious tradeoffs |
+| [`fe-performance`](skills/fe-performance/SKILL.md) | Waterfall elimination, bundle size, re-renders, RN & Next.js perf | Lighthouse regressions with non-obvious root cause |
 | [`fe-test`](skills/fe-test/SKILL.md) | Write/improve tests — enforces ≥ 93% coverage | Can't reach 93%, root cause unclear |
 
 ### General — on demand
@@ -164,6 +166,12 @@ Bug fix
 
 Refactor / simplify
   /fe-context → /code-simplify → /fe-review → /fe-test
+
+Performance investigation
+  /fe-context → /fe-performance → /fe-test
+
+Component / hook design question
+  /fe-context → /fe-patterns → /fe-review
 ```
 
 ### How `fe-context` feeds all skills
@@ -171,21 +179,23 @@ Refactor / simplify
 `/fe-context` runs first and writes `docs/context.md` (≤ 600 lines). Every other skill reads from it instead of re-scanning the project.
 
 ```
-                    ┌──────────────────────┐
-                    │     /fe-context      │
-                    │  reads branch diff   │
-                    │  writes docs/        │
-                    │  context.md ≤600 ln  │
-                    └──────────┬───────────┘
-                               │
-          ┌────────────────────┼────────────────────┐
-          ▼                    ▼                    ▼
-   ┌─────────────┐   ┌──────────────────┐   ┌────────────┐
-   │ /fe-scaffold│   │   /fe-review     │   │  /fe-test  │
-   │             │   │   /code-review   │   │            │
-   │  5-file     │   │   /code-simplify │   │  ≥93%      │
-   │  EVPMR      │   │   /debug         │   │  coverage  │
-   └─────────────┘   └──────────────────┘   └────────────┘
+                         ┌──────────────────────┐
+                         │     /fe-context      │
+                         │  reads branch diff   │
+                         │  writes docs/        │
+                         │  context.md ≤600 ln  │
+                         └──────────┬───────────┘
+                                    │
+         ┌──────────────────────────┼──────────────────────────┐
+         ▼                          ▼                          ▼
+  ┌─────────────┐   ┌────────────────────────┐   ┌────────────────┐
+  │ /fe-scaffold│   │   /fe-review           │   │  /fe-test      │
+  │             │   │   /fe-patterns         │   │                │
+  │  5-file     │   │   /fe-performance      │   │  ≥93%          │
+  │  EVPMR      │   │   /code-review         │   │  coverage      │
+  │             │   │   /code-simplify       │   │                │
+  │             │   │   /debug               │   │                │
+  └─────────────┘   └────────────────────────┘   └────────────────┘
 ```
 
 ### Context hierarchy

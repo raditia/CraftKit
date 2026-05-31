@@ -59,6 +59,32 @@ Hard constraints for the Entry/View/Presenter/Model/Resource architecture. These
 
 ---
 
+## React correctness
+
+- **Derive during render** — never `useEffect` to sync derived state:
+  ```ts
+  // WRONG
+  const [full, setFull] = useState('');
+  useEffect(() => setFull(`${first} ${last}`), [first, last]);
+  // CORRECT
+  const full = `${first} ${last}`;
+  ```
+- **No components defined inside components** — new type every render, breaks reconciliation
+- **Ternary over `&&`** for conditional render — `0` renders as text:
+  ```tsx
+  // WRONG: {count && <Badge />}
+  // CORRECT: {count > 0 ? <Badge /> : null}
+  ```
+- **Primitive deps in effects** — objects/arrays get new identity every render:
+  ```ts
+  // WRONG: useEffect(() => {}, [{ id }])
+  // CORRECT: useEffect(() => {}, [id])
+  ```
+- **Stable `key` props** — use database ID, never array index
+- **Functional `setState`** when new state depends on old: `setCount(c => c + 1)`
+
+---
+
 ## Tracking
 
 - All user interactions tracked via `useTracker()` from `@traveloka/core`
