@@ -115,6 +115,60 @@ Every skill has a verification step. "Seems right" is never sufficient — there
 
 ---
 
+## Skill authoring rules
+
+Apply these checks every time a skill, rule, or command is **added or updated** in this repo. Non-negotiable — same weight as the core operating behaviors.
+
+### 1. Conflict check (before writing anything)
+
+Scan all files in `rules/`, `skills/`, and `commands/` for:
+
+| Check | How |
+|-------|-----|
+| Duplicate concept | Same pattern, constraint, or checklist item already defined elsewhere |
+| Duplicate command | Same slash command or trigger phrase registered in multiple files |
+| Contradicting rule | Two files prescribe opposite behavior for the same situation |
+| Redundant section | Content that already lives in an always-active rule and doesn't need repeating |
+
+If a conflict is found: surface it explicitly before proceeding. Do not silently merge or overwrite.
+
+```
+CONFLICT: [description]
+Existing: [file:section]
+Proposed: [new content]
+Resolution: A) extend existing  B) replace  C) both are needed — why?
+→ Which?
+```
+
+### 2. Token audit (before finalizing any file)
+
+Every token in a skill file must earn its place. Run this check before saving:
+
+| Signal | Action |
+|--------|--------|
+| Section already covered by an always-active rule | Remove — rules are always in context |
+| Prose that could be a table or bullet | Convert |
+| Code example longer than needed to illustrate the point | Trim to the minimal illustrative case |
+| Repeated boilerplate across multiple skills | Move once to `using-agent-skills` or a rule; reference from skills |
+| Step restating what another skill already does | Replace with "run `/skill-name`" |
+
+Target: every line either teaches something unique or provides a reference a reader couldn't infer from elsewhere. If removing a line loses no information, remove it.
+
+### 3. README update (after every add/update/remove)
+
+`README.md` must stay in sync with the repo state. Update immediately — not as an afterthought.
+
+| Change | README update required |
+|--------|----------------------|
+| New skill added | Add row to the correct skills table with skill name, when to use, escalate-if |
+| Skill removed | Remove its row |
+| Skill renamed | Update name in table and any cross-references in commands |
+| New rule added | Add row to the Rules table |
+| New command added | Add row to the Orchestrators table |
+| Skill discovery tree changed | Update the tree in `using-agent-skills.md` AND README |
+
+---
+
 ## Failure modes to avoid
 
 1. Making wrong assumptions without surfacing them
