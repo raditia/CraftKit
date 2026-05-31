@@ -4,8 +4,7 @@ description: Structured debugging — reproduce, isolate, hypothesize, fix. Use 
 alwaysApply: false
 ---
 
-**Token mode:** caveman. Min tokens, max signal. Bullets > prose. No filler.
-**Commands:** always prefix with `rtk` — `rtk grep "pattern" .`, `rtk git status`, `rtk tsc`, `rtk jest`
+**Commands:** `rtk grep "pattern" .`, `rtk git status`, `rtk tsc`, `rtk jest`
 
 ---
 

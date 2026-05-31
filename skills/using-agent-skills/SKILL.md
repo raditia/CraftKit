@@ -19,16 +19,20 @@ When a task arrives, apply the corresponding skill:
 Task arrives
   ├── Need context on what's being built? ──────────→ /fe-context
   ├── Creating a new feature module?  ──────────────→ /fe-scaffold
-  ├── Reviewing code for correctness/patterns? ─────→ /fe-review
+  ├── Reviewing code quality / arch / security? ────→ /code-review
+  ├── Reviewing frontend patterns (EVPMR)? ─────────→ /fe-review
   ├── Writing or improving tests? ──────────────────→ /fe-test
+  ├── Code too complex or hard to read? ────────────→ /code-simplify
   └── Something broke? ─────────────────────────────→ /debug
 ```
 
-Multiple skills can apply. Typical sequence for a feature:
+Multiple skills can apply. Typical sequences:
 ```
-/fe-context → /fe-scaffold → /fe-review → /fe-test
+/fe-context → /fe-scaffold → /fe-review → /code-review → /fe-test
 ```
+For a PR review: `/fe-context → /code-review → /fe-review`
 For a bug fix: `/fe-context → /debug → /fe-test`
+After messy implementation: `/code-simplify → /fe-review → /fe-test`
 
 ---
 

@@ -4,8 +4,7 @@ description: Write or improve tests covering all changed code paths. Enforces 93
 alwaysApply: false
 ---
 
-**Token mode:** caveman. Min tokens, max signal. Bullets > prose. No filler.
-**Commands:** always prefix with `rtk` — `rtk jest`, `rtk tsc`, `rtk lint`, `rtk grep "pattern" .`
+**Commands:** `rtk jest`, `rtk tsc`, `rtk lint`, `rtk grep "pattern" .`
 
 ---
 

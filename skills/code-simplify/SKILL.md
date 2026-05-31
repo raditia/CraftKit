@@ -4,8 +4,7 @@ description: Reduce code complexity while preserving exact behavior. For compreh
 alwaysApply: false
 ---
 
-**Token mode:** caveman. Min tokens, max signal. Bullets > prose. No filler.
-**Commands:** always prefix with `rtk` — `rtk tsc`, `rtk jest`, `rtk lint`, `rtk grep "pattern" .`
+**Commands:** `rtk tsc`, `rtk jest`, `rtk lint`, `rtk grep "pattern" .`
 
 ---
 

@@ -4,8 +4,7 @@ description: Review code for correctness, pattern adherence, code quality, and E
 alwaysApply: false
 ---
 
-**Token mode:** caveman. Min tokens, max signal. Bullets > prose. No filler.
-**Commands:** always prefix with `rtk` — `rtk lint`, `rtk tsc`, `rtk git diff`, `rtk grep "pattern" .`
+**Commands:** `rtk lint`, `rtk tsc`, `rtk git diff`, `rtk grep "pattern" .`
 
 ---
 

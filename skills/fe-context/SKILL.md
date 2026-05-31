@@ -4,8 +4,7 @@ description: Generate or update docs/context.md from staged/committed/pushed bra
 alwaysApply: false
 ---
 
-**Token mode:** caveman. Min tokens, max signal. Bullets > prose. No filler.
-**Commands:** always prefix with `rtk` — `rtk git diff`, `rtk git log`, `rtk git status`, `rtk ls .`
+**Commands:** `rtk git diff`, `rtk git log`, `rtk git status`, `rtk ls .`
 
 ---
 
@@ -27,7 +26,7 @@ Feed the right information at the right time. `docs/context.md` is the single so
 | 4 — Errors | Failing tests, lint errors, TypeScript errors | On demand |
 | 5 — History | Conversation; compact when switching major tasks | Session |
 
-**Selective include:** only include what is relevant to the diff. Target < 2,000 lines. Do not dump entire unrelated files.
+**Selective include:** only include what is relevant to the diff. Hard limit: **< 600 lines / ~800 tokens**. Do not dump entire unrelated files. Summarize rather than paste full file contents.
 
 ---
 
@@ -116,7 +115,7 @@ Create `docs/` if needed. If file exists, update changed sections — preserve m
 <!-- managed by fe-context — regenerate with /fe-context -->
 <!-- L1=rules(skills) L2=this file L3=source-files L4=errors/tests -->
 **Generated:** {{ISO timestamp}}
-**Branch:** {{branch}} | **Base:** {{base}} | **Budget:** ~{{lines}} lines (target < 2,000)
+**Branch:** {{branch}} | **Base:** {{base}} | **Budget:** ~{{lines}} lines (limit: 600)
 
 ---
 
@@ -169,7 +168,7 @@ Create `docs/` if needed. If file exists, update changed sections — preserve m
 - [ ] `docs/context.md` written at the correct project root
 - [ ] All three layers (A/B/C) represented or noted as empty
 - [ ] Conflicts in the Conflicts section — not silently resolved
-- [ ] Context budget noted — flagged if > 2,000 lines
+- [ ] Context budget ≤ 600 lines — summarize aggressively if over
 - [ ] No unrelated files dumped in
 
 Report: path written, layers covered, conflict count, line count.

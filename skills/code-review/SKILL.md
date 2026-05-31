@@ -4,8 +4,7 @@ description: Five-axis code review — correctness, readability, architecture, s
 alwaysApply: false
 ---
 
-**Token mode:** caveman. Min tokens, max signal. Bullets > prose. No filler.
-**Commands:** always prefix with `rtk` — `rtk lint`, `rtk tsc`, `rtk git diff`, `rtk grep "pattern" .`
+**Commands:** `rtk lint`, `rtk tsc`, `rtk git diff`, `rtk grep "pattern" .`
 
 ---
 
@@ -160,50 +159,14 @@ Before adding any dependency:
 
 ## Review checklist
 
-```
-### Context
-- [ ] I understand what this change does and why
-
-### Correctness
-- [ ] Matches spec/requirements
-- [ ] Edge cases handled
-- [ ] Error paths handled
-- [ ] Tests cover the change adequately
-
-### Readability
-- [ ] Names clear and consistent with project conventions
-- [ ] Logic is straightforward — no nested ternaries > 1 level
-- [ ] No unnecessary complexity
-
-### Architecture (EVPMR)
-- [ ] View: no useState/useEffect/API calls
-- [ ] Presenter: no JSX returned
-- [ ] Entry: wrapped in ErrorBoundary
-- [ ] Resource: no hardcoded strings in View
-- [ ] Model: pure types and functions only
-- [ ] (Run /fe-review for full checklist)
-
-### Security
-- [ ] No secrets in code or version control
-- [ ] Input validated at system boundaries
-- [ ] External data treated as untrusted
-- [ ] Auth checks in place
-
-### Performance
-- [ ] No N+1 patterns
-- [ ] Stable refs via useCallback/useMemo where needed
-- [ ] No anonymous objects/fns in JSX props
-- [ ] Stable key props on lists
-
-### Verification
-- [ ] rtk tsc --noEmit (zero errors)
-- [ ] rtk lint path/to/file.tsx (zero errors)
-- [ ] rtk jest path/to/__tests__/ (all pass)
-
-### Verdict
-- [ ] Approve — ready to merge
-- [ ] Request changes — issues must be addressed first
-```
+- [ ] **Context:** understand what this change does and why
+- [ ] **Correctness:** spec matched, edge cases covered, error paths handled, tests adequate
+- [ ] **Readability:** clear names, no nested ternaries > 1 level, no unnecessary complexity
+- [ ] **Architecture:** run `/fe-review` for full EVPMR checklist
+- [ ] **Security:** no secrets, input validated at boundaries, external data untrusted, auth checked
+- [ ] **Performance:** no N+1, stable refs (useCallback/useMemo), no anon JSX props, stable list keys
+- [ ] **Verification:** `rtk tsc --noEmit` | `rtk lint` | `rtk jest` — all pass
+- [ ] **Verdict:** Approve / Request changes
 
 ---
 
