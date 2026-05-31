@@ -80,35 +80,66 @@ These skills are designed for React / React Native / Next.js with the Entry/View
 | [`fe-review`](skills/fe-review/SKILL.md) | Frontend-specific code review: EVPMR pattern, TypeScript, styling tokens, tracking, ESLint. |
 | [`fe-test`](skills/fe-test/SKILL.md) | Write or improve tests covering all changed code paths. Enforces ≥93% coverage on Lines, Branches, Functions, Statements. |
 
-### General
+### General — on demand
 
 | Skill | Description |
 |-------|-------------|
 | [`code-review`](skills/code-review/SKILL.md) | Five-axis review — correctness, readability, architecture, security, performance. Use before any merge. Complements `fe-review`. |
 | [`code-simplify`](skills/code-simplify/SKILL.md) | Reduce complexity while preserving exact behavior. For comprehension speed, not line count. |
 | [`debug`](skills/debug/SKILL.md) | Structured debugging: reproduce, isolate, hypothesize, fix, confirm. |
-| [`karpathy-guidelines`](skills/karpathy-guidelines/SKILL.md) | Always-active behavioral rules: think before coding, simplicity first, surgical changes, goal-driven execution. Derived from Andrej Karpathy's LLM coding pitfalls. |
-| [`using-agent-skills`](skills/using-agent-skills/SKILL.md) | Meta-skill: skill discovery, core operating behaviors, and failure modes to avoid. |
+
+### Always active — no invocation needed
+
+These skills have `alwaysApply: true` and load automatically on every session.
+
+| Skill | Description |
+|-------|-------------|
+| [`karpathy-guidelines`](skills/karpathy-guidelines/SKILL.md) | Behavioral rules applied to every task: think before coding, simplicity first, surgical changes, goal-driven execution. Derived from Andrej Karpathy's LLM coding pitfalls. |
+| [`using-agent-skills`](skills/using-agent-skills/SKILL.md) | Skill routing, core operating behaviors, and failure modes. The meta-layer that ties all skills together. |
 
 ---
 
-## Frontend skill workflow
+## Skill workflow
+
+Always active (automatic, every session):
+```
+karpathy-guidelines  ←─ think before coding, simplicity, surgical changes, goal-driven
+using-agent-skills   ←─ skill routing, core behaviors, failure modes
+```
+
+On-demand workflow — typical sequences:
+
+```
+New feature:
+  /fe-context → /fe-scaffold → /fe-review → /code-review → /fe-test
+
+PR review:
+  /fe-context → /code-review → /fe-review
+
+Bug fix:
+  /fe-context → /debug → /fe-test
+
+Refactor / simplify:
+  /fe-context → /code-simplify → /fe-review → /fe-test
+```
+
+How `fe-context` feeds all other skills:
 
 ```
                         ┌─────────────┐
                         │ /fe-context │  ← always first
                         │             │  reads: staged + committed + pushed
-                        │             │  writes: docs/context.md
+                        │             │  writes: docs/context.md (≤ 600 lines)
                         └──────┬──────┘
-                               │ all other fe-* skills read docs/context.md
-               ┌───────────────┼───────────────┐
-               ▼               ▼               ▼
-        ┌────────────┐  ┌────────────┐  ┌──────────┐
-        │/fe-scaffold│  │ /fe-review │  │ /fe-test │
-        │            │  │            │  │          │
-        │ new feature│  │ pattern +  │  │ tests +  │
-        │  5 files   │  │ arch check │  │ 93% cov  │
-        └────────────┘  └────────────┘  └──────────┘
+                               │ all skills below read docs/context.md
+        ┌──────────────────────┼──────────────────────┐
+        ▼                      ▼                      ▼
+ ┌────────────┐  ┌─────────────────────┐  ┌──────────────┐
+ │/fe-scaffold│  │ /fe-review          │  │ /fe-test     │
+ │            │  │ /code-review        │  │              │
+ │ new feature│  │ /code-simplify      │  │ tests +      │
+ │  5 files   │  │ /debug              │  │ 93% coverage │
+ └────────────┘  └─────────────────────┘  └──────────────┘
 ```
 
 **Context hierarchy** — what each level provides:
