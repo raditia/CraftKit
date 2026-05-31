@@ -58,6 +58,12 @@ bash install.sh
 **Requirements:** bash 4+, curl. On macOS: `brew install bash` if needed.
 Optional: `jq` for Copilot VS Code settings integration.
 
+**Per-project Copilot `@` agents** (run inside any project repo):
+```bash
+bash ~/agentic-skills/scripts/init-copilot-agents.sh
+# then commit .github/ to share with your team
+```
+
 ---
 
 ## Where content lands
@@ -84,7 +90,9 @@ Three tiers by source directory — no frontmatter flag needed:
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-> **Copilot Chat:** No custom slash commands — Copilot only supports built-in `/explain`, `/fix`, `/tests` etc. Skills are loaded as context files and triggered by natural language: "write tests for this", "review for EVPMR violations", "scaffold a new feature". The `using-agent-skills` rule (always active) routes requests to the right skill automatically.
+> **Copilot Chat — two layers:**
+> - **Global (auto):** skills loaded via `codeGeneration.instructions` — natural language trigger in any repo
+> - **Per-project (`@` invocation):** run `scripts/init-copilot-agents.sh` inside a project to generate `.github/agents/*.agent.md` and `.github/copilot-instructions.md` — enables `@fe-test`, `@fe-review`, `@debug` etc. in Copilot Chat. Commit `.github/` to share with your team.
 
 State tracking in `~/.agentic-skills-state/` — one file per adapter, one skill name per line.
 
