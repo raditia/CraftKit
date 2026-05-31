@@ -107,14 +107,12 @@ Each skill runs on the everyday model by default. When the AI detects genuine un
 
 > Copilot uses Claude models — select them in the VS Code model picker.
 
-**Escalation triggers** (defined per skill, surface as):
+**Escalation is inline — no model switching required.** When the AI detects genuine uncertainty it consults the higher model directly, informs you with a one-line note, incorporates the result, and continues on the everyday model:
+
 ```
-ESCALATE:
-Reason: no clear hypothesis after 2 isolation attempts
-Recommended: claude-opus-4-7
-Claude Code:     /model claude-opus-4-7 → re-invoke the skill
-Gemini:          gemini --model gemini-2.5-pro
-Cursor / Copilot: switch model in the model picker, then retry
+Low confidence on [specific problem] — consulting higher model.
+...
+[consulted claude-opus-4-7 for: architecture tradeoff on X]
 ```
 
 Escalation is reserved for genuine uncertainty — architecture decisions with non-obvious tradeoffs, security-sensitive changes, or debugging with no hypothesis after 2 attempts. Everyday tasks stay on the fast model.

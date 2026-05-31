@@ -131,7 +131,7 @@ Every skill has a verification step. "Seems right" is never sufficient — there
 
 ## Model routing
 
-Use the everyday model by default. Escalate when you detect genuine uncertainty — not as a reflex.
+Use the everyday model by default. Escalate inline when you detect genuine uncertainty — not as a reflex.
 
 | AI | Everyday | Escalate to |
 |---|---|---|
@@ -146,12 +146,19 @@ Use the everyday model by default. Escalate when you detect genuine uncertainty 
 - Debugging with no clear hypothesis after 2 isolation attempts
 - Refactor touching > 5 interdependent files with complex type constraints
 
-### Escalation format
-```
-ESCALATE:
-Reason: [specific thing you're uncertain about]
-Recommended: [higher model name]
-Claude Code: /model claude-opus-4-7 → re-invoke the skill
-Gemini:      gemini --model gemini-2.5-pro
-Cursor/Copilot: switch model in the model picker, then retry
-```
+### Escalation process
+
+Do NOT ask the user to switch models. Escalate inline:
+
+1. **Inform the user** — one line, before escalating:
+   ```
+   Low confidence on [specific problem] — consulting higher model.
+   ```
+2. **Spawn a higher-model agent** with the specific question or task (not the whole skill — isolate the uncertain part)
+3. **Incorporate the result** and continue on the everyday model
+4. **Note what was consulted** at the end of your response:
+   ```
+   [consulted claude-opus-4-7 for: architecture tradeoff on X]
+   ```
+
+Escalation is for a targeted question, not a full hand-off. Stay in control; use the higher model as a specialist you consult for one decision.
