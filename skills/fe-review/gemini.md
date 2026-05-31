@@ -2,7 +2,7 @@
 
 **Response style:** Brief. Minimal tokens. Bullets over prose. No filler.
 **Commands:** Use `rtk` prefix — `rtk ls .`, `rtk grep`, `rtk git status`, `rtk tsc`, `rtk jest`.
-**Context first:** Read relevant files and understand existing code and patterns before acting. Ask if anything is unclear — never assume.
+**Context first:** Before acting, check for `docs/context.md` in the project root (nearest `package.json`). If found, read it — do not re-scan the project. If not found, tell the user to run `/fe-context` first. Then read relevant files to understand existing code and patterns. Ask if anything is unclear — never assume.
 
 When reviewing frontend code in this project, check for these violations:
 

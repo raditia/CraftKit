@@ -7,6 +7,16 @@
 
 ---
 
+## Load project context
+
+Before doing anything else:
+1. Find the project root — walk up from CWD to the nearest directory containing `package.json`
+2. Check if `docs/context.md` exists there
+3. **If found:** read it — use it as your understanding of what's being worked on. Skip re-scanning the project.
+4. **If not found:** stop and tell the user: "No context found. Run `/fe-context` first to generate `docs/context.md`."
+
+---
+
 Debug the issue described below or in the current context. Follow this process:
 
 1. **Reproduce**: Identify the exact inputs or conditions that trigger the bug.

@@ -7,6 +7,16 @@
 
 ---
 
+## Load project context
+
+Before doing anything else:
+1. Find the project root — walk up from CWD to the nearest directory containing `package.json`
+2. Check if `docs/context.md` exists there
+3. **If found:** read it — use it as your understanding of what's being worked on. Skip re-scanning the project.
+4. **If not found:** stop and tell the user: "No context found. Run `/fe-context` first to generate `docs/context.md`."
+
+---
+
 Scaffold a new frontend feature module. Before generating any code, read the codebase around the target location to confirm naming conventions, token usage, and existing patterns — then apply them exactly.
 
 ---
