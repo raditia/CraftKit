@@ -31,6 +31,7 @@ Match natural language to the right command:
 | "help me review", "review the changes", "code review", "LGTM check" | `/review` |
 | "something is broken", "fix this bug", "this crashes", "why is X not working" | `/fix` |
 | "get this ready to merge", "ship this", "prepare for PR", "is this ready?" | `/ship` |
+| "write tests", "add tests", "test this", "coverage is low", "improve coverage", "I need tests for X" | `/fe-test` |
 
 ### Individual skills (use when task is narrower than a full workflow)
 
