@@ -126,7 +126,7 @@ Use the everyday model by default. Escalate when you detect genuine uncertainty 
 | Claude Code | `claude-sonnet-4-6` | `claude-opus-4-7` |
 | Gemini CLI | `gemini-2.5-flash` | `gemini-2.5-pro` |
 | Cursor | claude-sonnet / gpt-4o | claude-opus / o1 |
-| Copilot | `gpt-4o` | `o1` / `o3` |
+| Copilot | `claude-sonnet-4-6` | `claude-opus-4-7` |
 
 ### Escalation triggers
 Escalate when you genuinely cannot proceed with high confidence:
