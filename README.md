@@ -253,26 +253,40 @@ type AsyncData<T> =
 
 ---
 
-## Adding a new skill
+## Managing skills
 
-1. Create `skills/<name>/SKILL.md`
-2. Run `bash sync.sh` (or `git pull` if the hook is installed)
+**Never manually edit or delete installed skill files** in `~/.claude/`, `~/.cursor/`, or VS Code settings. All installs, updates, and removals are managed by `sync.sh` — editing installed files directly will be overwritten on the next sync.
 
-The skill is automatically installed across all AI models. No other changes needed.
+### Adding a skill
+
+1. Create `skills/<name>/SKILL.md` in this repo
+2. Commit and push
+3. End users get the skill automatically on the next `git pull`
 
 **Frontmatter fields:**
 ```yaml
 ---
 name: skill-name
 description: One-line description shown in skill discovery
-alwaysApply: false   # true → writes to CLAUDE.md / Cursor always-rule
-                     # false → slash command in Claude Code
+alwaysApply: false   # true → always-active rule (CLAUDE.md / Cursor always-rule)
+                     # false → on-demand command (slash command / natural language)
 ---
 ```
 
-## Removing a skill
+### Updating a skill
 
-Delete `skills/<name>/` and run `bash sync.sh`. The skill is uninstalled from all AI models and removed from `~/.claude/CLAUDE.md` if it was a rule.
+Edit `skills/<name>/SKILL.md`, commit, and push. `sync.sh` diffs the source against the installed copy on every run — changed files are re-installed automatically.
+
+### Removing a skill
+
+Delete `skills/<name>/` from the repo, commit, and push. On the next `git pull`, `sync.sh` compares the repo's current skill list against its state file (`~/.agentic-skills-state/<adapter>`), detects the removal, and uninstalls the skill from every AI tool — including removing it from `~/.claude/CLAUDE.md` if it was a rule.
+
+```
+git rm -r skills/<name>/
+git commit -m "remove skill: <name>"
+git push
+# end users: git pull → sync runs → skill removed from all AI tools
+```
 
 ---
 

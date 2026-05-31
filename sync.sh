@@ -93,6 +93,12 @@ sync_adapter() {
 
     # Persist new state
     printf '%s\n' "${current_skills[@]+"${current_skills[@]}"}" > "$state_file"
+
+    # Post-loop integrity check — adapters that maintain a managed file (CLAUDE.md,
+    # GEMINI.md) can define finalize_<adapter> to detect and repair drift.
+    if declare -f "finalize_${adapter}" &>/dev/null; then
+        "finalize_${adapter}"
+    fi
 }
 
 ensure_tools() {

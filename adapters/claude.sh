@@ -119,6 +119,27 @@ install_claude_skill() {
     fi
 }
 
+# Called after every sync pass — rebuilds CLAUDE.md if the managed section is
+# missing or stale (e.g. file was manually edited or accidentally deleted).
+finalize_claude() {
+    local has_rules=0
+    if compgen -G "$CLAUDE_RULES_DIR/*.md" &>/dev/null; then
+        has_rules=1
+    fi
+
+    if [[ $has_rules -eq 1 ]]; then
+        if [[ ! -f "$CLAUDE_MD" ]] || ! grep -qF "$_CLAUDE_SECTION_START" "$CLAUDE_MD"; then
+            echo "    ! CLAUDE.md managed section missing — rebuilding"
+            _rebuild_claude_md
+        fi
+    else
+        if [[ -f "$CLAUDE_MD" ]] && grep -qF "$_CLAUDE_SECTION_START" "$CLAUDE_MD"; then
+            echo "    ! CLAUDE.md has stale managed section (no rule skills) — cleaning"
+            _remove_claude_md_section
+        fi
+    fi
+}
+
 uninstall_claude_skill() {
     local skill_name="$1"
     local rule_file="$CLAUDE_RULES_DIR/${skill_name}.md"
