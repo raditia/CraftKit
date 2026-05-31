@@ -26,6 +26,17 @@ _copilot_is_always_apply() {
     grep -q "^alwaysApply: true" "$skill_file" 2>/dev/null
 }
 
+# VS Code settings.json is JSONC — may have trailing commas that jq rejects.
+# Strip trailing commas before any jq operation.
+_normalize_jsonc() {
+    python3 -c "
+import re, sys
+text = open(sys.argv[1]).read()
+text = re.sub(r',(\s*[}\]])', r'\1', text)
+sys.stdout.write(text)
+" "$1"
+}
+
 _register_copilot_file() {
     local skill_path="$1"
     local key="$2"
@@ -39,18 +50,12 @@ _register_copilot_file() {
         return 0
     fi
 
-    if ! jq empty "$settings" 2>/dev/null; then
-        echo "    [copilot] settings.json has invalid JSON — skipping VS Code registration"
-        echo "    Fix: open '$settings' and correct the JSON syntax, then re-run install.sh"
-        return 0
-    fi
-
     local tmp
     tmp="$(mktemp)"
-    jq --arg path "$skill_path" --arg key "$key" '
+    _normalize_jsonc "$settings" | jq --arg path "$skill_path" --arg key "$key" '
         .[$key] //= [] |
         .[$key] |= (map(select(.file != $path)) + [{"file": $path}])
-    ' "$settings" > "$tmp" && mv "$tmp" "$settings"
+    ' > "$tmp" && mv "$tmp" "$settings"
 }
 
 _unregister_copilot_file() {
@@ -60,14 +65,13 @@ _unregister_copilot_file() {
     settings="$(_vscode_settings_path)"
     [[ -z "$settings" || ! -f "$settings" ]] && return 0
     command -v jq &>/dev/null || return 0
-    jq empty "$settings" 2>/dev/null || return 0
 
     local tmp
     tmp="$(mktemp)"
-    jq --arg path "$skill_path" --arg key "$key" '
+    _normalize_jsonc "$settings" | jq --arg path "$skill_path" --arg key "$key" '
         .[$key] //= [] |
         .[$key] |= map(select(.file != $path))
-    ' "$settings" > "$tmp" && mv "$tmp" "$settings"
+    ' > "$tmp" && mv "$tmp" "$settings"
 }
 
 get_copilot_dest() {
