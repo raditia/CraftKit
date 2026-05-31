@@ -4,7 +4,7 @@ alwaysApply: true
 ---
 
 Respond briefly — minimal tokens, bullets over prose, no filler. Use `rtk` prefix for terminal commands: `rtk jest`, `rtk tsc`, `rtk ls .`, `rtk grep`.
-Before acting, check for `docs/context.md` in the project root (nearest `package.json`). If found, read it first — do not re-scan the project. If not found, tell the user to run `/fe-context` first.
+Before acting, check for `docs/context.md` in the project root (nearest `package.json`). If found, read it first — do not re-scan the project. If not found, automatically run the fe-context steps to generate `docs/context.md`, then proceed.
 Read the relevant files to understand existing code and patterns. Ask if anything is unclear — never assume.
 
 When writing tests for this project:

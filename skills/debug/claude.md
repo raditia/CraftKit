@@ -13,7 +13,7 @@ Before doing anything else:
 1. Find the project root — walk up from CWD to the nearest directory containing `package.json`
 2. Check if `docs/context.md` exists there
 3. **If found:** read it — use it as your understanding of what's being worked on. Skip re-scanning the project.
-4. **If not found:** stop and tell the user: "No context found. Run `/fe-context` first to generate `docs/context.md`."
+4. **If not found:** automatically run the fe-context steps — collect staged/committed/pushed changes, analyze, and write `docs/context.md` — then proceed with the original task.
 
 ---
 
