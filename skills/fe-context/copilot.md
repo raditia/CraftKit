@@ -1,21 +1,42 @@
-RESPONSE STYLE: Brief. Minimal tokens. Bullets over prose. No filler sentences. Direct only.
+RESPONSE STYLE: Brief. Minimal tokens. Bullets over prose. No filler. Direct only.
 COMMANDS: Always use rtk prefix — rtk git diff, rtk git log, rtk git status.
-CONTEXT FIRST: Before making any changes, read the relevant files to understand existing code and patterns. Ask if anything is unclear — never assume.
+CONTEXT FIRST: Read relevant files and understand existing patterns before acting. Ask if anything is unclear — never assume.
 
-When generating or updating feature context:
+CONTEXT HIERARCHY — structure context from most persistent to most transient:
+1. Rules: project-wide conventions (Entry/View/Presenter/Model/Resource, Token styling, RTK) — always in skills
+2. Spec: what is being built, constraints, decisions — stored in docs/context.md
+3. Source files: only files touched by this branch
+4. Errors/tests: failing tests, lint errors, TypeScript errors
+5. Conversation history: accumulates; compact when switching tasks
+
+SELECTIVE INCLUDE: only load what is relevant to the current diff. Target < 2,000 lines of focused context. Do not dump entire unrelated files.
 
 COLLECT — run these commands:
-- Staged (uncommitted): rtk git diff --cached --name-status + rtk git diff --cached
+- Staged: rtk git diff --cached --name-status + rtk git diff --cached
 - Committed not pushed: rtk git log @{u}..HEAD --oneline + rtk git diff @{u}..HEAD
 - Pushed vs base: rtk git log main...@{u} --oneline + rtk git diff main...@{u}
 
-WRITE — find project root (nearest package.json), create or update docs/context.md with:
-- Summary: 2-4 sentences on what is being built
-- Changed files grouped by layer (staged / committed-not-pushed / pushed)
-- Key changes: bullets on what was added, modified, removed
-- Architecture patterns in use: Entry/View/Presenter/Model/Resource files; state, styling, tracking
-- Test coverage needed: new or changed files/functions that lack tests
+INLINE PLAN: before generating, emit a brief step-by-step plan and pause if anything seems wrong.
 
-UPDATE RULE: if docs/context.md already exists, update only changed sections — preserve manually added notes.
+CONFLICT DETECTION — scan the diff before writing. For each violation found (View with useState, Presenter returning JSX, inline styles, eslint-disable without reason), surface it explicitly:
+"CONFLICT: file:line — found X, expected Y. Options: A) ... B) ... Awaiting direction."
+Never silently resolve conflicts.
 
-LOOKUP RULE: for all other tasks, check for docs/context.md in the project root first. If present, read it before proceeding. If absent, tell the user to run /fe-context first.
+WRITE docs/context.md at the project root (nearest package.json):
+- L2: Feature summary (2-4 sentences), constraints, key decisions
+- L3: Changed files by layer (staged/committed/pushed) with file roles
+- L2: Architecture patterns in use (EVPMR files; state; styling; tracking)
+- L4: Known issues (lint errors, TypeScript errors, failing tests)
+- L2: Conflicts/ambiguities (unresolved)
+- L3: Test coverage needed
+- Note context budget at top. Flag if > 2,000 lines.
+
+UPDATE RULE: if docs/context.md exists, update changed sections only — preserve manually added notes.
+
+LOOKUP RULE: for all other tasks, read docs/context.md first using selective include — load only sections relevant to the current task. Surface ambiguity explicitly — never guess.
+
+ANTI-PATTERNS TO AVOID:
+- Context starvation: acting without loading context.md
+- Context flooding: loading entire files not relevant to the task
+- Stale context: using context.md from a different task without refreshing
+- Silent confusion: guessing when context conflicts with code

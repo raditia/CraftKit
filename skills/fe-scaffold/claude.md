@@ -12,8 +12,18 @@
 Before doing anything else:
 1. Find the project root — walk up from CWD to the nearest directory containing `package.json`
 2. Check if `docs/context.md` exists there
-3. **If found:** read it — use it as your understanding of what's being worked on. Skip re-scanning the project.
-4. **If not found:** automatically run the fe-context steps — collect staged/committed/pushed changes, analyze, and write `docs/context.md` — then proceed with the original task.
+3. **If not found:** automatically run the fe-context steps to generate it, then continue
+4. **Selective include:** read only the sections of `docs/context.md` relevant to the current task — not the whole file:
+   - `fe-scaffold` → Summary, Architecture Patterns, Changed Files
+   - `fe-review` → Summary, Key Changes, Architecture Patterns, Conflicts/Ambiguities
+   - `fe-test` → Summary, Key Changes, Test Coverage Needed
+   - `debug` → Summary, Key Changes, Known Issues, Conflicts/Ambiguities
+5. **Confusion management:** if context conflicts with what you observe in the code, surface it — never silently pick one interpretation:
+   ```
+   CONFUSION: docs/context.md says X but the code shows Y.
+   Options: A) ... B) ... → Which should I follow?
+   ```
+6. Never invent requirements not in context — ask instead
 
 ---
 
