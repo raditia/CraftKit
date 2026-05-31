@@ -39,6 +39,12 @@ _register_copilot_file() {
         return 0
     fi
 
+    if ! jq empty "$settings" 2>/dev/null; then
+        echo "    [copilot] settings.json has invalid JSON — skipping VS Code registration"
+        echo "    Fix: open '$settings' and correct the JSON syntax, then re-run install.sh"
+        return 0
+    fi
+
     local tmp
     tmp="$(mktemp)"
     jq --arg path "$skill_path" --arg key "$key" '
@@ -54,6 +60,7 @@ _unregister_copilot_file() {
     settings="$(_vscode_settings_path)"
     [[ -z "$settings" || ! -f "$settings" ]] && return 0
     command -v jq &>/dev/null || return 0
+    jq empty "$settings" 2>/dev/null || return 0
 
     local tmp
     tmp="$(mktemp)"

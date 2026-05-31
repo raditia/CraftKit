@@ -220,10 +220,12 @@ ensure_tools() {
         rtk init -g --auto-patch 2>/dev/null && echo "    rtk hook (ok)" || true
     fi
 
-    # Caveman — install if the skill file is missing
+    # Caveman — install if missing. --only claude prevents caveman from running
+    # `npx skills add` inside this repo directory (which would create skills/caveman*
+    # symlinks that our sync picks up as first-party skills).
     if [[ ! -f "$HOME/.claude/commands/caveman.md" ]]; then
         echo "    + installing caveman..."
-        curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash -s -- --non-interactive
+        curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash -s -- --non-interactive --only claude
     else
         echo "    caveman (ok)"
     fi
