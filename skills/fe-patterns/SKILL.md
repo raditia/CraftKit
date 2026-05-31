@@ -13,11 +13,7 @@ alwaysApply: false
 
 ---
 
-## Load project context
-
-1. Find project root — nearest `package.json` going up from CWD
-2. If `docs/context.md` missing → auto-run `/fe-context` steps first
-3. **Selective include:** read only `Summary`, `Architecture Patterns in Use`, `Key Changes`
+**Context:** `docs/context.md` — read: Summary, Architecture Patterns in Use, Key Changes. Standard load procedure in `/using-agent-skills`.
 
 ---
 
@@ -39,32 +35,12 @@ Never put state in View. Never fetch data outside a Presenter.
 
 ## Hooks discipline
 
+> `fe-rules` (always active) enforces: derive during render not useEffect, primitive effect deps, no nested components, ternary not `&&`, stable keys, functional setState. Not repeated here.
+
 - Top-level only — never conditional or inside loops
 - Cleanup every subscription, interval, and listener in return of `useEffect`
-- Functional updater when new state depends on old: `setCount(c => c + 1)`
 - Default: **do not memoize** — add `useMemo`/`useCallback` only when a profiler proves it matters or a dependency chain requires stability
 - Extract to a custom hook only when the same hook sequence appears in 2+ Presenters
-
-### Derive during render — never via `useEffect`
-
-```ts
-// WRONG — extra render, can desync
-const [full, setFull] = useState('');
-useEffect(() => setFull(`${first} ${last}`), [first, last]);
-
-// CORRECT — derive inline
-const full = `${first} ${last}`;
-```
-
-### Primitive effect dependencies
-
-Objects and arrays get new identity on every render — use primitives as deps:
-```ts
-// WRONG
-useEffect(() => {}, [{ id, name }]);
-// CORRECT
-useEffect(() => {}, [id, name]);
-```
 
 ---
 

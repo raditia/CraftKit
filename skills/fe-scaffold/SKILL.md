@@ -13,17 +13,7 @@ alwaysApply: false
 
 ---
 
-## Load project context
-
-1. Find project root — nearest `package.json` going up from CWD
-2. If `docs/context.md` missing → auto-run `/fe-context` steps first
-3. **Selective include:** read only `Summary`, `Architecture Patterns in Use`, `Changed Files`
-4. If context conflicts with what you observe:
-   ```
-   CONFUSION: docs/context.md says X but existing code shows Y.
-   Options: A) ... B) ... → Which?
-   ```
-5. Never invent requirements not in context — ask instead
+**Context:** `docs/context.md` — read: Summary, Architecture Patterns in Use, Changed Files. Standard load procedure in `/using-agent-skills`. Never invent requirements not in context — ask instead.
 
 ---
 

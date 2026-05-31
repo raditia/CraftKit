@@ -12,104 +12,38 @@ description: Bug fix workflow — orchestrates fe-context, debug (reproduce → 
 
 ## How to run this workflow
 
-Five steps: reproduce → isolate → hypothesize → fix → verify. Never skip to fix without a hypothesis.
+Run the `/debug` skill workflow in full: Reproduce → Isolate → Hypothesize → Fix → Verify. Never skip to fix without a hypothesis.
 
 ---
 
 ## Step 1 — Context
 
 1. Detect base branch: `rtk git remote show origin | grep 'HEAD branch'`
-2. Read `docs/context.md` if present (selective: Summary + Key Changes only)
-3. Capture the exact failure: error message, stack trace, failing test output, reproduction steps
+2. Read `docs/context.md` — Summary + Key Changes only
+3. Capture the exact failure: error message, stack trace, failing test output
 
 ---
 
-## Step 2 — Reproduce
+## Steps 2–5 — Debug
 
-Confirm the bug is reproducible:
-```bash
-rtk jest path/to/__tests__/FileName.test.tsx   # failing test
-rtk tsc --noEmit                                # type errors
-rtk lint path/to/file                           # lint errors
-```
-
-If the bug is a runtime behavior:
-- Write a failing test that captures the exact failure before touching any code
-- The test must fail for the right reason — not just "error thrown" but the specific assertion
-
-**Gate:** Failure is reproducible and documented.
-
----
-
-## Step 3 — Isolate
-
-Narrow to the smallest change that triggers the failure:
-
-1. Bisect if needed: `rtk git bisect start`, `rtk git bisect bad`, `rtk git bisect good <hash>`
-2. Comment out code paths to identify which line/function is responsible
-3. Check recent changes: `rtk git log --oneline -10`, `rtk git diff HEAD~1`
-4. Grep for related patterns: `rtk grep "functionName" .`
-
-State what you find:
-```
-ISOLATED: the failure occurs in PresenterX.ts:42 when Y returns null
-```
-
-**Gate:** Single root cause identified. Not "somewhere in the flow" — specific file and line.
-
----
-
-## Step 4 — Hypothesize
-
-Before writing any fix, state the hypothesis:
-```
-HYPOTHESIS: [what is wrong and why]
-EXPECTED:   [what should happen]
-ACTUAL:     [what happens instead]
-FIX PLAN:   [one-sentence description of the change]
-```
-
-If you cannot form a clear hypothesis after 2 isolation attempts:
-```
-ESCALATE:
-Reason: no clear hypothesis after 2 isolation attempts
-Recommended: claude-opus-4-7
-Claude Code: /model claude-opus-4-7 → re-invoke /fix
-```
-
----
-
-## Step 5 — Fix
-
-**Surgical changes only** — touch only what is needed to fix the root cause:
-- Do not refactor code adjacent to the fix
-- Do not remove pre-existing dead code (mention it, don't delete it)
-- Do not add features "while you're in there"
-- Every changed line must trace directly to the hypothesis
-
-After fixing:
-```bash
-rtk tsc --noEmit
-rtk lint path/to/changed/file
-```
-
-**Gate:** Type check and lint pass.
+Follow the `/debug` workflow exactly:
+- **Reproduce:** confirm bug is reproducible; write a failing test before touching code
+- **Isolate:** narrow to specific file and line — not "somewhere in the flow"
+- **Hypothesize:** `HYPOTHESIS / EXPECTED / ACTUAL / FIX PLAN` before any code change; escalate to `claude-opus-4-7` if no hypothesis after 2 attempts
+- **Fix:** surgical changes only — every changed line traces to the hypothesis; `rtk tsc --noEmit` + `rtk lint` must pass
 
 ---
 
 ## Step 6 — Verify
 
-Run the full test suite for the affected area:
 ```bash
 rtk jest path/to/feature/
 rtk jest --coverage path/to/feature/
 ```
 
-All must pass. Coverage must stay ≥ 93%. If coverage drops, add tests.
+All tests pass. Coverage ≥ 93%. Add a regression test — the failing scenario must be permanently covered.
 
-Add a regression test if one didn't exist — the failing scenario should be permanently covered.
-
-**Gate:** All tests pass. Coverage ≥ 93%. Regression test exists for this bug.
+**Gate:** All tests pass. Coverage ≥ 93%. Regression test exists.
 
 ---
 

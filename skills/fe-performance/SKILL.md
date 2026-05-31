@@ -13,11 +13,7 @@ alwaysApply: false
 
 ---
 
-## Load project context
-
-1. Find project root — nearest `package.json` going up from CWD
-2. If `docs/context.md` missing → auto-run `/fe-context` steps first
-3. **Selective include:** read only `Summary`, `Key Changes`, `Architecture Patterns in Use`
+**Context:** `docs/context.md` — read: Summary, Key Changes, Architecture Patterns in Use. Standard load procedure in `/using-agent-skills`.
 
 ---
 
@@ -140,20 +136,7 @@ after(() => logAnalytics(data)); // runs after response is sent
 
 ## 4. Re-render optimization (MEDIUM)
 
-**Derive values during render — never via `useEffect`** (this is also a `fe-rules` constraint):
-```ts
-// WRONG — extra render cycle, can desync
-const [full, setFull] = useState('');
-useEffect(() => setFull(`${first} ${last}`), [first, last]);
-
-// CORRECT
-const full = `${first} ${last}`;
-```
-
-**Functional `setState` for stable callbacks in Presenter:**
-```ts
-const increment = useCallback(() => setCount((c) => c + 1), []);
-```
+> `fe-rules` (always active) covers: derive during render not useEffect, primitive effect deps, functional setState. Not repeated here.
 
 **`React.memo` only when:** component re-renders frequently + props are usually the same + render is measurably expensive. Memo adds an equality check on every render — overhead if props differ on most renders.
 
@@ -161,14 +144,6 @@ const increment = useCallback(() => setCount((c) => c + 1), []);
 ```tsx
 const EMPTY: Route[] = [];
 <RouteList routes={routes ?? EMPTY} />
-```
-
-**Primitive effect dependencies** — objects create new identity on every render:
-```ts
-// WRONG
-useEffect(() => {}, [{ id, name }]);
-// CORRECT
-useEffect(() => {}, [id, name]);
 ```
 
 **Subscribe to derived booleans in selectors, not raw values:**

@@ -69,22 +69,7 @@ Fix all errors. No `// eslint-disable` without a documented reason.
 
 ## Step 5 — Review
 
-Run the full review (both general quality and EVPMR):
-
-**EVPMR checklist:**
-- [ ] No `useState`/`useEffect`/API calls in View
-- [ ] No JSX in Presenter
-- [ ] No inline styles — `StyleSheet.create()` + `Token.*` only
-- [ ] All display strings in Resource
-- [ ] All tracking in Presenter handlers (not View)
-- [ ] `<ErrorBoundary>` in every Entry file
-
-**General quality:**
-- [ ] No secrets, tokens, or PII in source or logs
-- [ ] User input validated at system boundaries
-- [ ] Auth checks on every Server Action (Next.js)
-- [ ] No sequential awaits where `Promise.all` applies
-- [ ] No barrel imports for heavy packages
+Run the `/review` command — applies `/code-review` (5-axis: correctness, readability, architecture, security, performance) and `/fe-review` (EVPMR checklist). Use severity labels from `/using-agent-skills`.
 
 **Gate:** No `[ERROR]` findings remain.
 

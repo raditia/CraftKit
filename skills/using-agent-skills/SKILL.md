@@ -49,6 +49,28 @@ Task arrives
 
 ---
 
+## Standard context loading
+
+Every skill follows this on start — not repeated per skill:
+1. Find project root — nearest `package.json` going up from CWD
+2. If `docs/context.md` missing → run `/fe-context` first
+3. Read only the sections the skill specifies (see each skill's **Context:** line)
+4. If context conflicts with code → `CONFUSION: docs/context.md says X but code shows Y. Options: A) ... B) ... → Which?`
+
+---
+
+## Severity labels
+
+One system used across all skills and commands:
+
+| Label | Required | Meaning |
+|-------|----------|---------|
+| `[ERROR]` | Yes | Must fix — blocks merge, correctness, security, or hard EVPMR violation |
+| `[WARNING]` | Should | Convention deviation, soft pattern violation, or test gap |
+| `[SUGGESTION]` | Optional | Improvement worth considering — author may ignore |
+
+---
+
 ## Core operating behaviors
 
 These apply at all times, across every skill. Non-negotiable.

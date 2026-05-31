@@ -13,16 +13,7 @@ alwaysApply: false
 
 ---
 
-## Load project context
-
-1. Find project root — nearest `package.json` going up from CWD
-2. If `docs/context.md` missing → auto-run `/fe-context` steps first
-3. **Selective include:** read only `Summary`, `Key Changes`, `Test Coverage Needed`
-4. If context conflicts with what you observe:
-   ```
-   CONFUSION: docs/context.md says X but code shows Y.
-   Options: A) ... B) ... → Which?
-   ```
+**Context:** `docs/context.md` — read: Summary, Key Changes, Test Coverage Needed. Standard load procedure in `/using-agent-skills`.
 5. Never invent test cases not grounded in the actual diff or context — ask instead
 
 ---

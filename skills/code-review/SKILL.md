@@ -13,16 +13,9 @@ alwaysApply: false
 
 ---
 
-## Load project context
+**Context:** `docs/context.md` — read: Summary, Key Changes, Architecture Patterns in Use, Conflicts/Ambiguities. Standard load procedure in `/using-agent-skills`.
 
-1. Find project root — nearest `package.json` going up from CWD
-2. If `docs/context.md` missing → auto-run `/fe-context` steps first
-3. **Selective include:** read only `Summary`, `Key Changes`, `Architecture Patterns in Use`, `Conflicts/Ambiguities`
-4. If context conflicts with observed code:
-   ```
-   CONFUSION: docs/context.md says X but code shows Y.
-   Options: A) ... B) ... → Which takes precedence?
-   ```
+> For day-to-day reviews use the `/review` command — it runs this + fe-review automatically. Use this skill directly for deep reviews: large PRs, change sizing judgements, dependency discipline.
 
 ---
 
@@ -102,30 +95,16 @@ Perfect is the enemy of shipped. Review for real issues — not personal prefere
 
 ---
 
-## Severity labels
-
-Label every comment so authors know what's required vs. optional:
-
-| Prefix | Required? | Meaning |
-|--------|-----------|---------|
-| *(none)* | Yes | Must address before merge |
-| **Critical:** | Yes | Blocks merge — security, data loss, broken functionality |
-| **Nit:** | No | Minor style preference — author may ignore |
-| **Optional:** / **Consider:** | No | Worth considering but not required |
-| **FYI** | No | Informational only — no action needed |
-
----
-
 ## Output format
 
-For each issue:
+Use the unified severity labels from `/using-agent-skills`. For each issue:
 ```
-[SEVERITY] File:line — description
+[ERROR]      File:line — description (blocks merge)
+[WARNING]    File:line — description (should fix)
+[SUGGESTION] File:line — description (optional)
   Why: ...
   Fix: ...
 ```
-
-`ERROR` = blocks merge | `WARNING` = convention deviation | `SUGGESTION` = improvement opportunity
 
 ---
 
@@ -167,7 +146,7 @@ Before adding any dependency:
 - [ ] **Security:** no secrets, input validated at boundaries, external data untrusted, auth checked
 - [ ] **Performance:** no N+1, stable refs (useCallback/useMemo), no anon JSX props, stable list keys
 - [ ] **Verification:** `rtk tsc --noEmit` | `rtk lint` | `rtk jest` — all pass
-- [ ] **Verdict:** Approve / Request changes
+- [ ] **Verdict:** `APPROVE` / `REQUEST CHANGES` — list blocking `[ERROR]` items if requesting changes
 
 ---
 

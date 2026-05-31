@@ -61,37 +61,7 @@ Review every changed file on these axes:
 
 ## Step 3 — EVPMR review
 
-Check every changed file against these constraints:
-
-**Architecture**
-- [ ] View files: no `useState`, `useEffect`, or direct API calls
-- [ ] Presenter files: no JSX returned
-- [ ] Model files: no React imports, no side effects
-- [ ] Entry files: `<ErrorBoundary>` wraps all content
-- [ ] Resource files: only display strings — no logic
-
-**Styling**
-- [ ] No inline styles: `style={{ ... }}` is forbidden
-- [ ] `StyleSheet.create()` at bottom of every RN component file
-- [ ] Only `Token.spacing.*`, `Token.color.*`, `Token.border.*` — no magic numbers
-
-**TypeScript**
-- [ ] No `any` — use `unknown` + narrowing if type is genuinely unknown
-- [ ] All exported functions have explicit return types
-- [ ] `type Props = { ... }` above each component
-
-**State**
-- [ ] Single-Presenter state in `useState` inside that Presenter
-- [ ] Multi-Presenter shared state lifted to Entry / Context — not Redux unless genuinely cross-feature
-- [ ] Async data typed as discriminated unions (`NOT_ASKED | LOADING | DATA_READY | ERROR`)
-
-**Tracking**
-- [ ] `useTracker()` from `@traveloka/core` — no direct tracker calls
-- [ ] All tracking calls in Presenter handlers, not in View
-
-**Tests**
-- [ ] New code paths have tests
-- [ ] Coverage still ≥ 93% — run `rtk jest --coverage path/to/feature/` if unsure
+Run the `/fe-review` checklist in full. `fe-rules` (always active) defines the layer constraints — flag any violation using the severity labels from `/using-agent-skills`.
 
 ---
 

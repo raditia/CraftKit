@@ -31,64 +31,15 @@ Run the `/fe-context` workflow:
 
 ## Step 2 — Scaffold
 
-Surface assumptions before creating any files:
-```
-ASSUMPTIONS I'M MAKING:
-1. Feature name: [derived from request]
-2. Target platform: [RN / Next.js / both]
-3. Data source: [API endpoint / local state / TBD]
-→ Correct me now or I'll proceed with these.
-```
-
-Create the 5-file EVPMR module:
-```
-feature-name/
-├── EntryFeatureName.tsx      ← ErrorBoundary + context providers
-├── ViewFeatureName.tsx       ← Pure render — calls usePresenter*, no state/effects
-├── PresenterFeatureName.ts  ← All hooks, state, React Query — returns plain object
-├── ModelFeatureName.ts      ← TypeScript types + pure functions only
-└── ResourceFeatureName.ts   ← Content resource keys (display strings)
-```
-
-Scaffold rules (apply to every file created):
-- `strict: true`, no `any`, explicit return types on all exported functions
-- `type Props = { ... }` above each component
-- Async data typed as discriminated unions: `NOT_ASKED | LOADING | DATA_READY | ERROR`
-- All display strings in Resource — never hardcode in View
-- View: no `useState`/`useEffect`/API calls; pure JSX only
-- Presenter: no JSX; returns plain object
-- Entry: always wraps in `<ErrorBoundary>`
+Follow the `/fe-scaffold` workflow — surface assumptions first, then create the 5-file EVPMR module. Apply all TypeScript, styling, and layer rules from that skill.
 
 **Gate:** All 5 files created, `rtk tsc --noEmit` passes.
 
 ---
 
-## Step 3 — Implement (apply patterns + performance continuously)
+## Step 3 — Implement
 
-While writing implementation code, apply these rules at all times:
-
-**State location:**
-```
-Used by one Presenter?       → useState inside that Presenter
-Used by multiple Presenters? → lift to Entry / Context
-Async server data?           → React Query useQuery / useMutation in Presenter
-Display strings?             → Resource file
-```
-
-**Hooks discipline:**
-- Derive values during render — never `useEffect` to sync derived state
-- Primitive deps in effects — objects/arrays get new identity every render
-- No components defined inside components
-- Functional setState when new value depends on old: `setCount(c => c + 1)`
-- Cleanup every subscription/interval/listener in useEffect return
-
-**Performance (apply as you build, not after):**
-- Parallelize independent fetches: `const [a, b] = await Promise.all([getA(), getB()])`
-- Direct imports, not barrel imports: `import { X } from '@/components/X'`
-- RN: `FlatList` over `ScrollView` for lists, `StyleSheet.create()` always, `useNativeDriver: true` for animations
-- Next.js RSC: `React.cache()` for per-request deduplication, authenticate every Server Action
-- Conditional render: ternary not `&&` — `count > 0 ? <Badge /> : null`
-- Stable `key` props on lists — database ID, never array index
+Apply `/fe-patterns` (state location, hooks discipline, data fetching) and `/fe-performance` (waterfall elimination, bundle size, RN specifics) continuously as you build — not as a post-pass. `fe-rules` (always active) enforces layer constraints and React correctness throughout.
 
 **Gate:** `rtk tsc --noEmit` passes after every logical chunk.
 
@@ -96,19 +47,9 @@ Display strings?             → Resource file
 
 ## Step 4 — Review
 
-Run the EVPMR checklist before writing tests:
+Run the `/fe-review` checklist. Flag issues as `[ERROR]` / `[WARNING]` / `[SUGGESTION]`. Run `rtk tsc --noEmit` and `rtk lint`.
 
-- [ ] No `useState`/`useEffect`/API calls in View
-- [ ] No JSX in Presenter
-- [ ] All display strings in Resource (no hardcoded text in View)
-- [ ] No inline styles — `StyleSheet.create()` + `Token.*` tokens only
-- [ ] All tracking calls in Presenter handlers, not in View
-- [ ] `rtk tsc --noEmit` clean
-- [ ] `rtk lint` clean
-
-Flag any issue as `[ERROR]` (must fix), `[WARNING]` (should fix), or `[SUGGESTION]` (optional).
-
-**Gate:** No `[ERROR]` items remain.
+**Gate:** No `[ERROR]` items remain, tsc and lint clean.
 
 ---
 
