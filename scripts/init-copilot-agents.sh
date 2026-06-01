@@ -5,6 +5,9 @@
 #   .github/copilot-instructions.md  — always-active rules (auto-loaded every chat)
 #   .github/agents/<skill>.agent.md  — @-invokable agents per skill/command
 #
+# Registers the project path in ~/.agentic-skills-state/copilot-projects so
+# sync.sh can auto-update agents on every git pull.
+#
 # Usage:
 #   bash ~/agentic-skills/scripts/init-copilot-agents.sh           # current dir
 #   bash ~/agentic-skills/scripts/init-copilot-agents.sh /path/to/project
@@ -15,23 +18,24 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RULES_DIR="$REPO_DIR/rules"
 SKILLS_DIR="$REPO_DIR/skills"
 COMMANDS_DIR="$REPO_DIR/commands"
+STATE_DIR="$HOME/.agentic-skills-state"
+PROJECTS_FILE="$STATE_DIR/copilot-projects"
 
 TARGET_DIR="${1:-$(pwd)}"
+TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"  # normalize to absolute path
 AGENTS_DIR="$TARGET_DIR/.github/agents"
 COPILOT_INSTRUCTIONS="$TARGET_DIR/.github/copilot-instructions.md"
 
-mkdir -p "$AGENTS_DIR"
+mkdir -p "$AGENTS_DIR" "$STATE_DIR"
 
 # ── copilot-instructions.md ───────────────────────────────────────────────────
-# Concat all rules — Copilot auto-loads this every chat session in this repo.
 
 echo "→ .github/copilot-instructions.md"
 {
-    echo "<!-- managed by agentic-skills — re-run init-copilot-agents.sh to update -->"
+    echo "<!-- managed by agentic-skills — do not edit manually -->"
     for f in "$RULES_DIR"/*.md; do
         [[ -f "$f" ]] || continue
         echo ""
-        # Strip frontmatter (--- ... ---) — not needed in instructions file
         awk '/^---$/{if(fm==0){fm=1;next}else{fm=0;next}} fm==0{print}' "$f"
         echo ""
     done
@@ -39,7 +43,6 @@ echo "→ .github/copilot-instructions.md"
 echo "   written"
 
 # ── .github/agents/<name>.agent.md ───────────────────────────────────────────
-# One agent file per skill and command. Invoked with @<name> in Copilot Chat.
 
 echo "→ .github/agents/"
 
@@ -47,12 +50,24 @@ _write_agent() {
     local name="$1"
     local source_file="$2"
     local dest="$AGENTS_DIR/${name}.agent.md"
-
-    # Strip alwaysApply line — not meaningful for Copilot agents
     sed '/^alwaysApply:/d' "$source_file" > "$dest"
     echo "   + @${name}"
 }
 
+# Remove stale agents (skill/command deleted from repo)
+for existing in "$AGENTS_DIR"/*.agent.md; do
+    [[ -f "$existing" ]] || continue
+    agent_name="$(basename "$existing" .agent.md)"
+    skill_exists=0
+    [[ -f "$SKILLS_DIR/$agent_name/SKILL.md" ]] && skill_exists=1
+    [[ -f "$COMMANDS_DIR/$agent_name.md" ]]     && skill_exists=1
+    if [[ $skill_exists -eq 0 ]]; then
+        rm "$existing"
+        echo "   - removed @${agent_name}"
+    fi
+done
+
+# Install/update agents
 for dir in "$SKILLS_DIR"/*/; do
     [[ -d "$dir" ]] || continue
     skill_name="$(basename "$dir")"
@@ -66,6 +81,14 @@ for f in "$COMMANDS_DIR"/*.md; do
     cmd_name="$(basename "$f" .md)"
     _write_agent "$cmd_name" "$f"
 done
+
+# ── Register project for auto-sync ───────────────────────────────────────────
+
+if [[ ! -f "$PROJECTS_FILE" ]] || ! grep -qF "$TARGET_DIR" "$PROJECTS_FILE" 2>/dev/null; then
+    echo "$TARGET_DIR" >> "$PROJECTS_FILE"
+    echo ""
+    echo "   registered for auto-sync on git pull"
+fi
 
 echo ""
 echo "Done. Invoke in Copilot Chat:"

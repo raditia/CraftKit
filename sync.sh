@@ -240,5 +240,35 @@ for adapter in "${ADAPTERS[@]}"; do
         "finalize_${adapter}"
     fi
 done
+sync_copilot_projects() {
+    local projects_file="$STATE_DIR/copilot-projects"
+    [[ -f "$projects_file" ]] || return 0
+
+    local updated=0
+    local stale=()
+
+    while IFS= read -r project_dir; do
+        [[ -n "$project_dir" ]] || continue
+        if [[ ! -d "$project_dir/.github/agents" ]]; then
+            stale+=("$project_dir")
+            continue
+        fi
+        echo ""
+        echo "[copilot-agents] $project_dir"
+        bash "$REPO_DIR/scripts/init-copilot-agents.sh" "$project_dir" 2>&1 | sed 's/^/    /'
+        updated=1
+    done < "$projects_file"
+
+    # Remove stale entries (project deleted or agents dir removed)
+    if [[ ${#stale[@]} -gt 0 ]]; then
+        for s in "${stale[@]}"; do
+            grep -vF "$s" "$projects_file" > "${projects_file}.tmp" && mv "${projects_file}.tmp" "$projects_file" || true
+            echo "    [copilot-agents] unregistered: $s (agents dir gone)"
+        done
+    fi
+}
+
+sync_copilot_projects
+
 echo ""
 echo "Sync complete."
