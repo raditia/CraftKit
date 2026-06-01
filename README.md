@@ -55,7 +55,7 @@ bash install.sh
 
 `install.sh` wires up the post-merge hook and runs the first sync. After that, `git pull` keeps everything up to date automatically.
 
-**Requirements:** bash 4+, curl. On macOS: `brew install bash` if needed.
+**Requirements:** bash 3.2+, curl. macOS ships bash 3.2 by default — no upgrade needed.
 Optional: `jq` for Copilot VS Code settings integration.
 
 **Per-project Copilot `@` agents** (run inside any project repo):

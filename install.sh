@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
-    echo "Error: bash 4+ required. On macOS: brew install bash"
+if [[ "${BASH_VERSINFO[0]}" -lt 3 ]] || [[ "${BASH_VERSINFO[0]}" -eq 3 && "${BASH_VERSINFO[1]}" -lt 2 ]]; then
+    echo "Error: bash 3.2+ required (got ${BASH_VERSION})"
     exit 1
 fi
 
