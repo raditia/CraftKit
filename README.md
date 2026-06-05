@@ -150,6 +150,7 @@ Say what you want in plain language. These bundle the right skills automatically
 | [`/review`](commands/review.md) | "help me review", "review the changes", "LGTM check" | fe-context → code-quality (5-axis) → fe-review (EVPMR) |
 | [`/fix`](commands/fix.md) | "something is broken", "fix this bug", "this crashes" | fe-context → debug → fe-test |
 | [`/ship`](commands/ship.md) | "get this ready to merge", "ship this", "prepare for PR" | fe-test → coverage → tsc → lint → review |
+| [`/fe-test`](skills/fe-test/SKILL.md) | "write tests", "add tests", "test this", "coverage is low", "improve coverage", "missing tests" | write/improve tests, enforce ≥ 93% coverage |
 
 ### Frontend skills — on demand
 
@@ -185,7 +186,7 @@ Every session
       │
       ├─► karpathy-guidelines  — think before coding, simplicity, surgical changes
       ├─► fe-rules             — EVPMR constraints, TypeScript, styling, React correctness
-      └─► using-agent-skills   — skill routing, severity labels, core behaviors
+      └─► using-agent-skills   — skill routing, severity labels, core behaviors, skill invocation announcement
 ```
 
 ### Orchestrator workflow
