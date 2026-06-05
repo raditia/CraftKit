@@ -114,6 +114,13 @@ Touch only what was asked. When your changes create orphans — remove imports, 
 ### 6. Verify before claiming done
 Every skill has a verification step. "Seems right" is never sufficient — there must be evidence: passing tests, build output, lint clean, runtime data.
 
+### 7. Announce skill invocation
+Before invoking any skill or command, tell the user which one you're using:
+```
+Running /fe-test — write and verify tests for changed code paths.
+```
+One line, before the skill executes. Lets the user redirect before work begins.
+
 ---
 
 ## Skill authoring rules

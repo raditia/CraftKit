@@ -7,6 +7,8 @@ alwaysApply: false
 **Commands:** `rtk jest`, `rtk tsc`, `rtk lint`, `rtk grep "pattern" .`
 **Model:** everyday — escalate if coverage cannot reach 93% and root cause is non-obvious
 
+> Triggered by: "write tests", "add tests", "test this", "coverage is low", "improve coverage", "I need tests for X", "test coverage is failing", "missing tests"
+
 ---
 
 > **Core behaviors:** Surface assumptions about what needs testing. Never skip verification — tests must pass and coverage must be ≥ 93% before done. See `/using-agent-skills`.
@@ -60,6 +62,12 @@ beforeEach(() => {
 });
 ```
 Never let `@traveloka/*` hooks call real implementations in tests.
+
+**Fluent tracker chaining** — when production code calls `track(...).send(...)`, the mock must return an object with `send`, not a bare function:
+```ts
+useTracker: jest.fn(() => jest.fn(() => ({ send: jest.fn() }))),
+```
+Mismatch causes `TypeError: track(...).send is not a function`. Match the call shape used in the Presenter.
 
 ### Network mocking with MSW
 For tests that exercise real fetch/React Query flows (web):
