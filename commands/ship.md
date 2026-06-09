@@ -28,7 +28,7 @@ Three gates in order: tests pass → coverage met → review clean. All three mu
 
 Run the full test suite for every changed file:
 ```bash
-rtk jest path/to/feature/
+rtk test --testPathPattern="path/to/feature" --no-coverage
 ```
 
 Fix any failures. Do not proceed with failing tests.
@@ -40,7 +40,7 @@ Fix any failures. Do not proceed with failing tests.
 ## Step 3 — Coverage
 
 ```bash
-rtk jest --coverage path/to/feature/
+rtk test --testPathPattern="path/to/feature" --coverage
 ```
 
 Lines, Branches, Functions, Statements all ≥ 93%. Add tests until threshold is met.

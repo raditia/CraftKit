@@ -4,7 +4,8 @@ description: Write or improve tests covering all changed code paths. Enforces 93
 alwaysApply: false
 ---
 
-**Commands:** `rtk jest`, `rtk tsc`, `rtk lint`, `rtk grep "pattern" .`
+**Commands:** `rtk tsc`, `rtk lint`, `rtk grep "pattern" .`
+**Tests:** `rtk test --testPathPattern=<path> --no-coverage` (run from workspace root)
 **Model:** everyday — escalate if coverage cannot reach 93% and root cause is non-obvious
 
 > Triggered by: "write tests", "add tests", "test this", "coverage is low", "improve coverage", "I need tests for X", "test coverage is failing", "missing tests"
@@ -244,13 +245,13 @@ Cover every code path from the diff:
 
 ### 4. Run — all must pass
 ```bash
-rtk jest path/to/__tests__/FileName.test.tsx
+rtk test --testPathPattern="path/to/__tests__/FileName" --no-coverage
 ```
 Fix failures — never skip or comment out.
 
 ### 5. Coverage — must be ≥ 93%
 ```bash
-rtk jest --coverage path/to/feature/
+rtk test --testPathPattern="path/to/feature" --coverage
 ```
 Lines, Branches, Functions, Statements all ≥ 93%. Add tests until threshold is met.
 

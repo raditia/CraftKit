@@ -152,7 +152,7 @@ BEFORE SIMPLIFYING:
 
 One simplification at a time:
 ```bash
-rtk jest path/to/__tests__/
+rtk test --testPathPattern="path/to/__tests__" --no-coverage
 rtk tsc --noEmit
 ```
 If tests fail → revert and reconsider. Never batch multiple simplifications untested.
@@ -175,7 +175,7 @@ If tests fail → revert and reconsider. Never batch multiple simplifications un
 
 ## Verification (both modes)
 
-- [ ] `rtk jest` — all pass (simplify: without modification)
+- [ ] `rtk test --testPathPattern=<changed-path> --no-coverage` — all pass (simplify: without modification)
 - [ ] `rtk tsc --noEmit` — zero errors
 - [ ] `rtk lint` — zero errors
 - [ ] No unrelated changes mixed in

@@ -24,14 +24,14 @@ alwaysApply: false
 3. **Hypothesize** — state the most likely root cause before reading more code
 4. **Verify** — confirm or disprove with code and traces:
    ```bash
-   rtk jest path/to/__tests__/file.test.tsx
+   rtk test --testPathPattern="path/to/__tests__/file" --no-coverage
    rtk tsc --noEmit
    rtk grep "symbol" .
    ```
 5. **Fix** — minimal change only. Do not refactor unrelated code.
 6. **Confirm** — describe how to verify the fix:
    ```bash
-   rtk jest path/to/__tests__/file.test.tsx
+   rtk test --testPathPattern="path/to/__tests__/file" --no-coverage
    rtk lint path/to/fixed/file.tsx
    ```
 

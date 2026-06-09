@@ -3,7 +3,8 @@ name: fix
 description: Bug fix workflow — orchestrates fe-context, debug (reproduce → isolate → fix), and fe-test to verify the fix holds. Use when something is broken.
 ---
 
-**Commands:** `rtk jest`, `rtk tsc`, `rtk lint`, `rtk grep "pattern" .`
+**Commands:** `rtk tsc`, `rtk lint`, `rtk grep "pattern" .`
+**Tests:** `rtk test --testPathPattern=<path> --no-coverage` (run from workspace root)
 **Model:** everyday — escalate if no clear hypothesis after 2 isolation attempts
 
 > Triggered by: "something is broken", "fix this bug", "this test is failing", "this crashes", "why is X not working"
@@ -37,8 +38,8 @@ Follow the `/debug` workflow exactly:
 ## Step 6 — Verify
 
 ```bash
-rtk jest path/to/feature/
-rtk jest --coverage path/to/feature/
+rtk test --testPathPattern="path/to/feature" --no-coverage
+rtk test --testPathPattern="path/to/feature" --coverage
 ```
 
 All tests pass. Coverage ≥ 93%. Add a regression test — the failing scenario must be permanently covered.
@@ -54,4 +55,4 @@ Report:
 - Files changed (list)
 - Regression test added (yes/no + test name)
 - `rtk tsc --noEmit` result
-- `rtk jest --coverage` numbers
+- `rtk test --coverage` numbers

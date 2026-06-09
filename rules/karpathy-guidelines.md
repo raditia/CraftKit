@@ -72,7 +72,7 @@ Convert vague requests into verifiable goals before starting:
 |-------|-----------|
 | "Fix the bug" | Write a failing test that reproduces it, then make it pass |
 | "Add validation" | Write tests for invalid inputs, then make them pass |
-| "Refactor X" | Ensure `rtk jest` passes before and after |
+| "Refactor X" | Ensure `rtk test --testPathPattern=<path>` passes before and after |
 | "Scaffold the feature" | `rtk tsc --noEmit` and `rtk lint` pass on every generated file |
 
 For multi-step tasks, emit a brief plan before starting:

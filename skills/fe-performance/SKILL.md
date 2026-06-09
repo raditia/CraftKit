@@ -4,7 +4,8 @@ description: Performance optimization for React Native and Next.js within the EV
 alwaysApply: false
 ---
 
-**Commands:** `rtk tsc`, `rtk jest`, `rtk grep "pattern" .`
+**Commands:** `rtk tsc`, `rtk lint`, `rtk grep "pattern" .`
+**Tests:** `rtk test --testPathPattern=<path> --no-coverage` (run from workspace root)
 **Model:** everyday — escalate for Lighthouse regressions with non-obvious root cause or complex waterfall chains
 
 ---
@@ -246,7 +247,7 @@ const [tree] = useState(() => parseTree(largeInput));
 
 ## Verification
 
-- [ ] `rtk jest --coverage` — 93% maintained
+- [ ] `rtk test --testPathPattern=<changed-path> --coverage` — 93% maintained
 - [ ] `rtk tsc --noEmit` — zero errors
 - [ ] No `Promise.all` opportunities missed in Presenter
 - [ ] No inline style objects in React Native components

@@ -60,8 +60,8 @@ Write tests covering all new code paths:
 - All discriminated union states: `NOT_ASKED`, `LOADING`, `DATA_READY`, `ERROR`
 - All user interactions and tracking calls
 - Every `if/else`, ternary, and optional chaining fallback
-- Run: `rtk jest path/to/__tests__/FileName.test.tsx`
-- Coverage: `rtk jest --coverage path/to/feature/` — Lines, Branches, Functions, Statements all ≥ 93%
+- Run: `rtk test --testPathPattern="path/to/__tests__/FileName" --no-coverage`
+- Coverage: `rtk test --testPathPattern="path/to/feature" --coverage` — Lines, Branches, Functions, Statements all ≥ 93%
 
 **Gate:** All tests pass. Coverage ≥ 93% on all four metrics.
 

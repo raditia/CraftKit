@@ -3,7 +3,8 @@ name: using-agent-skills
 description: Skill routing, model selection, core operating behaviors, and failure modes. Always active.
 ---
 
-**Commands:** always prefix with `rtk` — `rtk git status`, `rtk git diff`, `rtk tsc`, `rtk jest`, `rtk lint`
+**Commands:** always prefix with `rtk` — `rtk git status`, `rtk git diff`, `rtk tsc`, `rtk lint`
+**Tests:** run from workspace root — `rtk test --testPathPattern=<path-or-pattern> --no-coverage` (or `--coverage` for gate checks)
 
 ---
 
