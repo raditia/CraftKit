@@ -74,6 +74,7 @@ Convert vague requests into verifiable goals before starting:
 | "Add validation" | Write tests for invalid inputs, then make them pass |
 | "Refactor X" | Ensure `rtk test --testPathPattern=<path>` passes before and after |
 | "Scaffold the feature" | `rtk tsc --noEmit` and `rtk lint` pass on every generated file |
+| Any code change | `npx tsc --noEmit` filtered to changed files — jest skips type checks |
 
 For multi-step tasks, emit a brief plan before starting:
 ```

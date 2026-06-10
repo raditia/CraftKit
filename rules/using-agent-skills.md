@@ -115,6 +115,8 @@ Touch only what was asked. When your changes create orphans — remove imports, 
 ### 6. Verify before claiming done
 Every skill has a verification step. "Seems right" is never sufficient — there must be evidence: passing tests, build output, lint clean, runtime data.
 
+**After any TypeScript code change** (source or test), run `npx tsc --noEmit` filtered to changed files before reporting done. Jest uses babel and skips type checking — passing tests do not guarantee type-correctness. Common misses: spread arg types (TS2556), missing required props (TS2322), incompatible types in mocks.
+
 ### 7. Announce skill invocation
 Before invoking any skill or command, tell the user which one you're using:
 ```
