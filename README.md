@@ -150,6 +150,7 @@ Say what you want in plain language. These bundle the right skills automatically
 | [`/review`](commands/review.md) | "help me review", "review the changes", "LGTM check" | fe-context → code-quality (5-axis) → fe-review (EVPMR) |
 | [`/fix`](commands/fix.md) | "something is broken", "fix this bug", "this crashes" | fe-context → debug → fe-test |
 | [`/ship`](commands/ship.md) | "get this ready to merge", "ship this", "prepare for PR" | fe-test → coverage → tsc → lint → review |
+| [`/pr-message`](commands/pr-message.md) | "generate PR message", "write PR description", "draft a PR", "what should my PR say" | pr-message (diff → message → clipboard) |
 | [`/fe-test`](skills/fe-test/SKILL.md) | "write tests", "add tests", "test this", "coverage is low", "improve coverage", "missing tests" | write/improve tests, enforce ≥ 93% coverage |
 
 ### Frontend skills — on demand
@@ -172,6 +173,7 @@ Invoke when a task is narrower than a full workflow. All prefixed `fe-` — futu
 |-------|-------------|-------------|
 | [`code-quality`](skills/code-quality/SKILL.md) | Review (5-axis) or simplify complex code — two modes in one skill | Security-sensitive review, or refactor > 500 lines |
 | [`debug`](skills/debug/SKILL.md) | Structured reproduce → isolate → fix | No clear hypothesis after 2 isolation attempts |
+| [`pr-message`](skills/pr-message/SKILL.md) | Generate PR message from branch diff — goal, changed files, test coverage, reviewer notes | Diff spans > 15 interdependent files |
 
 ---
 
@@ -203,6 +205,9 @@ Every session
 
 "get this ready to merge"
   /ship  →  fe-test → coverage → tsc → lint → review
+
+"generate PR message / draft a PR"
+  /pr-message  →  pr-message (diff → generate → clipboard)
 ```
 
 ### How `fe-context` feeds all skills
