@@ -58,6 +58,10 @@ When your changes create orphans:
 - Remove imports, variables, and functions that **your** changes made unused.
 - Don't remove pre-existing dead code unless explicitly asked.
 
+When your changes add required fields to a type or interface:
+- Search test files for mock objects that implement that type and add the missing fields.
+- Run `npx tsc --noEmit` on affected test files before reporting done — Jest skips type checks, so TS2739 errors are invisible until CI.
+
 Test: every changed line should trace directly to the user's request.
 
 ---
