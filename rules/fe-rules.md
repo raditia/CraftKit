@@ -44,6 +44,7 @@ Hard constraints for the Entry/View/Presenter/Model/Resource architecture. These
 - `strict: true` — no `any`, no implicit returns
 - `type Props = { ... }` above each component
 - Exported functions must have explicit return types
+- **No unused variables** (`no-unused-vars`): remove unused destructured names; if intentionally unused, prefix with `_` (e.g. `_inventoryActive`)
 
 ---
 
