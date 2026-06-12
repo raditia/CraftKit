@@ -55,8 +55,8 @@ Task arrives
 
 Every skill follows this on start — not repeated per skill:
 1. Find project root — nearest `package.json` going up from CWD
-2. If `docs/context.md` missing → run `/fe-context` first
-3. Read only the sections the skill specifies (see each skill's **Context:** line)
+2. If `docs/context.md` missing → run `/fe-context` first, then continue
+3. **Always read `docs/context.md`** — mandatory, not optional. Read only the sections the skill specifies (see each skill's **Context:** line); at minimum: Summary + Key Changes
 4. If context conflicts with code → `CONFUSION: docs/context.md says X but code shows Y. Options: A) ... B) ... → Which?`
 
 ---
@@ -191,7 +191,7 @@ Target: every line either teaches something unique or provides a reference a rea
 6. Modifying code orthogonal to the task
 7. Removing things you don't fully understand
 8. Skipping verification because "it looks right"
-9. Context starvation — acting without loading `docs/context.md`
+9. Skipping `docs/context.md` read — mandatory at skill start, no exceptions
 10. Context flooding — loading entire files not relevant to the current task
 
 ---
