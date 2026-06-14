@@ -45,6 +45,80 @@ Three namespaces — all synced automatically on every `git pull`:
 
 ---
 
+## Token savings
+
+Two compression layers work together — one on AI input, one on AI output.
+
+### RTK — compresses AI input (shell command output)
+
+Shell commands like `git diff` and `jest` produce verbose output full of noise. RTK filters it before it reaches the AI — fewer input tokens per operation.
+
+**`git status` — before vs after RTK:**
+
+```
+── WITHOUT RTK (38 tokens) ──────────────────────────────────────────
+On branch feature/checkout-flow
+Your branch is ahead of 'origin/feature/checkout-flow' by 3 commits.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update staging area)
+  (use "git checkout -- <file>..." to discard changes in working tree)
+
+        modified:   src/checkout/ViewCheckout.tsx
+        modified:   src/checkout/PresenterCheckout.ts
+
+Untracked files:
+  (use "git add" to include in what will be committed)
+        src/checkout/__tests__/ViewCheckout.test.tsx
+
+── WITH RTK (6 tokens) ──────────────────────────────────────────────
+M src/checkout/ViewCheckout.tsx
+M src/checkout/PresenterCheckout.ts
+? src/checkout/__tests__/ViewCheckout.test.tsx
+```
+
+**~84% reduction** on a single status call. Across a full session with dozens of shell calls — `git diff`, `tsc`, `jest`, `lint` — savings compound to **60–90% on AI input tokens**.
+
+---
+
+### Caveman — compresses AI output (response verbosity)
+
+The `caveman` rule strips filler, articles, hedging, and pleasantries from every response. The AI says the same thing in fewer tokens.
+
+**Code review finding — before vs after Caveman:**
+
+```
+── WITHOUT CAVEMAN (~65 tokens) ─────────────────────────────────────
+Sure! After carefully reviewing the code, I can see that there's
+actually an issue in the ViewCheckout component. It looks like
+there's a useState hook being used directly in the View layer,
+which basically violates the EVPMR architecture pattern. You'll
+want to move that state logic into the Presenter layer instead.
+
+── WITH CAVEMAN (~18 tokens) ────────────────────────────────────────
+[ERROR] ViewCheckout.tsx:14 — useState in View layer.
+  Why: violates EVPMR.
+  Fix: move to PresenterCheckout.ts.
+```
+
+**~72% reduction** per finding. Full review sessions with reasoning, plans, and multi-step output: **40–60% output token savings**.
+
+---
+
+### Combined impact
+
+| Layer | What it compresses | Typical savings |
+|-------|--------------------|-----------------|
+| RTK | Shell output → AI input | 60–90% on dev operations |
+| Caveman | AI reasoning → AI output | 40–60% on prose responses |
+| **Combined** | Both directions | **50–80% total session cost** |
+
+A typical feature review session without compression: ~40,000 tokens.
+With RTK + Caveman: ~8,000–20,000 tokens. Same findings, fraction of the cost.
+
+---
+
 ## Install
 
 ```bash
