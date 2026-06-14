@@ -26,10 +26,16 @@ alwaysApply: false
 ### File location
 `__tests__/[FileName].test.tsx` inside the feature folder.
 
-### Render helper (React Native)
-Always use `renderComponent` from `@traveloka/core/test` — never bare `render`:
-```ts
-import { renderComponent } from '@traveloka/core/test';
+### Render helper
+Create a project-level render wrapper that provides necessary providers — never use bare `render`. This avoids repeating provider setup in every test file.
+
+**React Native example:**
+```tsx
+import { render, RenderOptions } from '@testing-library/react-native';
+// Add your project's providers (theme, navigation context, etc.)
+export function renderComponent(ui: React.ReactElement, options?: RenderOptions) {
+  return render(ui, options);
+}
 ```
 
 ### Provider wrapper (Next.js / web)
@@ -48,9 +54,11 @@ export function renderWithProviders(ui: React.ReactElement, options?: RenderOpti
 ```
 Create `queryClient` outside the wrapper closure — creating it inside resets cache on every render and causes flaky tests.
 
-### Mocking `@traveloka/*` hooks
+### Mocking shared package hooks
+Mock all hooks from shared packages — never let them call real implementations in tests. Adapt import paths to your project's package names.
+
 ```ts
-jest.mock('@traveloka/core', () => ({
+jest.mock('@your-org/core', () => ({
   useContentResource: jest.fn(),
   useTracker: jest.fn(() => jest.fn()),
   useRouter: jest.fn(),
@@ -62,7 +70,6 @@ beforeEach(() => {
   });
 });
 ```
-Never let `@traveloka/*` hooks call real implementations in tests.
 
 **Fluent tracker chaining** — when production code calls `track(...).send(...)`, the mock must return an object with `send`, not a bare function:
 ```ts
@@ -192,7 +199,7 @@ Catches: missing labels, invalid ARIA, missing alt text, heading order violation
 import { renderHook, act } from '@testing-library/react-hooks';
 
 test('search state transitions', () => {
-  const { result } = renderHook(() => usePresenterBusSearch());
+  const { result } = renderHook(() => usePresenterCheckout());
   expect(result.current.searchState.type).toBe('NOT_ASKED');
 
   act(() => result.current.handleSearch({ origin: 'CGK', dest: 'DPS' }));

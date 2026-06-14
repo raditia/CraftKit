@@ -23,7 +23,7 @@ State assumptions before generating:
 ```
 ASSUMPTIONS I'M MAKING:
 1. Feature name: [name]
-2. Product prefix: [gtrbus / gtrtrn / gtrppr / gtrpps / ...]
+2. Feature folder: [kebab-case-feature-name]
 3. Platform: [mobile / desktop]
 4. Target package: [path]
 → Correct me now or I'll proceed with these.
@@ -82,10 +82,10 @@ Naming: `[Role][ProductPrefix][Platform][FeatureName].[ext]`
 
 - **Never** inline styles (`style={{ margin: 8 }}`)
 - **Always** `StyleSheet.create()` at bottom of file
-- **Always** design tokens from `@traveloka/web-components`:
-  - `Token.spacing.xs / s / m / l / xl`
-  - `Token.color.uiBluePrimary / uiLightPrimary / uiDarkNeutral / ...`
-  - `Token.border.radius.normal`
+- **Always** design tokens from your project's token system (adapt paths to your setup):
+  - Spacing: e.g. `Token.spacing.xs / s / m / l / xl`
+  - Color: e.g. `Token.color.primary / secondary / neutral`
+  - Border: e.g. `Token.border.radius.normal`
 - Compose as arrays: `style={[styles.base, isActive && styles.active]}`
 
 ---
@@ -112,7 +112,7 @@ Naming: `[Role][ProductPrefix][Platform][FeatureName].[ext]`
 ## Step 6 — Tracking
 
 ```ts
-const track = useTracker(); // from @traveloka/core
+const track = useTracker(); // from your project's tracking package
 track('FEATURE_NAME', 'ACTION', { ...payload });
 ```
 

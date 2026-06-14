@@ -17,6 +17,8 @@ alwaysApply: false
 
 ---
 
+> Styling, React correctness, and state/data-fetching rules enforced by `fe-rules` (always active) — not repeated here.
+
 ## What to check
 
 ### Architecture (Entry/View/Presenter/Model/Resource)
@@ -27,25 +29,12 @@ alwaysApply: false
 - [ ] **Entry** — wraps in `<ErrorBoundary>` from `react-error-boundary`?
 - [ ] **Resource** — all display strings here, not hardcoded in View?
 
-### Styling
-
-- [ ] No inline styles (`style={{ ... }}`)
-- [ ] All styles in `StyleSheet.create()` at bottom of file
-- [ ] Only `Token.spacing.*`, `Token.color.*`, `Token.border.*` — no magic numbers
-- [ ] No CSS modules, no styled-components, no Tailwind
-
 ### TypeScript
 
 - [ ] No `any` types (explicit or implicit)
 - [ ] Async data as discriminated unions (`NOT_ASKED | LOADING | DATA_READY | ERROR`)
 - [ ] Props typed as `type Props = { ... }` above component
 - [ ] No missing return types on exported functions (strict mode)
-
-### State & data fetching
-
-- [ ] Server state via React Query — no hand-rolled fetch in `useEffect`
-- [ ] Stable references via `useCallback`/`useMemo` where re-renders matter
-- [ ] Redux only for genuinely shared cross-component state
 
 ### Performance
 
@@ -55,14 +44,15 @@ alwaysApply: false
 
 ### Tracking
 
-- [ ] User interactions tracked via `useTracker()` from `@traveloka/core`
+- [ ] User interactions tracked via `useTracker()` from your project's tracking package
+- [ ] Tracking calls in Presenter handlers, not in View
 - [ ] Tracking calls include correct event category, action, payload
 
 ### Tests
 
 - [ ] `__tests__/` folder exists for each feature module
-- [ ] External hooks mocked with `jest.mock('@traveloka/...')`
-- [ ] Uses `renderComponent` from `@traveloka/core/test`, not bare `render`
+- [ ] External hooks from shared packages mocked with `jest.mock(...)`
+- [ ] Uses project render wrapper (not bare `render`) — see `/fe-test`
 
 ### Code quality
 

@@ -48,6 +48,13 @@ Ask: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
 
 **Touch only what you must. Clean up only your own mess.**
 
+Before adding any code, read:
+- Exports of the module you're touching
+- Immediate callers of the function you're modifying
+- Shared utilities that might already solve the problem
+
+"Looks orthogonal" is dangerous. If unsure why code is structured a certain way, ask — don't guess and restructure.
+
 When editing existing code:
 - Don't "improve" adjacent code, comments, or formatting.
 - Don't refactor things that aren't broken.
@@ -90,3 +97,42 @@ PLAN:
 ```
 
 Strong success criteria let you loop independently. "Make it work" requires constant clarification.
+
+"Completed" is wrong if anything was skipped silently. "Tests pass" is wrong if any were skipped. Default: surface uncertainty, never hide it.
+
+---
+
+## 5. Tests verify intent, not just behavior
+
+**Tests must encode WHY behavior matters — not just WHAT it does.**
+
+A test that can't fail when business logic changes is wrong.
+
+Before writing a test, ask: "If someone accidentally deleted the rule this test is protecting, would it fail?" If no → the test is testing implementation, not intent.
+
+```ts
+// WRONG — tests what, not why
+expect(result.status).toBe('LOADING');
+
+// CORRECT — tests why it matters
+// Status must be LOADING during fetch so the UI shows a spinner and blocks interactions
+expect(result.status).toBe('LOADING');
+expect(result.canSubmit).toBe(false);
+```
+
+---
+
+## 6. Checkpoint after every significant step
+
+**Summarize what was done, what's verified, what's left.**
+
+After completing any significant step (scaffold, implementation chunk, test run, type check):
+
+```
+CHECKPOINT:
+Done:     [what was completed]
+Verified: [evidence — test output, tsc clean, lint clean]
+Left:     [remaining steps]
+```
+
+Don't continue from a state you can't describe. If you lose track, stop and restate before proceeding.

@@ -87,5 +87,5 @@ Hard constraints for the Entry/View/Presenter/Model/Resource architecture. These
 
 ## Tracking
 
-- All user interactions tracked via `useTracker()` from `@traveloka/core`
+- All user interactions tracked via `useTracker()` from your project's tracking package
 - Tracking calls belong in Presenter handlers, not in View

@@ -47,12 +47,8 @@ Why it matters: ...
 Fix: ...
 ```
 
-Severity levels:
-- `[ERROR]` — blocks merge; correctness, security, or hard EVPMR violation
-- `[WARNING]` — should fix; readability, soft pattern violation, or test gap
-- `[SUGGESTION]` — optional improvement
+Use severity labels from `using-agent-skills`. End with:
 
-End with a summary:
 ```
 REVIEW SUMMARY
 Errors:      N  (must fix before merge)
@@ -60,4 +56,4 @@ Warnings:    N
 Suggestions: N
 ```
 
-If no findings: say so explicitly — "No issues found" is a valid outcome.
+If no findings: "No issues found" is a valid outcome.

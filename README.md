@@ -137,8 +137,8 @@ Loaded automatically from `rules/` on every session. Never call these — they'r
 |------|-----------------|
 | [`caveman`](rules/caveman.md) | Output compression: terse responses, no filler, full accuracy — lite/full/ultra modes |
 | [`fe-rules`](rules/fe-rules.md) | EVPMR layer constraints, TypeScript strict mode, styling tokens, React correctness, tracking |
-| [`karpathy-guidelines`](rules/karpathy-guidelines.md) | Coding discipline: think before coding, simplicity first, surgical changes, goal-driven execution |
-| [`using-agent-skills`](rules/using-agent-skills.md) | Skill routing, model selection, severity labels, core operating behaviors, failure modes |
+| [`karpathy-guidelines`](rules/karpathy-guidelines.md) | Coding discipline: think before coding, simplicity, surgical changes, goal-driven execution, read before write, tests verify intent, checkpoint after steps |
+| [`using-agent-skills`](rules/using-agent-skills.md) | Skill routing, model selection, severity labels, core operating behaviors — includes: use model for judgment only, surface token budget pressure, surface conflicts never average them |
 
 ### Orchestrators — natural language workflow commands
 
@@ -152,6 +152,9 @@ Say what you want in plain language. These bundle the right skills automatically
 | [`/ship`](commands/ship.md) | "get this ready to merge", "ship this", "prepare for PR" | fe-test → coverage → tsc → lint → review |
 | [`/pr-message`](commands/pr-message.md) | "generate PR message", "write PR description", "draft a PR", "what should my PR say" | pr-message (diff → message → clipboard) |
 | [`/fe-test`](skills/fe-test/SKILL.md) | "write tests", "add tests", "test this", "coverage is low", "improve coverage", "missing tests" | write/improve tests, enforce ≥ 93% coverage |
+| [`/parallel-review`](commands/parallel-review.md) | "parallel review", "fast review", "review in parallel" | classify diff → Phase 1 (tsc + lint + test in parallel) → Phase 2 (classifier-selected agents in parallel) → synthesize |
+| [`/parallel-ship`](commands/parallel-ship.md) | "parallel ship", "fast ship", "ship in parallel" | classify diff → Phase 1 (tsc + lint + test/coverage in parallel) → Phase 2 (classifier-selected agents in parallel) → synthesize |
+| [`/parallel-build`](commands/parallel-build.md) | "parallel build", "build in parallel", "build fast" | fe-context → scaffold → implement → Phase 3 (tsc + lint in parallel) → classify → Phase 5 (classifier-selected agents in parallel) → fe-test |
 
 ### Frontend skills — on demand
 
@@ -173,7 +176,6 @@ Invoke when a task is narrower than a full workflow. All prefixed `fe-` — futu
 |-------|-------------|-------------|
 | [`code-quality`](skills/code-quality/SKILL.md) | Review (5-axis) or simplify complex code — two modes in one skill | Security-sensitive review, or refactor > 500 lines |
 | [`debug`](skills/debug/SKILL.md) | Structured reproduce → isolate → fix | No clear hypothesis after 2 isolation attempts |
-| [`pr-message`](skills/pr-message/SKILL.md) | Generate PR message from branch diff — goal, changed files, test coverage, reviewer notes | Diff spans > 15 interdependent files |
 
 ---
 
@@ -208,7 +210,138 @@ Every session
 
 "generate PR message / draft a PR"
   /pr-message  →  pr-message (diff → generate → clipboard)
+
+"parallel review / fast review"
+  /parallel-review  →  read diff → [tsc ‖ lint ‖ test] → classify →
+                        [code-quality ‖ fe-review ‖ fe-a11y? ‖ adversarial?] → synthesize
+
+"parallel ship / fast ship"
+  /parallel-ship  →  read diff → [tsc ‖ lint ‖ test+coverage] → classify →
+                      [code-quality ‖ fe-review ‖ fe-performance? ‖ fe-a11y? ‖ adversarial?] → synthesize
+
+"parallel build / build fast"
+  /parallel-build  →  fe-context → fe-scaffold → implement →
+                       [tsc ‖ lint] → classify built files →
+                       [fe-review ‖ fe-patterns ‖ fe-a11y? ‖ fe-performance? ‖ adversarial?] →
+                       fe-test
 ```
+
+Parallel commands use a **dynamic classifier** — reads actual diff/files, selects only relevant agents, skips irrelevant ones. See `rules/using-agent-skills.md` for classifier logic.
+
+### Dynamic workflow examples
+
+The classifier reads the diff, identifies which EVPMR layers changed, and picks only the agents that matter. Different diffs produce different agent sets.
+
+---
+
+**Example A — View + Presenter changed** (e.g. new form or screen)
+
+```
+git diff shows:
+  ViewCheckout.tsx        ← View layer
+  PresenterCheckout.ts    ← Presenter layer
+
+         ┌─────────────────────────────────┐
+         │  classify: View + Presenter     │
+         └────────────┬────────────────────┘
+                      │
+       ┌──────────────┼──────────────┐
+       ▼              ▼              ▼
+  code-quality    fe-review      fe-a11y
+  (5-axis)        (EVPMR)        (interactive
+                                  View present)
+       └──────────────┼──────────────┘
+                      ▼
+                  synthesize
+                  → merged findings
+```
+
+---
+
+**Example B — Model only changed** (e.g. new type + pure function)
+
+```
+git diff shows:
+  ModelCheckout.ts        ← Model layer only
+
+         ┌─────────────────────────────────┐
+         │  classify: Model only           │
+         └────────────┬────────────────────┘
+                      │
+                      ▼
+                 code-quality
+                 (correctness +
+                  type safety focus)
+                      │
+                      ▼
+                  synthesize
+                  → targeted findings, no EVPMR/a11y noise
+```
+
+---
+
+**Example C — Test files only**
+
+```
+git diff shows:
+  __tests__/ViewCheckout.test.tsx
+  __tests__/PresenterCheckout.test.tsx
+
+         ┌─────────────────────────────────┐
+         │  classify: test files only      │
+         └────────────┬────────────────────┘
+                      │
+                      ▼
+              Phase 2 SKIPPED
+         (no production code changed —
+          deep review adds no value)
+                      │
+                      ▼
+         Phase 1 results only: tsc + lint + test
+```
+
+---
+
+**Example D — Large cross-layer change** (3+ EVPMR layers, triggers adversarial)
+
+```
+git diff shows:
+  EntryCheckout.tsx       ← Entry
+  ViewCheckout.tsx        ← View
+  PresenterCheckout.ts    ← Presenter
+  ModelCheckout.ts        ← Model
+
+         ┌──────────────────────────────────────┐
+         │  classify: 4 layers — adversarial    │
+         │  triggered (3+ EVPMR layers changed) │
+         └────────────┬─────────────────────────┘
+                      │
+       ┌──────────────┼──────────────┬──────────────┐
+       ▼              ▼              ▼              ▼
+  code-quality    fe-review      fe-a11y       adversarial
+  (5-axis)        (EVPMR)        (View          (devil's
+                                  present)       advocate)
+       └──────────────┼──────────────┴──────────────┘
+                      ▼
+                  synthesize
+                  → findings + adversarial block
+                    "strongest case against merging"
+```
+
+---
+
+**Agent selection rules at a glance:**
+
+| What changed | Agents spawned |
+|-------------|---------------|
+| `View*.tsx` | code-quality + fe-review + fe-a11y |
+| `Presenter*.ts` | code-quality + fe-review |
+| `Model*.ts` | code-quality |
+| `Entry*.tsx` or `Resource*.ts` | fe-review |
+| View or Presenter + `/parallel-ship` | + fe-performance |
+| 3+ EVPMR layers | + adversarial |
+| Auth / payment paths | code-quality (security emphasis) |
+| Test files only | Phase 2 skipped |
 
 ### How `fe-context` feeds all skills
 

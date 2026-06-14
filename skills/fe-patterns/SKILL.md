@@ -83,18 +83,18 @@ function UILayout({ header, footer, children }: Props) { ... }
 // Entry.tsx — provides context
 const TabsContext = createContext<TabsContextValue | undefined>(undefined);
 
-export function EntryBusSearch() {
+export function EntryCheckout() {
   return (
     <ErrorBoundary>
       <TabsContext.Provider value={tabsState}>
-        <ViewBusSearch />
+        <ViewCheckout />
       </TabsContext.Provider>
     </ErrorBoundary>
   );
 }
 
 // View consumes context, never owns it
-function UIBusSearchTabs() {
+function UICheckoutTabs() {
   const { activeTab } = useContext(TabsContext)!;
   return ...;
 }
@@ -157,8 +157,8 @@ Form state and validation belong in Presenter. View renders dumb inputs.
 
 **Simple forms — Presenter owns state:**
 ```ts
-// PresenterBusSearch.ts
-function usePresenterBusSearch() {
+// PresenterCheckout.ts
+function usePresenterCheckout() {
   const [origin, setOrigin] = useState('');
   const [errors, setErrors] = useState<{ origin?: string }>({});
 
@@ -194,15 +194,15 @@ Server action validation with Zod; form state via `useActionState`. Never put bu
 
 ```tsx
 // Server Component — default, no "use client", can async
-export default async function PageBusSearch({ params }) {
+export default async function PageCheckout({ params }) {
   const routes = await getRoutes(params.id);
-  return <ViewBusSearch routes={routes} />;
+  return <ViewCheckout routes={routes} />;
 }
 
 // Client Component — needed for hooks, interactivity
 'use client';
-export function ViewBusSearch() {
-  const { ... } = usePresenterBusSearch();
+export function ViewCheckout() {
+  const { ... } = usePresenterCheckout();
   return ...;
 }
 ```

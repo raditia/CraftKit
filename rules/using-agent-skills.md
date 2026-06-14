@@ -34,6 +34,9 @@ Match natural language to the right command:
 | "get this ready to merge", "ship this", "prepare for PR", "is this ready?" | `/ship` |
 | "write tests", "add tests", "test this", "coverage is low", "improve coverage", "I need tests for X" | `/fe-test` |
 | "generate PR message", "write PR description", "draft a PR", "what should my PR say", "PR message for this branch" | `/pr-message` |
+| "parallel review", "fast review", "review in parallel", "review fast" | `/parallel-review` |
+| "parallel ship", "fast ship", "ship in parallel", "ship fast" | `/parallel-ship` |
+| "parallel build", "build in parallel", "build fast" | `/parallel-build` |
 
 ### Individual skills (use when task is narrower than a full workflow)
 
@@ -47,6 +50,54 @@ Task arrives
   ├── Accessibility (labels, roles, focus, a11y)? ──→ /fe-a11y
   ├── Writing or improving tests only? ────────────→ /fe-test
   └── Review or simplify code quality? ────────────→ /code-quality
+```
+
+---
+
+## Parallel workflow: dynamic classifier
+
+Used by `/parallel-review`, `/parallel-ship`, `/parallel-build`. Run this classification step before spawning any Phase 2 agents.
+
+### Step 1 — Read the diff and actual changed files
+
+```bash
+rtk git diff <base>...HEAD --name-only   # file list
+rtk git diff <base>...HEAD               # full diff
+```
+
+For each changed file, read enough of its actual content to confirm what layer it belongs to — don't rely on filename alone.
+
+### Step 2 — Classify and select agents
+
+| Changed file pattern | Agent(s) to add |
+|---------------------|-----------------|
+| `View*.tsx` | `fe-review`, `fe-a11y` |
+| `Presenter*.ts` | `fe-review`, `code-quality` |
+| `Model*.ts` | `code-quality` |
+| `Entry*.tsx` | `fe-review` |
+| `Resource*.ts` | `fe-review` |
+| `auth/*`, `payment/*`, `*credential*`, `*token*` | `code-quality` (security emphasis — note in prompt) |
+| `package.json` changed | `code-quality` (dependency audit — note in prompt) |
+| Test files only (all changed files match `__tests__/*` or `*.test.*`) | **Skip Phase 2** — fast gates only |
+
+Dedup the set. Always include `code-quality` if any non-test, non-resource code changed.
+
+### Step 3 — Flag conditions
+
+Evaluate before spawning:
+
+| Condition | Action |
+|-----------|--------|
+| Diff > 300 lines | Add `[WARNING] Change size: N lines — consider splitting` to synthesis |
+| 3+ EVPMR layers changed | Add adversarial agent: "argue strongest case against merging this" |
+| Security-sensitive paths | Emphasize security axis in `code-quality` agent prompt |
+
+### Step 4 — Announce selection
+
+Before spawning agents, tell the user:
+```
+Classifier selected: [agent-a, agent-b, agent-c] based on: View*.tsx + Presenter*.ts changed
+Spawning N agents in parallel...
 ```
 
 ---
@@ -118,7 +169,39 @@ Every skill has a verification step. "Seems right" is never sufficient — there
 
 **After any TypeScript code change** (source or test), run `npx tsc --noEmit` filtered to changed files before reporting done. Jest uses babel and skips type checking — passing tests do not guarantee type-correctness. Common misses: spread arg types (TS2556), missing required props (TS2322), incompatible types in mocks.
 
-### 7. Announce skill invocation
+### 7. Use the model for judgment, not mechanics
+
+Use Claude for: classification, drafting, summarization, extraction, tradeoff evaluation.
+
+Do NOT use Claude for: deterministic transforms, string routing that regex handles, retries with fixed logic, any operation where "if code can answer, code answers."
+
+In skill files: the classifier reads diffs and selects agents — that's judgment. Counting lines or matching filenames deterministically is mechanics; use Bash for that, not a prompt.
+
+### 8. Surface token budget pressure
+
+Token budgets are not advisory. When approaching context limits mid-task:
+- Stop. Summarize what was done, what's verified, what's left.
+- Tell the user explicitly: "Approaching context limit — summarizing before continuing."
+- Do not silently overrun or skip steps to fit.
+
+Project teams set their own per-task budgets. The rule is: **surface the breach, never hide it.**
+
+### 9. Surface conflicts — never average them
+
+When two patterns in the codebase contradict each other:
+1. Pick one (prefer: more recent, more tested, closer to the affected code).
+2. Explain the choice explicitly.
+3. Flag the other pattern for cleanup — don't blend both.
+
+```
+CONFLICT: ComponentA uses Redux for this state, ComponentB uses local useState.
+Picking: local useState — more recent pattern, no cross-component sharing needed.
+Flag: ComponentA.tsx can be migrated to useState when touched next.
+```
+
+Applies at code level and at skill authoring level — see skill authoring rules below.
+
+### 11. Announce skill invocation
 Before invoking any skill or command, tell the user which one you're using:
 ```
 Running /fe-test — write and verify tests for changed code paths.

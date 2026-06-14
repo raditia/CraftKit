@@ -64,200 +64,96 @@ return { accessibilityProps, ... };
 
 ```tsx
 <Pressable
-  accessible={true}               // makes element a single focusable unit
-  accessibilityLabel="Submit"     // what screen reader announces (from Resource)
-  accessibilityHint="Saves your changes and returns to the list"
-  accessibilityRole="button"      // announces element type to screen reader
+  accessible={true}
+  accessibilityLabel={Resource.submitLabel}   // from Resource — never hardcode
+  accessibilityHint={Resource.submitHint}
+  accessibilityRole="button"
   accessibilityState={{ disabled: isLoading, selected: isActive }}
   onPress={onPress}
 />
 ```
 
-### accessibilityRole values
+`accessibilityRole` values: `button`, `link`, `text`, `header`, `image`, `checkbox`, `radio`, `combobox`, `tab`, `none` (decorative).
 
-| RN Role | Use for |
-|---------|---------|
-| `button` | `Pressable`, `TouchableOpacity` acting as buttons |
-| `link` | Navigation elements |
-| `text` | Plain text elements |
-| `header` | Section headings |
-| `image` | `Image` components |
-| `checkbox` / `radio` | Toggle inputs |
-| `combobox` | Dropdown/picker |
-| `tab` | Tab bar items |
-| `none` | Decorative elements to hide from screen reader |
+`accessibilityState` fields: `disabled`, `selected`, `checked`, `expanded`, `busy`.
 
-### accessibilityState
+### Grouping + decorative elements
 
 ```tsx
-// Communicates interactive state without visual reliance
-accessibilityState={{
-  disabled: !isValid,
-  selected: isSelected,
-  checked: isChecked,       // for checkboxes
-  expanded: isOpen,         // for accordions/dropdowns
-  busy: isLoading,          // for loading indicators
-}}
-```
-
-### Grouping elements
-
-```tsx
-// BAD: screen reader reads each child separately
-<View>
-  <Text>John Doe</Text>
-  <Text>Premium member</Text>
+// Group related text into one focusable unit
+<View accessible={true} accessibilityLabel="Jane Doe, Premium member">
+  <Text>Jane Doe</Text><Text>Premium member</Text>
 </View>
 
-// GOOD: grouped into a single focusable unit with one announcement
-<View accessible={true} accessibilityLabel="John Doe, Premium member">
-  <Text>John Doe</Text>
-  <Text>Premium member</Text>
-</View>
+// Hide decorative icon from screen reader
+<Icon name="trash" importantForAccessibility="no-hide-descendants" />
 ```
 
-### Hiding decorative elements
-
-```tsx
-// Decorative icon alongside a labelled button — hide from screen reader
-<Pressable accessibilityLabel={Resource.deleteLabel} accessibilityRole="button" onPress={onDelete}>
-  <Icon name="trash" importantForAccessibility="no-hide-descendants" />
-  <Text>{Resource.deleteLabel}</Text>
-</Pressable>
-```
-
----
-
-## TextInput accessibility
-
-```tsx
-// BAD: no label, no error link
-<TextInput placeholder="Email" value={email} onChangeText={setEmail} />
-
-// GOOD: label announced, error state and hint communicated
-<TextInput
-  accessibilityLabel={Resource.emailLabel}
-  accessibilityHint={Resource.emailHint}
-  accessibilityState={{ disabled: isSubmitting }}
-  // when error present, Presenter combines label + error into accessibilityLabel:
-  // e.g. "Email, Invalid email address"
-  value={email}
-  onChangeText={onEmailChange}
-  autoComplete="email"
-  keyboardType="email-address"
-  textContentType="emailAddress"
-/>
-```
+### TextInput
 
 Combine error into `accessibilityLabel` from Presenter — RN has no `aria-describedby`:
 
 ```ts
 // PresenterFeatureName.ts
-const emailAccessibilityLabel = emailError
+const emailA11yLabel = emailError
   ? `${Resource.emailLabel}, ${emailError}`
   : Resource.emailLabel;
 ```
 
----
-
-## Focus management
-
-Use when UI transitions require explicit focus control (modals, screen changes, alert dialogs).
+### Focus management (modals / screen transitions)
 
 ```ts
-// PresenterFeatureName.ts
+// PresenterFeatureName.ts — call after modal opens
 import { AccessibilityInfo, findNodeHandle } from 'react-native';
-
-// Call from Presenter after modal opens
-const focusOnOpen = (ref: React.RefObject<View>) => {
-  const node = findNodeHandle(ref.current);
-  if (node) AccessibilityInfo.setAccessibilityFocus(node);
-};
+const node = findNodeHandle(ref.current);
+if (node) AccessibilityInfo.setAccessibilityFocus(node);
 ```
 
 ```tsx
-// ViewFeatureName.tsx — pass ref from Presenter
-<View ref={modalRef} accessible={true} accessibilityViewIsModal={true}>
-  ...
-</View>
+// ViewFeatureName.tsx
+<View ref={modalRef} accessible={true} accessibilityViewIsModal={true}>...</View>
 ```
 
-`accessibilityViewIsModal={true}` prevents screen readers from reading content outside the modal.
+### Dynamic announcements
 
----
+```ts
+// PresenterFeatureName.ts — after async action, NOT on every render
+AccessibilityInfo.announceForAccessibility(Resource.successMessage);
+```
 
-## Dynamic content announcements
-
-For content that updates without a navigation event (success banners, inline errors, loading state):
+### Reduced motion
 
 ```ts
 // PresenterFeatureName.ts
-import { AccessibilityInfo } from 'react-native';
-
-// After async action completes
-const announceResult = (message: string) => {
-  AccessibilityInfo.announceForAccessibility(message);
-};
-```
-
-Use sparingly — only for state changes the user cannot see (background completion, async errors). Do not announce every render.
-
----
-
-## Reduced motion
-
-```ts
-// PresenterFeatureName.ts
-import { AccessibilityInfo } from 'react-native';
-import { useEffect, useState } from 'react';
-
-// In Presenter hook — returns to View as plain value
 const [reduceMotion, setReduceMotion] = useState(false);
 useEffect(() => {
   AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
   const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
   return () => sub.remove();
 }, []);
-```
-
-```tsx
-// ViewFeatureName.tsx
-<Animated.View style={{ opacity: reduceMotion ? 1 : animatedOpacity }}>
-  {children}
-</Animated.View>
+// Pass reduceMotion to View as plain value
 ```
 
 ---
 
-## Next.js / web (when building web screens)
+## Next.js / web
 
 Use native HTML semantics first. ARIA only when native is insufficient.
 
 ```tsx
-// Forms — always connect label to input
+// Forms — label must be explicit, not placeholder
 <label htmlFor="email">{Resource.emailLabel}</label>
-<input
-  id="email"
-  type="email"
+<input id="email" type="email"
   aria-describedby={emailError ? 'email-error' : undefined}
-  aria-invalid={!!emailError}
-/>
+  aria-invalid={!!emailError} />
 {emailError && <span id="email-error" role="alert">{emailError}</span>}
-```
 
-```tsx
-// Interactive elements — use semantic elements
-<button type="button" onClick={onPress}>{Resource.label}</button>  // not <div onClick>
-<a href="/path">{Resource.navLabel}</a>                            // not <div onClick> for nav
-```
-
-```tsx
 // Dynamic content
-<div role="status" aria-live="polite" aria-atomic="true">{statusMessage}</div>
-<div role="alert" aria-live="assertive">{errorMessage}</div>  // urgent errors only
+<div role="status" aria-live="polite">{statusMessage}</div>  // non-urgent
+<div role="alert" aria-live="assertive">{errorMessage}</div> // urgent only
 ```
 
-Heading hierarchy must be sequential (h1 → h2 → h3). Never skip levels.
+Heading hierarchy must be sequential (h1 → h2 → h3). Never skip levels. Use `<button>` not `<div onClick>`.
 
 ---
 

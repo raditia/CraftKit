@@ -214,17 +214,6 @@ Animated.timing(opacity, { toValue: 1, useNativeDriver: true }).start();
 
 ## 6. Rendering
 
-**Ternary over `&&` for conditional render** — `0` renders as a text node (also a `fe-rules` constraint):
-```tsx
-// WRONG
-{count && <Badge>{count}</Badge>}
-
-// CORRECT
-{count > 0 ? <Badge>{count}</Badge> : null}
-```
-
-**Stable `key` props on dynamic lists** — use database ID, never array index.
-
 **Lazy state initializer for expensive initial values:**
 ```ts
 const [tree] = useState(() => parseTree(largeInput));
