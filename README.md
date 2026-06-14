@@ -1,4 +1,4 @@
-# agentic-skills
+# agentic-skills `v1.2.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **GitHub Copilot**, and **Gemini CLI**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
@@ -19,6 +19,7 @@ One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**,
 - [Architecture (EVPMR)](#architecture-evpmr)
 - [Model routing](#model-routing)
 - [Managing skills](#managing-skills)
+- [Changelog](#changelog)
 
 ---
 
@@ -554,3 +555,16 @@ git commit -m "remove: <name>" && git push
 |------|---------|----------------|
 | [RTK](https://github.com/rtk-ai/rtk) | Filters shell output before it reaches the AI — saves 60–90% on input tokens | Yes, on `bash install.sh` |
 | Caveman | Strips AI output verbosity — saves 40–60% on response tokens | Yes, via `rules/caveman.md` |
+
+---
+
+## Changelog
+
+| Version | Date | Changes |
+|---------|------|---------|
+| `v1.2.0` | 2026-06-14 | Dynamic parallel workflows made default for `/build`, `/review`, `/ship`. README restructured with workflow diagrams, TOC, and token savings examples |
+| `v1.1.0` | 2026-06-13 | Added `/parallel-review`, `/parallel-build`, `/parallel-ship` with classifier-based agent selection. Audited and cleaned all skills |
+| `v1.0.3` | 2026-06-10 | Added `/pr-message` skill. Enforced `no-unused-vars` in `fe-rules`. Added `tsc --noEmit` verification after any TS change |
+| `v1.0.2` | 2026-06-08 | Skill invocation announcements. Fluent tracker mock. Natural language triggers for `/fe-test`. Per-project Copilot agents auto-sync on `git pull` |
+| `v1.0.1` | 2026-06-05 | Bash 3.2 support (macOS default). Natural language routing for `/fe-test`. `init-copilot-agents.sh` for per-project `@` agents |
+| `v1.0.0` | 2026-06-01 | Three-tier namespace (`rules/`, `skills/`, `commands/`). `code-quality` skill. Inline model escalation. `fe-a11y` skill. Caveman embedded as rule. Skill auto-cleanup on `git pull` |
