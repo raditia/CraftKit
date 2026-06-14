@@ -24,19 +24,24 @@ Loaded from `rules/` automatically on every session:
 
 ### Orchestrator commands (multi-skill workflows — use these first)
 
-Match natural language to the right command:
+Match natural language to the right command. **Dynamic parallel is the default** — static sequential available via explicit slash command when a lightweight run is needed.
 
-| User says | Run |
-|-----------|-----|
-| "build feature X", "create a new screen", "implement X", "scaffold a module" | `/build` |
-| "help me review", "review the changes", "code review", "LGTM check" | `/review` |
-| "something is broken", "fix this bug", "this crashes", "why is X not working" | `/fix` |
-| "get this ready to merge", "ship this", "prepare for PR", "is this ready?" | `/ship` |
-| "write tests", "add tests", "test this", "coverage is low", "improve coverage", "I need tests for X" | `/fe-test` |
-| "generate PR message", "write PR description", "draft a PR", "what should my PR say", "PR message for this branch" | `/pr-message` |
-| "parallel review", "fast review", "review in parallel", "review fast" | `/parallel-review` |
-| "parallel ship", "fast ship", "ship in parallel", "ship fast" | `/parallel-ship` |
-| "parallel build", "build in parallel", "build fast" | `/parallel-build` |
+| User says | Run | Mode |
+|-----------|-----|------|
+| "build feature X", "create a new screen", "implement X", "scaffold a module" | `/parallel-build` | dynamic |
+| "help me review", "review the changes", "code review", "LGTM check" | `/parallel-review` | dynamic |
+| "get this ready to merge", "ship this", "prepare for PR", "is this ready?" | `/parallel-ship` | dynamic |
+| "something is broken", "fix this bug", "this crashes", "why is X not working" | `/fix` | sequential (linear by nature) |
+| "write tests", "add tests", "test this", "coverage is low", "improve coverage", "I need tests for X" | `/fe-test` | — |
+| "generate PR message", "write PR description", "draft a PR", "what should my PR say", "PR message for this branch" | `/pr-message` | — |
+
+**Sequential fallback** — use explicit slash command when you want a lightweight, single-pass run:
+
+| Explicit command | When to prefer |
+|-----------------|----------------|
+| `/review` | Quick sanity check, small diff, no need for parallel agents |
+| `/ship` | Simple pre-merge gate, already know tests pass |
+| `/build` | Scaffold-only or when parallel validation overhead isn't worth it |
 
 ### Individual skills (use when task is narrower than a full workflow)
 

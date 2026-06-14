@@ -142,19 +142,26 @@ Loaded automatically from `rules/` on every session. Never call these — they'r
 
 ### Orchestrators — natural language workflow commands
 
-Say what you want in plain language. These bundle the right skills automatically.
+Say what you want in plain language. **Dynamic parallel is the default** for build, review, and ship — the classifier reads the diff, selects only relevant agents, and runs them concurrently. Static sequential commands remain available via explicit slash command for lightweight runs.
+
+#### Dynamic (default — natural language triggers these)
 
 | Command | Say… | What it runs |
 |---------|------|--------------|
-| [`/build`](commands/build.md) | "build feature X", "create a new screen", "implement X" | fe-context → fe-scaffold → fe-patterns + fe-performance → fe-review → fe-test |
-| [`/review`](commands/review.md) | "help me review", "review the changes", "LGTM check" | fe-context → code-quality (5-axis) → fe-review (EVPMR) |
-| [`/fix`](commands/fix.md) | "something is broken", "fix this bug", "this crashes" | fe-context → debug → fe-test |
-| [`/ship`](commands/ship.md) | "get this ready to merge", "ship this", "prepare for PR" | fe-test → coverage → tsc → lint → review |
-| [`/pr-message`](commands/pr-message.md) | "generate PR message", "write PR description", "draft a PR", "what should my PR say" | pr-message (diff → message → clipboard) |
+| [`/parallel-build`](commands/parallel-build.md) | "build feature X", "create a new screen", "implement X", "scaffold a module" | fe-context → scaffold → implement → [tsc ‖ lint] → classify → [relevant agents in parallel] → fe-test |
+| [`/parallel-review`](commands/parallel-review.md) | "help me review", "review the changes", "code review", "LGTM check" | [tsc ‖ lint ‖ test] → classify diff → [relevant agents in parallel] → synthesize |
+| [`/parallel-ship`](commands/parallel-ship.md) | "get this ready to merge", "ship this", "prepare for PR", "is this ready?" | [tsc ‖ lint ‖ test+coverage] → classify diff → [relevant agents in parallel] → synthesize |
+| [`/fix`](commands/fix.md) | "something is broken", "fix this bug", "this crashes", "why is X not working" | fe-context → debug (reproduce → isolate → fix) → fe-test |
+| [`/pr-message`](commands/pr-message.md) | "generate PR message", "write PR description", "draft a PR", "what should my PR say" | diff → message → clipboard |
 | [`/fe-test`](skills/fe-test/SKILL.md) | "write tests", "add tests", "test this", "coverage is low", "improve coverage", "missing tests" | write/improve tests, enforce ≥ 93% coverage |
-| [`/parallel-review`](commands/parallel-review.md) | "parallel review", "fast review", "review in parallel" | classify diff → Phase 1 (tsc + lint + test in parallel) → Phase 2 (classifier-selected agents in parallel) → synthesize |
-| [`/parallel-ship`](commands/parallel-ship.md) | "parallel ship", "fast ship", "ship in parallel" | classify diff → Phase 1 (tsc + lint + test/coverage in parallel) → Phase 2 (classifier-selected agents in parallel) → synthesize |
-| [`/parallel-build`](commands/parallel-build.md) | "parallel build", "build in parallel", "build fast" | fe-context → scaffold → implement → Phase 3 (tsc + lint in parallel) → classify → Phase 5 (classifier-selected agents in parallel) → fe-test |
+
+#### Sequential (explicit slash command only — lightweight fallback)
+
+| Command | When to prefer |
+|---------|---------------|
+| [`/review`](commands/review.md) | Quick sanity check, small diff, no parallel overhead needed |
+| [`/ship`](commands/ship.md) | Simple pre-merge gate, already know tests pass |
+| [`/build`](commands/build.md) | Scaffold-only run or minimal validation needed |
 
 ### Frontend skills — on demand
 
@@ -195,38 +202,41 @@ Every session
 
 ### Orchestrator workflow
 
+Natural language triggers the dynamic variant by default. Explicit slash commands run the sequential fallback.
+
 ```
-"build feature X"
-  /build  →  fe-context → fe-scaffold → (fe-patterns + fe-performance) → fe-review → fe-test
+── DYNAMIC (default — triggered by natural language) ──────────────────────────
 
-"help me review the changes"
-  /review  →  fe-context → code-quality (review mode) → fe-review
-
-"something is broken / fix this"
-  /fix  →  fe-context → debug → fe-test
-
-"get this ready to merge"
-  /ship  →  fe-test → coverage → tsc → lint → review
-
-"generate PR message / draft a PR"
-  /pr-message  →  pr-message (diff → generate → clipboard)
-
-"parallel review / fast review"
-  /parallel-review  →  read diff → [tsc ‖ lint ‖ test] → classify →
-                        [code-quality ‖ fe-review ‖ fe-a11y? ‖ adversarial?] → synthesize
-
-"parallel ship / fast ship"
-  /parallel-ship  →  read diff → [tsc ‖ lint ‖ test+coverage] → classify →
-                      [code-quality ‖ fe-review ‖ fe-performance? ‖ fe-a11y? ‖ adversarial?] → synthesize
-
-"parallel build / build fast"
+"build feature X" / "implement X" / "create a new screen"
   /parallel-build  →  fe-context → fe-scaffold → implement →
                        [tsc ‖ lint] → classify built files →
                        [fe-review ‖ fe-patterns ‖ fe-a11y? ‖ fe-performance? ‖ adversarial?] →
                        fe-test
+
+"review this" / "help me review" / "code review" / "LGTM check"
+  /parallel-review  →  read diff → [tsc ‖ lint ‖ test] → classify →
+                        [code-quality ‖ fe-review ‖ fe-a11y? ‖ adversarial?] → synthesize
+
+"ship this" / "get this ready to merge" / "prepare for PR" / "is this ready?"
+  /parallel-ship  →  read diff → [tsc ‖ lint ‖ test+coverage] → classify →
+                      [code-quality ‖ fe-review ‖ fe-performance? ‖ fe-a11y? ‖ adversarial?] → synthesize
+
+── SEQUENTIAL (always linear by nature) ───────────────────────────────────────
+
+"something is broken" / "fix this bug" / "this crashes"
+  /fix  →  fe-context → debug (reproduce → isolate → fix) → fe-test
+
+"generate PR message" / "draft a PR"
+  /pr-message  →  diff → generate → clipboard
+
+── SEQUENTIAL FALLBACK (explicit slash command only) ──────────────────────────
+
+  /review  →  fe-context → code-quality (5-axis) → fe-review
+  /ship    →  fe-test → coverage → tsc → lint → review
+  /build   →  fe-context → fe-scaffold → fe-patterns + fe-performance → fe-review → fe-test
 ```
 
-Parallel commands use a **dynamic classifier** — reads actual diff/files, selects only relevant agents, skips irrelevant ones. See `rules/using-agent-skills.md` for classifier logic.
+Dynamic commands use a **classifier** — reads actual diff/files, selects only relevant agents, skips irrelevant ones (test-only diffs skip Phase 2 entirely). See `rules/using-agent-skills.md` for classifier logic.
 
 ### Dynamic workflow examples
 
