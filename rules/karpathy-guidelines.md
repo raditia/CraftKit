@@ -21,8 +21,8 @@ Before implementing anything non-trivial:
 
 ```
 ASSUMPTIONS I'M MAKING:
-1. [architecture assumption]
-2. [requirement assumption]
+1. [requirement assumption]
+2. [architecture assumption]
 → Correct me now or I'll proceed with these.
 ```
 
@@ -32,13 +32,28 @@ ASSUMPTIONS I'M MAKING:
 
 **Minimum code that solves the problem. Nothing speculative.**
 
-- No features beyond what was asked.
+Before writing any code, stop at the first rung that holds:
+
+1. Does this need to exist at all? (YAGNI)
+2. Does the standard library already do this? Use it.
+3. Does a native platform feature cover it? Use it.
+4. Does an already-installed dependency solve it? Use it.
+5. Can this be one line? Make it one line.
+6. Only then: write the minimum code that works.
+
+Rules:
 - No abstractions for single-use code.
 - No "flexibility" or "configurability" that wasn't requested.
 - No error handling for impossible scenarios — trust framework and internal guarantees.
 - If you wrote 200 lines and it could be 50, rewrite it.
+- Deletion over addition. Boring over clever. Fewest files possible.
 
-Ask: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+Ask: "Would a senior engineer say 'why didn't you just…'?" If yes, simplify.
+
+**Deliberate shortcuts:** when you knowingly pick a simpler approach with a known ceiling (global lock, O(n²) scan, naive heuristic), mark it with a `ponytail:` comment naming the ceiling and upgrade path:
+```ts
+// ponytail: linear scan over all items. ceiling: >10k rows gets slow. upgrade: add index when perf becomes issue.
+```
 
 **EVPMR corollary:** don't pre-split a View into sub-components until it exceeds ~80 lines. Don't pre-split a Presenter until it exceeds ~100 lines. Split when complex, not speculatively.
 

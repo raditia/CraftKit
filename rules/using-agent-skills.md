@@ -22,6 +22,15 @@ Loaded from `rules/` automatically on every session:
 
 ## Skill discovery
 
+**Intent-first routing — always active.** Before responding to any user message, classify intent against available skills. Do NOT require specific trigger words — infer from meaning, not keywords.
+
+Classification order:
+1. **Orchestrator** — does the request imply build / review / ship / fix / test / PR? → match orchestrator table below
+2. **Individual skill** — narrower task (scaffold, patterns, a11y, performance, context)? → match skill tree below
+3. **General purpose** — no skill matches → respond directly
+
+Announce the matched skill before invoking it (see core behavior #11). If genuinely ambiguous between two skills, name both and ask.
+
 ### Orchestrator commands (multi-skill workflows — use these first)
 
 Match natural language to the right command. **Dynamic parallel is the default** — static sequential available via explicit slash command when a lightweight run is needed.
@@ -54,7 +63,11 @@ Task arrives
   ├── Performance bottleneck (waterfall, bundle)? ──→ /fe-performance
   ├── Accessibility (labels, roles, focus, a11y)? ──→ /fe-a11y
   ├── Writing or improving tests only? ────────────→ /fe-test
-  └── Review or simplify code quality? ────────────→ /code-quality
+  ├── Review or simplify code quality? ────────────→ /code-quality
+  ├── Debug a bug (reproduce → isolate → fix)? ─────→ /debug
+  ├── Over-engineering audit on a diff/file? ───────→ /ponytail-review
+  ├── Whole-repo bloat scan? ───────────────────────→ /ponytail-audit
+  └── List all deliberate shortcuts (ponytail:)? ───→ /ponytail-debt
 ```
 
 ---
@@ -205,6 +218,17 @@ Flag: ComponentA.tsx can be migrated to useState when touched next.
 ```
 
 Applies at code level and at skill authoring level — see skill authoring rules below.
+
+### 10. Intent-first skill routing
+
+Every user message — regardless of wording — gets classified against available skills before responding. Do not wait for explicit slash commands or reserved words. Infer intent from meaning.
+
+Steps:
+1. Read the message. Map intent → orchestrator or individual skill.
+2. If match found → announce + invoke (see #11).
+3. If no match → respond directly.
+
+Ambiguous between two skills → name both, ask user which applies.
 
 ### 11. Announce skill invocation
 Before invoking any skill or command, tell the user which one you're using:

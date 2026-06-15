@@ -1,4 +1,4 @@
-# agentic-skills `v1.2.0`
+# agentic-skills `v1.3.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **GitHub Copilot**, and **Gemini CLI**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
@@ -6,7 +6,7 @@ One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**,
 
 ## Table of contents
 
-- [Why bother?](#why-bother) — token savings with RTK + Caveman
+- [Why bother?](#why-bother) — token savings with RTK + Caveman + Ponytail
 - [Install](#install)
 - [How it works](#how-it-works)
 - [Using the workflows](#using-the-workflows)
@@ -19,6 +19,7 @@ One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**,
 - [Architecture (EVPMR)](#architecture-evpmr)
 - [Model routing](#model-routing)
 - [Managing skills](#managing-skills)
+- [Tooling](#tooling) — RTK, Caveman, Ponytail, Karpathy Guidelines
 - [Changelog](#changelog)
 
 ---
@@ -76,13 +77,36 @@ want to move that state logic into the Presenter layer instead.
 
 ### Combined impact
 
+### Ponytail — compresses what the AI generates (code output)
+
+The `ponytail` decision ladder enforces YAGNI before any code is written. Before generating code, the AI stops at the first rung that holds: does this need to exist? is it in stdlib? is it a native feature? is an installed dep enough? can it be one line? Only then: minimal code. Deliberate shortcuts are marked with `ponytail:` comments naming their ceiling and upgrade path.
+
+```
+── WITHOUT PONYTAIL ─────────────────────────────────────────────────
+// custom retry logic with exponential backoff + jitter
+class RetryManager {
+  private attempts = 0;
+  async execute<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> { ... }
+  private calcDelay(attempt: number): number { ... }
+}
+
+── WITH PONYTAIL ────────────────────────────────────────────────────
+// ponytail: no retry lib — inline for now. ceiling: >3 callers → extract.
+const withRetry = (fn, n = 3) => fn().catch(e => n > 0 ? withRetry(fn, n-1) : Promise.reject(e));
+```
+
+**80–94% code reduction** on over-engineered solutions. Pairs with `/ponytail-review` (audit a diff), `/ponytail-audit` (scan the whole repo), `/ponytail-debt` (track deferred shortcuts).
+
+### Combined impact
+
 | Layer | Compresses | Typical savings |
 |-------|------------|-----------------|
 | RTK | Shell output → AI input | 60–90% on dev operations |
 | Caveman | AI output → your reading | 40–60% on prose responses |
-| **Together** | Both directions | **50–80% total session cost** |
+| Ponytail | Code generated | 80–94% on over-engineered solutions |
+| **Together** | All directions | **50–80% total session cost** |
 
-Typical feature review session without compression: ~40,000 tokens. With RTK + Caveman: ~8,000–20,000 tokens.
+Typical feature review session without compression: ~40,000 tokens. With RTK + Caveman + Ponytail: ~8,000–20,000 tokens.
 
 ---
 
@@ -428,6 +452,9 @@ Use when a task is narrower than a full workflow.
 |-------|-------------|-------------|
 | [`code-quality`](skills/code-quality/SKILL.md) | Review (5-axis) or simplify complex code | Security-sensitive review, or refactor > 500 lines |
 | [`debug`](skills/debug/SKILL.md) | Structured reproduce → isolate → fix | No hypothesis after 2 isolation attempts |
+| [`ponytail-review`](skills/ponytail-review/SKILL.md) | Over-engineering audit on a diff or file — what to delete/shrink | Correctness or security concerns → use `code-quality` |
+| [`ponytail-audit`](skills/ponytail-audit/SKILL.md) | Whole-repo bloat scan — ranked list of removals | — |
+| [`ponytail-debt`](skills/ponytail-debt/SKILL.md) | Ledger of all `ponytail:` shortcuts — surfaces deferred simplifications | — |
 
 ---
 
@@ -551,10 +578,14 @@ git commit -m "remove: <name>" && git push
 
 ## Tooling
 
-| Tool | Purpose | Auto-installed |
-|------|---------|----------------|
-| [RTK](https://github.com/rtk-ai/rtk) | Filters shell output before it reaches the AI — saves 60–90% on input tokens | Yes, on `bash install.sh` |
-| Caveman | Strips AI output verbosity — saves 40–60% on response tokens | Yes, via `rules/caveman.md` |
+External tools and inspirations bundled or adopted into this repo.
+
+| Tool | Source | Purpose | How it's used |
+|------|--------|---------|---------------|
+| **RTK** | [github.com/rtk-ai/rtk](https://github.com/rtk-ai/rtk) | Filters shell output before it reaches the AI — 60–90% input token savings | Auto-installed on `bash install.sh`. All commands prefixed with `rtk` |
+| **Caveman** | [github.com/JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) | Strips AI output verbosity — 40–60% response token savings | Always-active via `rules/caveman.md`. lite / full / ultra modes |
+| **Ponytail** | [github.com/DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) | YAGNI-first decision ladder + over-engineering audit — 80–94% code reduction | Decision ladder in `karpathy-guidelines`, `ponytail:` comment convention, 3 skills: `/ponytail-review`, `/ponytail-audit`, `/ponytail-debt` |
+| **Karpathy Guidelines** | [karpathy.ai](https://karpathy.ai) — adapted | Behavioral rules to prevent LLM coding pitfalls: think before coding, surgical changes, goal-driven execution | Always-active via `rules/karpathy-guidelines.md` |
 
 ---
 
@@ -562,6 +593,7 @@ git commit -m "remove: <name>" && git push
 
 | Version | Date | Changes |
 |---------|------|---------|
+| `v1.3.0` | 2026-06-15 | Adopted ponytail: decision ladder in `karpathy-guidelines`, `ponytail:` comment convention, 3 new skills (`ponytail-review`, `ponytail-audit`, `ponytail-debt`), intent-first routing rule |
 | `v1.2.0` | 2026-06-14 | Dynamic parallel workflows made default for `/build`, `/review`, `/ship`. README restructured with workflow diagrams, TOC, and token savings examples |
 | `v1.1.0` | 2026-06-13 | Added `/parallel-review`, `/parallel-build`, `/parallel-ship` with classifier-based agent selection. Audited and cleaned all skills |
 | `v1.0.3` | 2026-06-10 | Added `/pr-message` skill. Enforced `no-unused-vars` in `fe-rules`. Added `tsc --noEmit` verification after any TS change |

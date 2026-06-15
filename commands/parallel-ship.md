@@ -49,7 +49,7 @@ coverage: Lines N% / Branches N% / Functions N% / Statements N% — PASS / FAIL
 
 ## Phase 1.5 — Classify
 
-Apply the parallel workflow classifier from `using-agent-skills`. For ship, always include `fe-performance` in the agent set if any View or Presenter file changed. Announce selected agents before proceeding.
+Apply the parallel workflow classifier from `using-agent-skills`. Announce selected agents before proceeding.
 
 ---
 
