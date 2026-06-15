@@ -290,6 +290,7 @@ Target: every line either teaches something unique or provides a reference a rea
 | New rule added | Add row to the Rules table |
 | New command added | Add row to the Orchestrators table |
 | Skill discovery tree changed | Update the tree in `using-agent-skills.md` AND README |
+| Version bumped | Update `# agentic-skills \`vX.Y.Z\`` header AND add changelog row — GH Action auto-creates the release on push |
 
 ---
 
