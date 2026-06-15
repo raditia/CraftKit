@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Gemini CLI: copies skill files to ~/.agentic-skills/gemini/ and maintains a
+# Gemini CLI: copies skill files to ~/.craftkit/gemini/ and maintains a
 # managed AI-SKILLS section in ~/GEMINI.md (the global Gemini context file).
 
-GEMINI_SKILLS_DIR="$HOME/.agentic-skills/gemini"
+GEMINI_SKILLS_DIR="$HOME/.craftkit/gemini"
 GEMINI_MD="$HOME/GEMINI.md"
 _SECTION_START="<!-- BEGIN AGENTIC-SKILLS (managed — do not edit manually) -->"
 _SECTION_END="<!-- END AGENTIC-SKILLS -->"

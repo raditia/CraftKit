@@ -7,7 +7,7 @@ if [[ "${BASH_VERSINFO[0]}" -lt 3 ]] || [[ "${BASH_VERSINFO[0]}" -eq 3 && "${BAS
 fi
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STATE_DIR="$HOME/.agentic-skills-state"
+STATE_DIR="$HOME/.craftkit-state"
 RULES_DIR="$REPO_DIR/rules"
 SKILLS_DIR="$REPO_DIR/skills"
 COMMANDS_DIR="$REPO_DIR/commands"
@@ -222,7 +222,7 @@ ensure_tools() {
 
 }
 
-echo "==> Syncing agentic-skills..."
+echo "==> Syncing craftkit..."
 
 # RTK patches shell profile and is interactive — only run from install.sh,
 # never from the post-merge hook.

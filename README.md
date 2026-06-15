@@ -1,4 +1,4 @@
-# agentic-skills `v1.3.0`
+# craftkit `v1.3.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **GitHub Copilot**, and **Gemini CLI**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
@@ -113,8 +113,8 @@ Typical feature review session without compression: ~40,000 tokens. With RTK + C
 ## Install
 
 ```bash
-git clone git@github.com:raditia/agentic-skills.git ~/agentic-skills
-cd ~/agentic-skills
+git clone git@github.com:raditia/craftkit.git ~/craftkit
+cd ~/craftkit
 bash install.sh
 ```
 
@@ -125,7 +125,7 @@ bash install.sh
 
 **Per-project Copilot `@` agents** (run inside any project repo):
 ```bash
-bash ~/agentic-skills/scripts/init-copilot-agents.sh
+bash ~/craftkit/scripts/init-copilot-agents.sh
 # commit .github/ to share with your team
 ```
 

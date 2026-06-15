@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GitHub Copilot: copies skill files to ~/.agentic-skills/copilot/ and registers
+# GitHub Copilot: copies skill files to ~/.craftkit/copilot/ and registers
 # them as file-based custom instructions in VS Code's settings.json.
 #
 # alwaysApply: true  → registered in codeGeneration.instructions AND reviewSelection.instructions
@@ -7,7 +7,7 @@
 # alwaysApply: false → registered in codeGeneration.instructions only
 #                      (available as context when user invokes by name / natural language)
 
-COPILOT_SKILLS_DIR="$HOME/.agentic-skills/copilot"
+COPILOT_SKILLS_DIR="$HOME/.craftkit/copilot"
 
 _vscode_settings_path() {
     case "$(uname -s)" in

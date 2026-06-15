@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# init-copilot-agents.sh — wires agentic-skills into a project's Copilot Chat
+# init-copilot-agents.sh — wires craftkit into a project's Copilot Chat
 #
 # Generates:
 #   .github/copilot-instructions.md  — always-active rules (auto-loaded every chat)
 #   .github/agents/<skill>.agent.md  — @-invokable agents per skill/command
 #
-# Registers the project path in ~/.agentic-skills-state/copilot-projects so
+# Registers the project path in ~/.craftkit-state/copilot-projects so
 # sync.sh can auto-update agents on every git pull.
 #
 # Usage:
-#   bash ~/agentic-skills/scripts/init-copilot-agents.sh           # current dir
-#   bash ~/agentic-skills/scripts/init-copilot-agents.sh /path/to/project
+#   bash ~/craftkit/scripts/init-copilot-agents.sh           # current dir
+#   bash ~/craftkit/scripts/init-copilot-agents.sh /path/to/project
 
 set -euo pipefail
 
@@ -18,7 +18,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RULES_DIR="$REPO_DIR/rules"
 SKILLS_DIR="$REPO_DIR/skills"
 COMMANDS_DIR="$REPO_DIR/commands"
-STATE_DIR="$HOME/.agentic-skills-state"
+STATE_DIR="$HOME/.craftkit-state"
 PROJECTS_FILE="$STATE_DIR/copilot-projects"
 
 TARGET_DIR="${1:-$(pwd)}"
@@ -32,7 +32,7 @@ mkdir -p "$AGENTS_DIR" "$STATE_DIR"
 
 echo "→ .github/copilot-instructions.md"
 {
-    echo "<!-- managed by agentic-skills — do not edit manually -->"
+    echo "<!-- managed by craftkit — do not edit manually -->"
     for f in "$RULES_DIR"/*.md; do
         [[ -f "$f" ]] || continue
         echo ""

@@ -5,7 +5,7 @@
 # alwaysApply: false → installed as ~/.claude/commands/<skill>.md (slash command)
 
 CLAUDE_COMMANDS_DIR="$HOME/.claude/commands"
-CLAUDE_RULES_DIR="$HOME/.agentic-skills/claude-rules"
+CLAUDE_RULES_DIR="$HOME/.craftkit/claude-rules"
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
 _CLAUDE_SECTION_START="<!-- BEGIN AGENTIC-SKILLS (managed — do not edit manually) -->"
 _CLAUDE_SECTION_END="<!-- END AGENTIC-SKILLS -->"

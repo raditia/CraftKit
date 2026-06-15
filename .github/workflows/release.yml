@@ -18,7 +18,7 @@ jobs:
       - name: Extract version from README
         id: version
         run: |
-          VERSION=$(grep -m1 '^# agentic-skills' README.md | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')
+          VERSION=$(grep -m1 '^# craftkit' README.md | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')
           if [ -z "$VERSION" ]; then
             echo "No version found in README header — skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -66,5 +66,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "${{ steps.version.outputs.version }}" \
-            --title "agentic-skills ${{ steps.version.outputs.version }}" \
+            --title "craftkit ${{ steps.version.outputs.version }}" \
             --notes "${{ steps.notes.outputs.notes }}"

@@ -8,7 +8,7 @@ fi
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "==> Installing agentic-skills..."
+echo "==> Installing craftkit..."
 
 # Install git post-merge hook so 'git pull' auto-syncs + installs tools
 cp "$REPO_DIR/hooks/post-merge" "$REPO_DIR/.git/hooks/post-merge"
