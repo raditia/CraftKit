@@ -37,12 +37,19 @@ Match natural language to the right command. **Dynamic parallel is the default**
 
 | User says | Run | Mode |
 |-----------|-----|------|
-| "build feature X", "create a new screen", "implement X", "scaffold a module" | `/parallel-build` | dynamic |
-| "help me review", "review the changes", "code review", "LGTM check" | `/parallel-review` | dynamic |
-| "get this ready to merge", "ship this", "prepare for PR", "is this ready?" | `/parallel-ship` | dynamic |
-| "something is broken", "fix this bug", "this crashes", "why is X not working" | `/fix` | sequential (linear by nature) |
-| "write tests", "add tests", "test this", "coverage is low", "improve coverage", "I need tests for X" | `/fe-test` | — |
+| "build feature X", "create a new screen", "implement X", "I want to create X" — **object must be a feature/screen/module, not a test** | `/parallel-build` | dynamic |
+| "scaffold a module", "scaffold X", "scaffold only" — **scaffold intent without full build** | `/build` | sequential |
+| "help me review", "review the changes", "code review", "LGTM check", "can you check my changes?" — **feedback intent, no merge signal** | `/parallel-review` | dynamic |
+| "get this ready to merge", "ship this", "prepare for PR", "is this ready?", "can I merge this?" — **merge intent present** | `/parallel-ship` | dynamic |
+| "something is broken", "fix this bug", "this crashes", "why is X not working", "coverage is failing in CI" — **clear breakage signal**; vague complaints without error/crash/fail → `/parallel-review` instead | `/fix` | sequential (linear by nature) |
+| "write tests", "add tests", "test this", "coverage is low", "improve coverage", "I need tests for X", "create a test for X", "create tests for X" — **test authoring, not broken coverage** | `/fe-test` | — |
 | "generate PR message", "write PR description", "draft a PR", "what should my PR say", "PR message for this branch" | `/pr-message` | — |
+
+**Tiebreakers:**
+- Vague complaint ("this looks wrong", "something seems off") — no error/crash/fail signal → `/parallel-review`
+- "scaffold" verb alone → `/build` not `/parallel-build`
+- Merge intent ("ready to merge", "can I merge", "ship") → `/parallel-ship` over `/parallel-review`
+- Coverage mentioned + failing/CI context → `/fix`; coverage mentioned + authoring context → `/fe-test`
 
 **Sequential fallback** — use explicit slash command when you want a lightweight, single-pass run:
 
@@ -50,7 +57,7 @@ Match natural language to the right command. **Dynamic parallel is the default**
 |-----------------|----------------|
 | `/review` | Quick sanity check, small diff, no need for parallel agents |
 | `/ship` | Simple pre-merge gate, already know tests pass |
-| `/build` | Scaffold-only or when parallel validation overhead isn't worth it |
+| `/build` | Scaffold-only or parallel validation overhead not worth it |
 
 ### Individual skills (use when task is narrower than a full workflow)
 
@@ -231,11 +238,13 @@ Steps:
 Ambiguous between two skills → name both, ask user which applies.
 
 ### 11. Announce skill invocation
-Before invoking any skill or command, tell the user which one you're using:
+Before invoking any skill or command, tell the user which one you're using and what model will run it:
 ```
-Running /fe-test — write and verify tests for changed code paths.
+Running /fe-test [everyday: claude-sonnet-4-6] — write and verify tests for changed code paths.
+Running /pr-message [cheapest: claude-haiku-4-5] — generate PR message from branch diff.
+Running /fe-context [cheapest: claude-haiku-4-5] — generate context doc from staged changes.
 ```
-One line, before the skill executes. Lets the user redirect before work begins.
+One line, before the skill executes. Lets the user redirect before work begins. Read the skill's `**Model:**` line to get the right label — use `cheapest`, `everyday`, or `escalated` as the tier label.
 
 ---
 

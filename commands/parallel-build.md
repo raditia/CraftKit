@@ -78,7 +78,7 @@ Announce selected agents before proceeding.
 
 ## Phase 5 — Dynamic parallel validation agents
 
-Spawn selected agents simultaneously in a single response using the Agent tool. Use `caveman:cavecrew-reviewer` subagent type. Each agent is cold — pass the full new file contents and context.md summary inline (not just the diff — agents need the full implementation context).
+Spawn selected agents simultaneously in a single response using the Agent tool. Use `caveman:cavecrew-reviewer` subagent type. Set `model` based on the skill's `**Model:**` tier: `cheapest` → `"haiku"`, `everyday` → `"sonnet"`, `escalated` → `"opus"`. Each agent is cold — pass the full new file contents and context.md summary inline (not just the diff — agents need the full implementation context).
 
 **Agent: fe-review (EVPMR checklist)**
 

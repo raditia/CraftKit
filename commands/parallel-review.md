@@ -52,7 +52,7 @@ Apply the parallel workflow classifier from `using-agent-skills`. Announce selec
 
 ## Phase 2 — Dynamic parallel agents
 
-Spawn selected agents simultaneously in a single response using the Agent tool. Use `caveman:cavecrew-reviewer` subagent type. Each agent is cold — pass the full diff and context.md summary inline.
+Spawn selected agents simultaneously in a single response using the Agent tool. Use `caveman:cavecrew-reviewer` subagent type. Set `model` based on the skill's `**Model:**` tier: `cheapest` → `"haiku"`, `everyday` → `"sonnet"`, `escalated` → `"opus"`. Each agent is cold — pass the full diff and context.md summary inline.
 
 **Agent: code-quality (5-axis)**
 
