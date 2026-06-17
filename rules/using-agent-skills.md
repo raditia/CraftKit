@@ -192,7 +192,12 @@ Touch only what was asked. When your changes create orphans — remove imports, 
 ### 6. Verify before claiming done
 Every skill has a verification step. "Seems right" is never sufficient — there must be evidence: passing tests, build output, lint clean, runtime data.
 
-**After any TypeScript code change** (source or test), run `npx tsc --noEmit` filtered to changed files before reporting done. Jest uses babel and skips type checking — passing tests do not guarantee type-correctness. Common misses: spread arg types (TS2556), missing required props (TS2322), incompatible types in mocks.
+**After any code change**, run these CI gates before reporting done:
+
+1. **Lint** — `rtk pnpm deplint` — catches ESLint violations that block CI
+2. **Type check** — `rtk tsc --project tsconfig.json` — Jest uses babel and skips types; passing tests do not guarantee type-correctness
+
+Both must be clean. Common type misses: spread arg types (TS2556), missing required props (TS2322), incompatible types in mocks.
 
 ### 7. Use the model for judgment, not mechanics
 
