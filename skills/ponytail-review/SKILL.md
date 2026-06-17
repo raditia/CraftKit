@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `rtk git diff`, `rtk grep "pattern" .`
-**Model:** everyday
+**Model:** cheapest — `claude-haiku-4-5` (Claude), `gemini-2.5-flash` (Gemini), `gpt-4o-mini` (Copilot/Cursor). No escalation — task is pattern matching on diff, not architecture judgment.
 
 > Correctness bugs, security issues, performance: use `/code-quality` instead. This skill targets complexity only.
 

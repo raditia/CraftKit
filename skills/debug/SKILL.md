@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `rtk grep "pattern" .`, `rtk git status`, `rtk tsc`, `rtk jest`
-**Model:** everyday — escalate after 2 failed hypotheses with no clear root cause
+**Model:** cheapest — `claude-haiku-4-5` (Claude), `gemini-2.5-flash` (Gemini), `gpt-4o-mini` (Copilot/Cursor). Escalate to everyday after 2 failed hypotheses with no clear root cause.
 
 ---
 
@@ -20,7 +20,7 @@ alwaysApply: false
 ## Debug process
 
 1. **Reproduce** — identify exact inputs or conditions that trigger the bug
-2. **Isolate** — narrow to the smallest failing unit (function, query, request)
+2. **Isolate** — spawn `cavecrew-investigator` to locate the failing unit (function, query, call site). Pass it the symptom and ask for `file:line` table. Do not read files yourself at this step.
 3. **Hypothesize** — state the most likely root cause before reading more code
 4. **Verify** — confirm or disprove with code and traces:
    ```bash

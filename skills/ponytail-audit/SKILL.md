@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `rtk grep "pattern" .`, `find . -name "*.ts" -not -path "*/node_modules/*"`
-**Model:** everyday
+**Model:** cheapest — `claude-haiku-4-5` (Claude), `gemini-2.5-flash` (Gemini), `gpt-4o-mini` (Copilot/Cursor). No escalation — task is grep + classify across repo, not design decisions.
 
 > Diff-scoped review: use `/ponytail-review` instead. This skill scans the full repo.
 
