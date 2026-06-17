@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `rtk git diff`, `rtk git log`, `rtk git status`, `rtk ls .`
-**Model:** everyday — escalate if diff spans > 10 files with complex interdependencies
+**Model:** cheapest — `claude-haiku-4-5` (Claude), `gemini-2.5-flash` (Gemini), `gpt-4o-mini` (Copilot/Cursor). Escalate to everyday if diff spans > 10 files with complex interdependencies.
 
 ---
 

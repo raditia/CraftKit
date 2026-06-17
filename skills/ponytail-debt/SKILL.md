@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `rtk grep "ponytail:" . --include="*.ts" --include="*.tsx" --include="*.js"`
-**Model:** everyday
+**Model:** cheapest — `claude-haiku-4-5` (Claude), `gemini-2.5-flash` (Gemini), `gpt-4o-mini` (Copilot/Cursor). No escalation — task is pure extraction.
 
 ---
 
