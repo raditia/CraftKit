@@ -22,12 +22,15 @@ Loaded from `rules/` automatically on every session:
 
 ## Skill discovery
 
-**Intent-first routing — always active.** Before responding to any user message, classify intent against available skills. Do NOT require specific trigger words — infer from meaning, not keywords.
+**Intent-first routing — BLOCKING REQUIREMENT.** Before generating ANY response to a user request, classify intent against available skills. This is mandatory — not advisory. Do NOT require specific trigger words — infer from meaning, not keywords. Do NOT skip this step even for simple or conversational requests.
 
 Classification order:
 1. **Orchestrator** — does the request imply build / review / ship / fix / test / PR? → match orchestrator table below
 2. **Individual skill** — narrower task (scaffold, patterns, a11y, performance, context)? → match skill tree below
-3. **General purpose** — no skill matches → respond directly
+3. **No match** — no skill matches → **announce this explicitly before responding**:
+   ```
+   No skill matched for this request. Responding directly.
+   ```
 
 Announce the matched skill before invoking it (see core behavior #11). If genuinely ambiguous between two skills, name both and ask.
 
@@ -231,14 +234,20 @@ Flag: ComponentA.tsx can be migrated to useState when touched next.
 
 Applies at code level and at skill authoring level — see skill authoring rules below.
 
-### 10. Intent-first skill routing
+### 10. Intent-first skill routing — MANDATORY GATE
 
-Every user message — regardless of wording — gets classified against available skills before responding. Do not wait for explicit slash commands or reserved words. Infer intent from meaning.
+**Every user message gets classified against available skills BEFORE any response is generated.** This is a hard requirement — not a suggestion. No exceptions for simple, conversational, or "obvious" requests.
 
 Steps:
-1. Read the message. Map intent → orchestrator or individual skill.
-2. If match found → announce + invoke (see #11).
-3. If no match → respond directly.
+1. Read message. Map intent → orchestrator or individual skill (see Skill discovery section).
+2. Match found → announce + invoke (see #11). Do NOT respond until skill completes.
+3. No match → output exactly:
+   ```
+   No skill matched for this request. Responding directly.
+   ```
+   Then respond.
+
+**Never silently skip the classification step.** Skipping = wasting user tokens on work a skill would have done better. Every skipped skill check is a token waste the user pays for.
 
 Ambiguous between two skills → name both, ask user which applies.
 
@@ -320,6 +329,7 @@ Target: every line either teaches something unique or provides a reference a rea
 8. Skipping verification because "it looks right"
 9. Skipping `docs/context.md` read — mandatory at skill start, no exceptions
 10. Context flooding — loading entire files not relevant to the current task
+11. **Skipping skill classification before responding** — always check skills first; always announce match or no-match; never silently bypass this gate
 
 ---
 

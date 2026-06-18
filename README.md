@@ -1,4 +1,4 @@
-# craftkit `v1.3.0`
+# craftkit `v1.3.1`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **GitHub Copilot**, and **Gemini CLI**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
@@ -430,7 +430,7 @@ Loaded automatically on every session. Never invoke these — they're always pre
 | [`caveman`](rules/caveman.md) | Terse responses — no filler, no hedging. lite / full / ultra modes |
 | [`fe-rules`](rules/fe-rules.md) | EVPMR layer constraints, TypeScript strict, styling tokens, React correctness, tracking |
 | [`karpathy-guidelines`](rules/karpathy-guidelines.md) | Think before coding, simplicity, surgical changes, goal-driven, read before write, tests verify intent, checkpoint after steps |
-| [`using-agent-skills`](rules/using-agent-skills.md) | Skill routing, model selection, severity labels, parallel classifier, model for judgment only, surface conflicts |
+| [`using-agent-skills`](rules/using-agent-skills.md) | Skill routing (mandatory gate — classify before every response, announce match or "No skill matched."), model selection, severity labels, parallel classifier, model for judgment only, surface conflicts |
 
 ### Frontend skills — on demand
 
@@ -593,6 +593,7 @@ External tools and inspirations bundled or adopted into this repo.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| `v1.3.1` | 2026-06-18 | Skill routing upgraded to mandatory gate: classify before every response, announce match or "No skill matched.", added as failure mode #11. Hook injects skill-first reminder every turn for per-turn reinforcement |
 | `v1.3.0` | 2026-06-15 | Adopted ponytail: decision ladder in `karpathy-guidelines`, `ponytail:` comment convention, 3 new skills (`ponytail-review`, `ponytail-audit`, `ponytail-debt`), intent-first routing rule |
 | `v1.2.0` | 2026-06-14 | Dynamic parallel workflows made default for `/build`, `/review`, `/ship`. README restructured with workflow diagrams, TOC, and token savings examples |
 | `v1.1.0` | 2026-06-13 | Added `/parallel-review`, `/parallel-build`, `/parallel-ship` with classifier-based agent selection. Audited and cleaned all skills |
