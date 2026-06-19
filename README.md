@@ -523,10 +523,12 @@ git add agents/my-agent.md && git commit -m "feat: add my-agent agent" && git pu
 # users: git pull → auto-installed to ~/.claude/agents/
 ```
 
-### Remove a skill or command
+### Remove a skill, command, or agent
 
 ```bash
-git rm -r skills/<name>/       # or: git rm commands/<name>.md
+git rm -r skills/<name>/       # skill
+git rm commands/<name>.md      # command
+git rm agents/<name>.md        # agent → also remove from subagent_type references in commands/
 git commit -m "remove: <name>" && git push
 # users: git pull → auto-uninstalled from all AI tools
 ```

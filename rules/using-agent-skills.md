@@ -111,6 +111,8 @@ For each changed file, read enough of its actual content to confirm what layer i
 
 Dedup the set. Always include `code-quality` if any non-test, non-resource code changed.
 
+> **Command-specific extensions:** `parallel-build` and `parallel-ship` add agents beyond this base table (e.g. `fe-patterns`, `fe-performance`). Those additions are defined in the command file itself, not here — this table is the shared base.
+
 ### Step 3 — Flag conditions
 
 Evaluate before spawning:
@@ -118,8 +120,8 @@ Evaluate before spawning:
 | Condition | Action |
 |-----------|--------|
 | Diff > 300 lines | Add `[WARNING] Change size: N lines — consider splitting` to synthesis |
-| 3+ EVPMR layers changed | Add adversarial agent: "argue strongest case against merging this" |
-| Security-sensitive paths | Emphasize security axis in `code-quality` agent prompt |
+| 3+ EVPMR layers changed | Add `adversarial` agent (definition in `agents/adversarial.md`) |
+| Security-sensitive paths | Pass "Security-sensitive code present — emphasize security axis." in user message to `code-quality` agent |
 
 ### Step 4 — Announce selection
 
@@ -277,7 +279,7 @@ Apply these checks every time a skill, rule, or command is **added or updated** 
 
 ### 1. Conflict check (before writing anything)
 
-Scan all files in `rules/`, `skills/`, and `commands/` for:
+Scan all files in `rules/`, `skills/`, `commands/`, and `agents/` for:
 
 | Check | How |
 |-------|-----|
@@ -321,6 +323,9 @@ Target: every line either teaches something unique or provides a reference a rea
 | Skill renamed | Update name in table and any cross-references in commands |
 | New rule added | Add row to the Rules table |
 | New command added | Add row to the Orchestrators table |
+| New agent added | Add row to the Agents reference table (name, role, spawned-by, model) |
+| Agent removed | Remove its row from agents table |
+| Agent renamed | Update name in agents table and all `subagent_type:` references in commands |
 | Skill discovery tree changed | Update the tree in `using-agent-skills.md` AND README |
 | Version bumped | Update `# craftkit \`vX.Y.Z\`` header AND add changelog row — GH Action auto-creates the release on push |
 
