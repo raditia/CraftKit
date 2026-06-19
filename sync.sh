@@ -11,6 +11,7 @@ STATE_DIR="$HOME/.craftkit-state"
 RULES_DIR="$REPO_DIR/rules"
 SKILLS_DIR="$REPO_DIR/skills"
 COMMANDS_DIR="$REPO_DIR/commands"
+AGENTS_DIR="$REPO_DIR/agents"
 
 mkdir -p "$STATE_DIR"
 
@@ -65,6 +66,16 @@ read_current_rules() {
     for f in "$RULES_DIR"/*.md; do
         [[ -f "$f" ]] || continue
         _current_rules+=("$(basename "$f" .md)")
+    done
+}
+
+# Collects agent names from agents/*.md
+read_current_agents() {
+    _current_agents=()
+    if [[ ! -d "$AGENTS_DIR" ]]; then return; fi
+    for f in "$AGENTS_DIR"/*.md; do
+        [[ -f "$f" ]] || continue
+        _current_agents+=("$(basename "$f" .md)")
     done
 }
 
@@ -160,6 +171,45 @@ sync_rules_adapter() {
     printf '%s\n' "${current_rules[@]+"${current_rules[@]}"}" > "$state_file"
 }
 
+sync_agents_adapter() {
+    local adapter="$1"
+    local state_file="$STATE_DIR/${adapter}-agents"
+    local changed=0
+
+    local installed_agents=()
+    if [[ -f "$state_file" ]]; then
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && installed_agents+=("$line")
+        done < "$state_file"
+    fi
+
+    read_current_agents
+    local current_agents=("${_current_agents[@]+"${_current_agents[@]}"}")
+
+    for agent in "${installed_agents[@]+"${installed_agents[@]}"}"; do
+        if ! contains "$agent" "${current_agents[@]+"${current_agents[@]}"}"; then
+            echo "    - removing agent: $agent"
+            "uninstall_${adapter}_agent" "$agent"
+            changed=1
+        fi
+    done
+
+    for agent in "${current_agents[@]+"${current_agents[@]}"}"; do
+        local source_file="$AGENTS_DIR/${agent}.md"
+        local dest
+        dest="$("get_${adapter}_agent_dest" "$agent")"
+        if [[ ! -f "$dest" ]] || ! diff -q "$source_file" "$dest" &>/dev/null; then
+            echo "    + agent: $agent"
+            "install_${adapter}_agent" "$agent" "$source_file"
+            changed=1
+        fi
+    done
+
+    [[ $changed -eq 0 ]] && echo "    agents: (up to date)"
+
+    printf '%s\n' "${current_agents[@]+"${current_agents[@]}"}" > "$state_file"
+}
+
 sync_commands_adapter() {
     local adapter="$1"
     local state_file="$STATE_DIR/${adapter}-commands"
@@ -238,6 +288,9 @@ for adapter in "${ADAPTERS[@]}"; do
     sync_rules_adapter "$adapter"
     sync_adapter "$adapter"
     sync_commands_adapter "$adapter"
+    if declare -f "install_${adapter}_agent" &>/dev/null; then
+        sync_agents_adapter "$adapter"
+    fi
     if declare -f "finalize_${adapter}" &>/dev/null; then
         "finalize_${adapter}"
     fi

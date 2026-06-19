@@ -52,78 +52,53 @@ Apply the parallel workflow classifier from `using-agent-skills`. Announce selec
 
 ## Phase 2 — Dynamic parallel agents
 
-Spawn selected agents simultaneously in a single response using the Agent tool. Use `caveman:cavecrew-reviewer` subagent type. Set `model` based on the skill's `**Model:**` tier: `cheapest` → `"haiku"`, `everyday` → `"sonnet"`, `escalated` → `"opus"`. Each agent is cold — pass the full diff and context.md summary inline.
+Spawn selected agents simultaneously in a single response using the Agent tool. Agent definitions live in `agents/` — the harness loads their system prompt and tool restrictions automatically. Each agent is cold — pass content as the user message.
 
-**Agent: code-quality (5-axis)**
+**Agent: code-quality** (`subagent_type: "code-quality"`)
 
+Pass as user message:
 ```
-Review this diff for correctness, readability, architecture (EVPMR), security, and performance.
-[Add if security-sensitive: Pay extra attention to the security axis — auth/payment code present.]
-[Add if package.json changed: Audit any new dependencies for bundle impact, maintenance status, and known vulnerabilities.]
+[if auth/payment/credential paths changed, prepend: "Security-sensitive code present — emphasize security axis."]
+[if package.json changed, prepend: "package.json changed — audit new dependencies for bundle impact, maintenance status, and known vulnerabilities."]
 
 DIFF:
 <full diff>
 
 CONTEXT:
 <docs/context.md Summary + Key Changes>
-
-Output: [SEVERITY] file:line — description / Why: ... / Fix: ...
-Severity: [ERROR]=blocks merge [WARNING]=should fix [SUGGESTION]=optional
-End with: REVIEW SUMMARY / Errors: N / Warnings: N / Suggestions: N
 ```
 
-**Agent: fe-review (EVPMR checklist)**
+**Agent: fe-review** (`subagent_type: "fe-review"`)
 
+Pass as user message:
 ```
-Run the EVPMR checklist on this diff:
-- View: no useState/useEffect/API calls, calls usePresenter*(), pure JSX
-- Presenter: no JSX, returns plain object
-- Model: no React imports, no side effects
-- Entry: wraps in <ErrorBoundary> from react-error-boundary
-- Resource: all display strings here, none hardcoded in View
-- Styling: StyleSheet.create() + Token.spacing.* / Token.color.* / Token.border.* only, no inline styles
-- TypeScript: no any, discriminated unions for async data, explicit return types
-- React correctness: derive don't sync, ternary not && for conditional render, stable keys, functional setState
-- Tracking: useTracker() in Presenter handlers, not in View
-
 DIFF:
 <full diff>
 
 CONTEXT:
 <docs/context.md Summary + Key Changes>
-
-Output: [SEVERITY] file:line — description / Why: ... / Fix: ...
-End with: EVPMR SUMMARY / Errors: N / Warnings: N / Suggestions: N
 ```
 
-**Agent: fe-a11y** _(only if View*.tsx changed)_
+**Agent: fe-a11y** (`subagent_type: "fe-a11y"`) — _only if View*.tsx changed_
 
+Pass as user message:
 ```
-Review this diff for accessibility issues in React Native / Next.js:
-Check accessible labels, roles, focus management, dynamic announcements, reduced motion, touch target sizes, color contrast reliance.
-
 DIFF:
 <full diff>
 
 CONTEXT:
 <docs/context.md Summary + Key Changes>
-
-Output: [SEVERITY] file:line — description / Why: ... / Fix: ...
-End with: A11Y SUMMARY / Errors: N / Warnings: N / Suggestions: N
 ```
 
-**Agent: adversarial** _(only if 3+ EVPMR layers changed)_
+**Agent: adversarial** (`subagent_type: "adversarial"`) — _only if 3+ EVPMR layers changed_
 
+Pass as user message:
 ```
-You are a devil's advocate reviewer. Your job: argue the strongest case AGAINST merging this diff. Find risks, hidden assumptions, design smells, missing edge cases, or reasons this change could cause production issues. Be specific — vague concerns don't count.
-
 DIFF:
 <full diff>
 
 CONTEXT:
 <docs/context.md Summary + Key Changes>
-
-Output: list of specific concerns, most severe first. No praise.
 ```
 
 ---

@@ -78,96 +78,63 @@ Announce selected agents before proceeding.
 
 ## Phase 5 — Dynamic parallel validation agents
 
-Spawn selected agents simultaneously in a single response using the Agent tool. Use `caveman:cavecrew-reviewer` subagent type. Set `model` based on the skill's `**Model:**` tier: `cheapest` → `"haiku"`, `everyday` → `"sonnet"`, `escalated` → `"opus"`. Each agent is cold — pass the full new file contents and context.md summary inline (not just the diff — agents need the full implementation context).
+Spawn selected agents simultaneously in a single response using the Agent tool. Agent definitions live in `agents/` — the harness loads their system prompt and tool restrictions automatically. Each agent is cold — pass content as the user message. Pass full file contents, not just the diff — agents need the full implementation context.
 
-**Agent: fe-review (EVPMR checklist)**
+**Agent: fe-review** (`subagent_type: "fe-review"`)
 
+Pass as user message:
 ```
-Review this newly built EVPMR feature module for pattern violations:
-- View: no useState/useEffect/API calls, calls usePresenter*(), pure JSX, JSX ≤ 80 lines or extracted sub-components
-- Presenter: no JSX, returns plain object, hook ≤ 100 lines or split
-- Model: no React imports, no side effects, async data as discriminated unions
-- Entry: wraps in <ErrorBoundary> from react-error-boundary
-- Resource: all display strings here, none hardcoded in View
-- Styling: StyleSheet.create() + Token.spacing.* / Token.color.* / Token.border.* only
-- TypeScript: no any, explicit return types on exported functions
-- React correctness: derive don't sync, ternary not && for conditional render, stable keys
-- Tracking: useTracker() in Presenter handlers
+FILES:
+<content of all newly created/modified files>
+
+CONTEXT:
+<docs/context.md full content>
+```
+
+**Agent: fe-patterns** (`subagent_type: "fe-patterns"`)
+
+Pass as user message:
+```
+FILES:
+<content of all newly created/modified files>
+
+CONTEXT:
+<docs/context.md full content>
+```
+
+**Agent: fe-a11y** (`subagent_type: "fe-a11y"`) — _only if interactive View components built_
+
+Pass as user message:
+```
+FILES:
+<content of all newly created/modified files>
+
+CONTEXT:
+<docs/context.md full content>
+```
+
+**Agent: fe-performance** (`subagent_type: "fe-performance"`) — _only if Presenter with data fetching or complex state_
+
+Pass as user message:
+```
+FILES:
+<content of all newly created/modified files>
+
+CONTEXT:
+<docs/context.md full content>
+```
+
+**Agent: adversarial** (`subagent_type: "adversarial"`) — _only if large module built (> 5 files or > 300 lines total)_
+
+Pass as user message:
+```
+This is a newly built feature — argue the strongest case against shipping it as-is.
 
 FILES:
 <content of all newly created/modified files>
 
 CONTEXT:
 <docs/context.md full content>
-
-Output: [SEVERITY] file:line — description / Why: ... / Fix: ...
-End with: EVPMR SUMMARY / Errors: N / Warnings: N / Suggestions: N
-```
-
-**Agent: fe-patterns**
-
-```
-Review the composition patterns, hooks discipline, and state location in this newly built feature:
-- State in the right layer (URL > server > context > local)?
-- No derived state synced with useEffect?
-- useCallback/useMemo where re-renders matter?
-- No components defined inside components?
-- Hook return shape stable — no new object identity on every render?
-- Redux only for genuinely shared cross-component state?
-
-FILES:
-<content of all newly created/modified files>
-
-CONTEXT:
-<docs/context.md full content>
-
-Output: [SEVERITY] file:line — description / Why: ... / Fix: ...
-End with: PATTERNS SUMMARY / Errors: N / Warnings: N / Suggestions: N
-```
-
-**Agent: fe-a11y** _(only if interactive View components built)_
-
-```
-Review this newly built React Native / Next.js feature for accessibility:
-Check accessible labels, roles, focus management, dynamic announcements, reduced motion support, touch target sizes, color contrast reliance, heading order.
-
-FILES:
-<content of all newly created/modified files>
-
-CONTEXT:
-<docs/context.md full content>
-
-Output: [SEVERITY] file:line — description / Why: ... / Fix: ...
-End with: A11Y SUMMARY / Errors: N / Warnings: N / Suggestions: N
-```
-
-**Agent: fe-performance** _(only if Presenter with data fetching or complex state)_
-
-```
-Review this newly built feature for performance issues: waterfall data fetching, missing Promise.all, missing useCallback/useMemo, missing dynamic() imports, bundle size concerns, unnecessary re-renders, unstable key props.
-
-FILES:
-<content of all newly created/modified files>
-
-CONTEXT:
-<docs/context.md full content>
-
-Output: [SEVERITY] file:line — description / Why: ... / Fix: ...
-End with: PERFORMANCE SUMMARY / Errors: N / Warnings: N / Suggestions: N
-```
-
-**Agent: adversarial** _(only if large module built)_
-
-```
-You are a devil's advocate reviewer. This is a newly built feature — argue the strongest case against shipping it as-is. Find risks, hidden assumptions, missing edge cases, over-engineering, or reasons this implementation could cause production issues. Be specific.
-
-FILES:
-<content of all newly created/modified files>
-
-CONTEXT:
-<docs/context.md full content>
-
-Output: list of specific concerns, most severe first. No praise.
 ```
 
 **Gate (Phase 5):** No `[ERROR]` findings remain before proceeding to tests.

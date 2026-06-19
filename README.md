@@ -1,4 +1,4 @@
-# craftkit `v1.3.4`
+# craftkit `v1.4.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **GitHub Copilot**, **Gemini CLI**, **Codex CLI**, and **Crush**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
@@ -16,6 +16,7 @@ One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**,
   - [Sequential fallback](#sequential-fallback) — `/review`, `/ship`, `/build`
   - [Fix, tests, and PR message](#fix-tests-and-pr-message)
 - [Skills reference](#skills-reference)
+- [Agents reference](#agents-reference)
 - [Architecture (EVPMR)](#architecture-evpmr)
 - [Model routing](#model-routing)
 - [Managing skills](#managing-skills)
@@ -378,6 +379,40 @@ Use when a task is narrower than a full workflow.
 
 ---
 
+## Agents reference
+
+Cold sub-agents spawned by parallel workflows. Each has a fixed system prompt (role + checklist), enforced tool restrictions (`Read, Grep, Glob` — no writes), and a set model. Orchestrators pass content (diff or files) as the user message when spawning.
+
+Auto-synced to `~/.claude/agents/` on `git pull` (Claude Code only).
+
+| Agent | Role | Spawned by | Model |
+|-------|------|-----------|-------|
+| [`code-quality`](agents/code-quality.md) | 5-axis review: correctness, readability, EVPMR arch, security, performance | `parallel-review`, `parallel-ship` | sonnet |
+| [`fe-review`](agents/fe-review.md) | EVPMR layer violations, TypeScript, styling, React correctness, tracking | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
+| [`fe-a11y`](agents/fe-a11y.md) | Accessibility: labels, roles, focus, announcements, reduced motion | `parallel-review`, `parallel-build`, `parallel-ship` | haiku |
+| [`fe-patterns`](agents/fe-patterns.md) | Composition patterns, hooks discipline, state location | `parallel-build` | sonnet |
+| [`fe-performance`](agents/fe-performance.md) | Waterfalls, bundle size, re-renders, server-side, RN patterns | `parallel-build`, `parallel-ship` | sonnet |
+| [`adversarial`](agents/adversarial.md) | Devil's advocate — strongest case against merging/shipping | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
+| [`plan-roaster`](agents/plan-roaster.md) | Stress-test a plan before implementation — weakest assumption + failure modes | On demand | sonnet |
+
+### Add an agent
+
+```bash
+# create agents/<name>.md with frontmatter: name, description, tools, model, color
+git add agents/<name>.md && git commit -m "feat: add <name> agent" && git push
+# users: git pull → auto-installed to ~/.claude/agents/
+```
+
+### Use an agent in a command
+
+```
+Agent({ subagent_type: "<name>", prompt: "<content to review>" })
+```
+
+The harness loads the agent definition automatically — no inline prompt needed.
+
+---
+
 ## Architecture (EVPMR)
 
 All frontend features follow a strict 5-file module structure. Rules are enforced by `fe-rules` at all times — no invocation needed.
@@ -478,6 +513,14 @@ git add skills/my-skill && git commit -m "feat: add my-skill" && git push
 git add commands/my-command.md && git commit -m "feat: add my-command" && git push
 ```
 
+### Add an agent (cold sub-agent for Claude Code)
+
+```bash
+# create agents/my-agent.md with frontmatter: name, description, tools, model, color
+git add agents/my-agent.md && git commit -m "feat: add my-agent agent" && git push
+# users: git pull → auto-installed to ~/.claude/agents/
+```
+
 ### Remove a skill or command
 
 ```bash
@@ -505,6 +548,7 @@ External tools and inspirations bundled or adopted into this repo.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| `v1.4.0` | 2026-06-19 | New `agents/` folder with 7 cold sub-agent definitions (`code-quality`, `fe-review`, `fe-a11y`, `fe-patterns`, `fe-performance`, `adversarial`, `plan-roaster`). Auto-synced to `~/.claude/agents/` on `git pull`. Parallel commands (`parallel-review`, `parallel-ship`, `parallel-build`) updated to spawn agents by name — inline prompt duplication removed (~120 lines). |
 | `v1.3.4` | 2026-06-19 | Replaced all ASCII flow diagrams with Mermaid — parallel-review, parallel-ship, parallel-build, classifier examples (A–D), and context flow. Fail/blocked paths added to ship and build diagrams. |
 | `v1.3.3` | 2026-06-19 | Added Codex CLI adapter (`~/.codex/AGENTS.md` managed block) and Crush adapter (`~/.config/crush/CRUSH.md` rules + `~/.config/crush/skills/` per-command files). Both wired into sync.sh auto-sync on `git pull`. |
 | `v1.3.2` | 2026-06-19 | Escalation model updated to `claude-opus-4-8` across all skills and commands. Context freshness check added to standard load procedure — detects branch/commit mismatch and auto-regenerates `docs/context.md`. Downgraded `fe-a11y`, `fe-scaffold` to cheapest model. Token optimizations: `fe-test` drops redundant context section + git log step. |

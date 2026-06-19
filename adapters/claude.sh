@@ -5,6 +5,7 @@
 # alwaysApply: false → installed as ~/.claude/commands/<skill>.md (slash command)
 
 CLAUDE_COMMANDS_DIR="$HOME/.claude/commands"
+CLAUDE_AGENTS_DIR="$HOME/.claude/agents"
 CLAUDE_RULES_DIR="$HOME/.craftkit/claude-rules"
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
 _CLAUDE_SECTION_START="<!-- BEGIN AGENTIC-SKILLS (managed — do not edit manually) -->"
@@ -176,6 +177,21 @@ finalize_claude() {
             _remove_claude_md_section
         fi
     fi
+}
+
+get_claude_agent_dest() {
+    echo "$CLAUDE_AGENTS_DIR/${1}.md"
+}
+
+install_claude_agent() {
+    local name="$1"
+    local source_file="$2"
+    mkdir -p "$CLAUDE_AGENTS_DIR"
+    cp "$source_file" "$CLAUDE_AGENTS_DIR/${name}.md"
+}
+
+uninstall_claude_agent() {
+    rm -f "$CLAUDE_AGENTS_DIR/${1}.md"
 }
 
 uninstall_claude_skill() {
