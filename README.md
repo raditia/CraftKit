@@ -395,6 +395,20 @@ Auto-synced to `~/.claude/agents/` on `git pull` (Claude Code only).
 | [`adversarial`](agents/adversarial.md) | Devil's advocate — strongest case against merging/shipping | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
 | [`plan-roaster`](agents/plan-roaster.md) | Stress-test a plan before implementation — weakest assumption + failure modes | On demand | sonnet |
 
+### Skill vs agent — when to add which
+
+| Question | Answer → add |
+|----------|-------------|
+| Will you invoke it yourself (`/name`)? | **skill** |
+| Does it need conversation history or prior context? | **skill** |
+| Will it ever run in parallel with another instance? | **agent** |
+| Is it purely internal — only spawned by a command, never invoked by you? | **agent only** (no skill needed) |
+| Needs to work both ways? | **both** — skill for manual invocation, agent for parallel spawn |
+
+`fe-review` is an example of both: `/fe-review` for manual use, `fe-review` agent for parallel workflows. `adversarial` is agent-only — you'd never invoke it directly.
+
+> **Agent system prompts are cold copies.** Agents don't inherit rules or session context — anything the agent needs must be baked into `agents/<name>.md`. If you update `rules/fe-rules.md`, manually update any agent that duplicates its content.
+
 ### Add an agent
 
 ```bash
@@ -501,6 +515,8 @@ git add rules/my-rule.md && git commit -m "feat: add my-rule" && git push
 ```
 
 ### Add a skill (on-demand)
+
+> Not sure whether to add a skill or an agent? See [Skill vs agent](#skill-vs-agent--when-to-add-which).
 
 ```bash
 mkdir -p skills/my-skill
