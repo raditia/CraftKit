@@ -45,14 +45,15 @@ Match natural language to the right command. **Dynamic parallel is the default**
 | "help me review", "review the changes", "code review", "LGTM check", "can you check my changes?" — **feedback intent, no merge signal** | `/parallel-review` | dynamic |
 | "get this ready to merge", "ship this", "prepare for PR", "is this ready?", "can I merge this?" — **merge intent present** | `/parallel-ship` | dynamic |
 | "something is broken", "fix this bug", "this crashes", "why is X not working", "coverage is failing in CI" — **clear breakage signal**; vague complaints without error/crash/fail → `/parallel-review` instead | `/fix` | sequential (linear by nature) |
-| "write tests", "add tests", "test this", "coverage is low", "improve coverage", "I need tests for X", "create a test for X", "create tests for X" — **test authoring, not broken coverage** | `/fe-test` | — |
+| Any test work: "write tests", "add tests", "update tests", "fix tests", "test this", "do tests need updating", "any tests to update", "coverage is low", "improve coverage", "I need tests for X", "create a test for X", "create tests for X", "should I update tests", "are there tests to update" — **test authoring/updating, not broken coverage**. When in doubt about test intent → default here | `/fe-test` | — |
 | "generate PR message", "write PR description", "draft a PR", "what should my PR say", "PR message for this branch" | `/pr-message` | — |
 
 **Tiebreakers:**
 - Vague complaint ("this looks wrong", "something seems off") — no error/crash/fail signal → `/parallel-review`
 - "scaffold" verb alone → `/build` not `/parallel-build`
 - Merge intent ("ready to merge", "can I merge", "ship") → `/parallel-ship` over `/parallel-review`
-- Coverage mentioned + failing/CI context → `/fix`; coverage mentioned + authoring context → `/fe-test`
+- Coverage mentioned + failing/CI context → `/fix`; coverage mentioned + authoring/update context → `/fe-test`
+- Any ambiguous test query ("any tests?", "tests needed?", "should tests change?") → `/fe-test`
 
 **Sequential fallback** — use explicit slash command when you want a lightweight, single-pass run:
 
