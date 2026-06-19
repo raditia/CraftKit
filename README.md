@@ -113,6 +113,17 @@ Typical feature review session without compression: ~40,000 tokens. With RTK + C
 
 ## Install
 
+**Option A — npm** (version pinning + rollback):
+```bash
+npm install -g @raditia/craftkit
+```
+
+Pin a version or roll back:
+```bash
+npm install -g @raditia/craftkit@1.5.0
+```
+
+**Option B — git** (auto-update on `git pull`):
 ```bash
 git clone git@github.com:raditia/craftkit.git ~/craftkit
 cd ~/craftkit
