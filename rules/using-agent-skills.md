@@ -354,9 +354,9 @@ Use the everyday model by default. Escalate inline when you detect genuine uncer
 | AI | Everyday | Escalate | Fusion panel |
 |---|---|---|---|
 | Claude Code | `claude-sonnet-4-6` | `claude-opus-4-8` | 2× `claude-opus-4-8` → opus judge |
-| Gemini CLI | `gemini-2.5-flash` | `gemini-2.5-pro` | — |
-| Cursor | claude-sonnet / gpt-4o | claude-opus / o1 | — |
-| Copilot | `claude-sonnet-4-6` | `claude-opus-4-8` | — |
+| Gemini CLI | `gemini-2.5-flash` | `gemini-2.5-pro` | 2× `gemini-2.5-pro` → pro judge |
+| Cursor | claude-sonnet / gpt-4o | claude-opus / o1 | 2× claude-opus → opus judge |
+| Copilot | `claude-sonnet-4-6` | `claude-opus-4-8` | 2× `claude-opus-4-8` → opus judge |
 
 ### Escalation triggers → single opus
 - Architecture decision with significant, non-obvious tradeoffs
@@ -396,7 +396,14 @@ Adopted from the independence-then-synthesis principle: same prompt → multiple
    High-stakes decision on [X] — routing to fusion panel (2× opus).
    ```
 2. Write the question **verbatim** — no lenses, no personas assigned. Every panelist gets the task straight.
-3. **Spawn 2 independent `claude-opus-4-8` agents** in a single message (so they run concurrently). Same prompt, no cross-contamination.
+3. **Spawn 2 independent panelists** with the same prompt, no cross-contamination. Spawn mechanism varies by AI:
+
+   | AI | Spawn mechanism |
+   |---|---|
+   | Claude Code | Agent tool — both in a single message so they run concurrently; `model: claude-opus-4-8` |
+   | Gemini CLI | Shell parallelism — `gemini --model gemini-2.5-pro -p "..." > /tmp/p1.txt & gemini --model gemini-2.5-pro -p "..." > /tmp/p2.txt & wait`, then judge call reads both |
+   | Cursor | Two background agent tabs opened simultaneously; same model (`claude-opus` or `o1`) |
+   | Copilot | Two parallel chat windows (no programmatic spawn — trigger both then copy outputs to a third judge window) |
 4. **Classify the deliverable**, then synthesize:
    - **Artifact (code, config, script)** → Track A: run both candidates, merge by what demonstrably works, verify. The seam between grafted pieces is where merges silently break — run the merged result and fix until it passes.
    - **Research / analysis** → Track B: five sections — **Consensus** (independent agreement = highest confidence), **Contradictions** (state both positions and adjudicate — never bury a conflict), **Partial coverage** (depth only some panelists engaged), **Unique insights** (non-obvious points from one panelist — highest-leverage payoff), **Blind spots** (what the panel as a whole missed — you as judge may add one none of them named).
