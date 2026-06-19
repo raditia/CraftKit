@@ -120,7 +120,17 @@ CONTEXT:
 
 ## Phase 3 — Synthesize
 
-Merge findings from all agents. Deduplicate: same `file:line` flagged by multiple agents → keep once, note which axes caught it. Sort: `[ERROR]` → `[WARNING]` → `[SUGGESTION]`. Adversarial concerns appear as a separate block at the end.
+This is a pre-merge code review → apply **Track B** (structured synthesis). Deduplicate by `file:line`, then classify each finding's confidence:
+
+- `[CONSENSUS]` — flagged by 2+ agents independently → highest-confidence signal, fix first
+- Standard — flagged by one agent
+- `[UNIQUE]` — notable finding from one agent, not corroborated → preserve, note lower confidence
+
+**Surface contradictions explicitly.** If two agents recommend different fixes for the same location, state both and adjudicate — prefer whichever has evidence over assertion. Never silently average conflicting recommendations.
+
+Adversarial findings are **blind spots** — what all review agents missed. Surface them as a separate block.
+
+Sort within each tier: `[CONSENSUS]` first, then standard, then `[UNIQUE]`.
 
 ```
 PARALLEL SHIP COMPLETE
@@ -130,16 +140,23 @@ Phase 1:   tsc PASS | lint PASS | test PASS (N tests)
 Agents:    [list of agents that ran]
 
 FINDINGS
-[ERROR]      file:line — description
-               Why: ...
-               Fix: ...
-[WARNING]    ...
-[SUGGESTION] ...
+[ERROR][CONSENSUS]   file:line — description  (caught by: agent-a + agent-b)
+                       Why: ...
+                       Fix: ...
+[ERROR]              file:line — description
+                       Why: ...
+                       Fix: ...
+[WARNING][UNIQUE]    file:line — description  (agent-name only — lower confidence)
+                       Why: ...
+                       Fix: ...
+[SUGGESTION]         ...
 
-[ADVERSARIAL CONCERNS]          ← only if adversarial agent ran
-  ...
+[BLIND SPOTS]                    ← only if adversarial agent ran
+  1. concern — scenario → consequence
+  2. ...
 
 SUMMARY
+Consensus findings: N  (2+ agents — highest confidence)
 Errors:      N  (must fix before merge)
 Warnings:    N
 Suggestions: N

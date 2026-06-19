@@ -137,7 +137,13 @@ CONTEXT:
 <docs/context.md full content>
 ```
 
-**Gate (Phase 5):** No `[ERROR]` findings remain before proceeding to tests.
+**Synthesize Phase 5 findings** — apply **Track B** (structured synthesis):
+- `[CONSENSUS]` — flagged by 2+ agents independently → fix before proceeding
+- Standard — flagged by one agent
+- `[UNIQUE]` — notable finding from one agent only → preserve, note lower confidence
+- Adversarial findings → **blind spots** block (what review agents missed as a whole)
+
+**Gate (Phase 5):** No `[ERROR]` findings (consensus or single-agent) remain before proceeding to tests.
 
 ---
 
@@ -159,12 +165,13 @@ Phase 3:         tsc PASS | lint PASS
 Agents (Phase 5): [list of agents that ran]
 
 FINDINGS (from validation)
-[ERROR]      ...
-[WARNING]    ...
-[SUGGESTION] ...
+[ERROR][CONSENSUS]   file:line — description  (caught by: agent-a + agent-b)
+[ERROR]              file:line — description
+[WARNING][UNIQUE]    file:line — description  (agent-name only — lower confidence)
+[SUGGESTION]         ...
 
-[ADVERSARIAL CONCERNS]          ← only if adversarial agent ran
-  ...
+[BLIND SPOTS]                    ← only if adversarial agent ran
+  1. concern — scenario → consequence
 
 Tests:     PASS (N tests, N new)
 Coverage:  Lines N% / Branches N% / Functions N% / Statements N%

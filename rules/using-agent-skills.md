@@ -344,22 +344,28 @@ Target: every line either teaches something unique or provides a reference a rea
 
 ## Model routing
 
-Use the everyday model by default. Escalate inline when you detect genuine uncertainty — not as a reflex.
+Use the everyday model by default. Escalate inline when you detect genuine uncertainty — not as a reflex. For decisions where being confidently wrong is expensive, use the fusion panel instead of a single escalation.
 
-| AI | Everyday | Escalate to |
-|---|---|---|
-| Claude Code | `claude-sonnet-4-6` | `claude-opus-4-8` |
-| Gemini CLI | `gemini-2.5-flash` | `gemini-2.5-pro` |
-| Cursor | claude-sonnet / gpt-4o | claude-opus / o1 |
-| Copilot | `claude-sonnet-4-6` | `claude-opus-4-8` |
+| AI | Everyday | Escalate | Fusion panel |
+|---|---|---|---|
+| Claude Code | `claude-sonnet-4-6` | `claude-opus-4-8` | 2× `claude-opus-4-8` → opus judge |
+| Gemini CLI | `gemini-2.5-flash` | `gemini-2.5-pro` | — |
+| Cursor | claude-sonnet / gpt-4o | claude-opus / o1 | — |
+| Copilot | `claude-sonnet-4-6` | `claude-opus-4-8` | — |
 
-### Escalation triggers
+### Escalation triggers → single opus
 - Architecture decision with significant, non-obvious tradeoffs
 - Security-sensitive code with unclear threat model
 - Debugging with no clear hypothesis after 2 isolation attempts
 - Refactor touching > 5 interdependent files with complex type constraints
 
-### Escalation process
+### Fusion panel triggers → 2× opus → opus judge
+Use when a single higher-model pass might still miss something and being wrong has real cost:
+- Irreversible production changes (schema migrations, data transforms, permanent deletes)
+- Security architecture with meaningful attack surface and unclear threat model
+- Complex tradeoff where multiple independent reasoning paths are likely to diverge
+
+### Escalation process (single opus)
 
 Do NOT ask the user to switch models. Escalate inline:
 
@@ -375,3 +381,24 @@ Do NOT ask the user to switch models. Escalate inline:
    ```
 
 Escalation is for a targeted question, not a full hand-off. Stay in control; use the higher model as a specialist you consult for one decision.
+
+### Fusion panel process
+
+Adopted from the independence-then-synthesis principle: same prompt → multiple independent runs → judge synthesizes. Two independent models diverge on reasoning paths, tool calls, and edge cases — synthesis of those divergences beats one model run once.
+
+1. **Inform the user** — one line:
+   ```
+   High-stakes decision on [X] — routing to fusion panel (2× opus).
+   ```
+2. Write the question **verbatim** — no lenses, no personas assigned. Every panelist gets the task straight.
+3. **Spawn 2 independent `claude-opus-4-8` agents** in a single message (so they run concurrently). Same prompt, no cross-contamination.
+4. **Classify the deliverable**, then synthesize:
+   - **Artifact (code, config, script)** → Track A: run both candidates, merge by what demonstrably works, verify. The seam between grafted pieces is where merges silently break — run the merged result and fix until it passes.
+   - **Research / analysis** → Track B: five sections — **Consensus** (independent agreement = highest confidence), **Contradictions** (state both positions and adjudicate — never bury a conflict), **Partial coverage** (depth only some panelists engaged), **Unique insights** (non-obvious points from one panelist — highest-leverage payoff), **Blind spots** (what the panel as a whole missed — you as judge may add one none of them named).
+5. Write the final answer grounded in the synthesis. It must follow from the analysis, not be one panelist's answer lightly edited.
+6. **Note at end of response:**
+   ```
+   [consulted fusion panel (2× claude-opus-4-8) for: X]
+   ```
+
+Evidence over assertion: a panelist that ran the code or read a primary source outranks one reasoning from memory.

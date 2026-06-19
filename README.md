@@ -1,4 +1,4 @@
-# craftkit `v1.4.0`
+# craftkit `v1.5.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **GitHub Copilot**, **Gemini CLI**, **Codex CLI**, and **Crush**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
@@ -470,16 +470,18 @@ flowchart TD
 
 Each skill runs on the everyday model. Escalation is inline — the AI consults the higher model for a specific question and continues without interrupting you.
 
-| AI | Everyday | Escalates to |
-|----|----------|-------------|
-| Claude Code | `claude-sonnet-4-6` | `claude-opus-4-8` |
-| Gemini CLI | `gemini-2.5-flash` | `gemini-2.5-pro` |
-| Cursor | claude-sonnet / gpt-4o | claude-opus / o1 |
-| Copilot | `claude-sonnet-4-6` | `claude-opus-4-8` |
-| Codex CLI | `codex-mini-latest` | `o3` |
-| Crush | provider-dependent | provider-dependent |
+| AI | Everyday | Escalate | Fusion panel |
+|----|----------|----------|-------------|
+| Claude Code | `claude-sonnet-4-6` | `claude-opus-4-8` | 2× opus → opus judge |
+| Gemini CLI | `gemini-2.5-flash` | `gemini-2.5-pro` | — |
+| Cursor | claude-sonnet / gpt-4o | claude-opus / o1 | — |
+| Copilot | `claude-sonnet-4-6` | `claude-opus-4-8` | — |
+| Codex CLI | `codex-mini-latest` | `o3` | — |
+| Crush | provider-dependent | provider-dependent | — |
 
 Escalation triggers: architecture decisions with non-obvious tradeoffs, security-sensitive code, debugging with no hypothesis after 2 attempts.
+
+Fusion panel triggers: irreversible production changes, security architecture with meaningful attack surface, decisions where a single-model opinion may miss divergent reasoning paths. Runs 2 independent opus passes → opus synthesizes using Track A (artifact: run+merge) or Track B (analysis: consensus/contradictions/unique/blind spots).
 
 ---
 
@@ -548,6 +550,7 @@ External tools and inspirations bundled or adopted into this repo.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| `v1.5.0` | 2026-06-19 | Adopted fusion-fable independence-then-synthesis pattern. Model routing gains fusion panel tier (2× opus → opus judge) with Track A/B classification. Parallel command synthesis upgraded: [CONSENSUS]/[UNIQUE] confidence markers, explicit contradiction surfacing, adversarial findings reframed as blind spots. |
 | `v1.4.0` | 2026-06-19 | New `agents/` folder with 7 cold sub-agent definitions (`code-quality`, `fe-review`, `fe-a11y`, `fe-patterns`, `fe-performance`, `adversarial`, `plan-roaster`). Auto-synced to `~/.claude/agents/` on `git pull`. Parallel commands (`parallel-review`, `parallel-ship`, `parallel-build`) updated to spawn agents by name — inline prompt duplication removed (~120 lines). |
 | `v1.3.4` | 2026-06-19 | Replaced all ASCII flow diagrams with Mermaid — parallel-review, parallel-ship, parallel-build, classifier examples (A–D), and context flow. Fail/blocked paths added to ship and build diagrams. |
 | `v1.3.3` | 2026-06-19 | Added Codex CLI adapter (`~/.codex/AGENTS.md` managed block) and Crush adapter (`~/.config/crush/CRUSH.md` rules + `~/.config/crush/skills/` per-command files). Both wired into sync.sh auto-sync on `git pull`. |
