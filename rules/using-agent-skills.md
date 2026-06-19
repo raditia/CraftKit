@@ -134,7 +134,15 @@ Spawning N agents in parallel...
 
 Every skill follows this on start — not repeated per skill:
 1. Find project root — nearest `package.json` going up from CWD
-2. If `docs/context.md` missing → run `/fe-context` first, then continue
+2. Freshness check — run both in parallel:
+   ```bash
+   rtk git branch --show-current
+   rtk git rev-parse HEAD
+   ```
+   Then read the `**Branch:**` and `**Commit:**` fields from the `docs/context.md` header (first 5 lines).
+   - If `docs/context.md` missing → run `/fe-context`, then continue
+   - If branch mismatch OR commit mismatch → regenerate with `/fe-context`, then continue
+   - If both match → context is fresh, proceed
 3. **Always read `docs/context.md`** — mandatory, not optional. Read only the sections the skill specifies (see each skill's **Context:** line); at minimum: Summary + Key Changes
 4. If context conflicts with code → `CONFUSION: docs/context.md says X but code shows Y. Options: A) ... B) ... → Which?`
 
@@ -339,10 +347,10 @@ Use the everyday model by default. Escalate inline when you detect genuine uncer
 
 | AI | Everyday | Escalate to |
 |---|---|---|
-| Claude Code | `claude-sonnet-4-6` | `claude-opus-4-7` |
+| Claude Code | `claude-sonnet-4-6` | `claude-opus-4-8` |
 | Gemini CLI | `gemini-2.5-flash` | `gemini-2.5-pro` |
 | Cursor | claude-sonnet / gpt-4o | claude-opus / o1 |
-| Copilot | `claude-sonnet-4-6` | `claude-opus-4-7` |
+| Copilot | `claude-sonnet-4-6` | `claude-opus-4-8` |
 
 ### Escalation triggers
 - Architecture decision with significant, non-obvious tradeoffs
@@ -362,7 +370,7 @@ Do NOT ask the user to switch models. Escalate inline:
 3. **Incorporate the result** and continue on the everyday model
 4. **Note what was consulted** at the end of your response:
    ```
-   [consulted claude-opus-4-7 for: architecture tradeoff on X]
+   [consulted claude-opus-4-8 for: architecture tradeoff on X]
    ```
 
 Escalation is for a targeted question, not a full hand-off. Stay in control; use the higher model as a specialist you consult for one decision.

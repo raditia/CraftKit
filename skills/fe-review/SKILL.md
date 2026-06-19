@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `rtk lint`, `rtk tsc`, `rtk git diff`, `rtk grep "pattern" .`
-**Model:** everyday — escalate if review surfaces architectural conflicts with non-obvious resolution
+**Model:** everyday — escalate to `claude-opus-4-8` if review surfaces architectural conflicts with non-obvious resolution
 
 ---
 

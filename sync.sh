@@ -18,8 +18,10 @@ source "$REPO_DIR/adapters/claude.sh"
 source "$REPO_DIR/adapters/cursor.sh"
 source "$REPO_DIR/adapters/copilot.sh"
 source "$REPO_DIR/adapters/gemini.sh"
+source "$REPO_DIR/adapters/codex.sh"
+source "$REPO_DIR/adapters/crush.sh"
 
-ADAPTERS=("claude" "cursor" "copilot" "gemini")
+ADAPTERS=("claude" "cursor" "copilot" "gemini" "codex" "crush")
 
 # Returns 0 if needle is in the remaining args
 contains() {

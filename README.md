@@ -1,6 +1,6 @@
-# craftkit `v1.3.1`
+# craftkit `v1.3.4`
 
-One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **GitHub Copilot**, and **Gemini CLI**. Pull once — every AI tool gets the same workflows, rules, and commands.
+One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **GitHub Copilot**, **Gemini CLI**, **Codex CLI**, and **Crush**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
 ---
 
@@ -160,20 +160,24 @@ Three namespaces, one source of truth:
 
 ```
 rules/  →  ALWAYS-ON
-┌──────────────┬────────────────────────────────────────┐
-│ Claude Code  │ ~/.claude/CLAUDE.md    (managed block) │
-│ Cursor       │ ~/.cursor/rules/*.mdc  (alwaysApply)   │
-│ Copilot      │ codeGeneration.instructions            │
-│ Gemini CLI   │ ~/GEMINI.md            (managed block) │
-└──────────────┴────────────────────────────────────────┘
+┌──────────────┬────────────────────────────────────────────────────┐
+│ Claude Code  │ ~/.claude/CLAUDE.md           (managed block)      │
+│ Cursor       │ ~/.cursor/rules/*.mdc         (alwaysApply)        │
+│ Copilot      │ codeGeneration.instructions                        │
+│ Gemini CLI   │ ~/GEMINI.md                   (managed block)      │
+│ Codex CLI    │ ~/.codex/AGENTS.md            (managed block)      │
+│ Crush        │ ~/.config/crush/CRUSH.md      (managed block)      │
+└──────────────┴────────────────────────────────────────────────────┘
 
 skills/ and commands/  →  ON-DEMAND
-┌──────────────┬────────────────────────────────────────┐
-│ Claude Code  │ ~/.claude/commands/<name>.md → /<name> │
-│ Cursor       │ ~/.cursor/rules/*.mdc  (alwaysApply:f) │
-│ Copilot      │ codeGeneration.instructions            │
-│ Gemini CLI   │ ~/GEMINI.md            (managed block) │
-└──────────────┴────────────────────────────────────────┘
+┌──────────────┬────────────────────────────────────────────────────┐
+│ Claude Code  │ ~/.claude/commands/<name>.md  → /<name>            │
+│ Cursor       │ ~/.cursor/rules/*.mdc         (alwaysApply:false)  │
+│ Copilot      │ codeGeneration.instructions                        │
+│ Gemini CLI   │ ~/GEMINI.md                   (managed block)      │
+│ Codex CLI    │ ~/.codex/AGENTS.md            (managed block)      │
+│ Crush        │ ~/.config/crush/skills/<name>.md → command         │
+└──────────────┴────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -201,120 +205,50 @@ Build, review, and ship use **dynamic parallel execution** — a classifier read
 
 #### /parallel-review
 
-```
-"review this" / "help me review" / "code review" / "LGTM check"
-                          │
-                          ▼
-               ┌──────────────────┐
-               │ /parallel-review │
-               └────────┬─────────┘
-                        │
-            ┌───────────▼───────────┐
-            │       Phase 1         │  parallel — fast gates
-            │  ─────────────────── │
-            │  tsc  ‖  lint  ‖  test│
-            └───────────┬───────────┘
-                        │ all pass ✓
-                        ▼
-            ┌───────────────────────┐
-            │   classify diff       │  reads actual files
-            │   select agents       │  skips irrelevant ones
-            └───────────┬───────────┘
-                        │
-            ┌───────────▼──────────────────────────┐
-            │              Phase 2                  │  parallel — LLM agents
-            │  ─────────────────────────────────── │
-            │  code-quality  ‖  fe-review  ‖  ...  │  selected by classifier
-            └───────────┬──────────────────────────┘
-                        │
-                        ▼
-            ┌───────────────────────┐
-            │      synthesize       │  merge + deduplicate
-            └───────────┬───────────┘
-                        ▼
-                  merged report
+> Triggered by: `"review this"` / `"help me review"` / `"code review"` / `"LGTM check"`
+
+```mermaid
+flowchart TD
+    A[/parallel-review/] --> B["Phase 1 — parallel fast gates\ntsc ‖ lint ‖ test"]
+    B -->|all pass ✓| C["Classify diff\nreads actual files · skips irrelevant agents"]
+    C --> D["Phase 2 — parallel LLM agents\ncode-quality ‖ fe-review ‖ fe-a11y? ‖ adversarial?\nselected by classifier"]
+    D --> E["Synthesize\nmerge · deduplicate · sort by severity"]
+    E --> F[Merged report]
+    B -->|any fail ✗| G[BLOCKED — fix gates first]
 ```
 
 #### /parallel-ship
 
-```
-"ship this" / "prepare for PR" / "is this ready?" / "get this ready to merge"
-                          │
-                          ▼
-               ┌─────────────────┐
-               │ /parallel-ship  │
-               └───────┬─────────┘
-                       │
-           ┌───────────▼────────────────┐
-           │          Phase 1           │  parallel — with coverage gate
-           │  ────────────────────────  │
-           │  tsc  ‖  lint  ‖  test+cov │  ≥93% coverage required
-           └───────────┬────────────────┘
-                       │ all pass ✓
-                       ▼
-           ┌───────────────────────────┐
-           │       classify diff       │
-           └───────────┬───────────────┘
-                       │
-           ┌───────────▼────────────────────────────────────┐
-           │                  Phase 2                        │  parallel
-           │  ─────────────────────────────────────────────  │
-           │  code-quality  ‖  fe-review  ‖  fe-performance? │
-           │            ‖  fe-a11y?  ‖  adversarial?         │
-           └───────────┬────────────────────────────────────┘
-                       │
-                       ▼
-           ┌───────────────────────┐
-           │       synthesize      │
-           └───────────┬───────────┘
-                       ▼
-              READY TO MERGE / BLOCKED
+> Triggered by: `"ship this"` / `"prepare for PR"` / `"is this ready?"` / `"get this ready to merge"`
+
+```mermaid
+flowchart TD
+    A[/parallel-ship/] --> B["Phase 1 — parallel fast gates\ntsc ‖ lint ‖ test + coverage\n≥93% Lines · Branches · Functions · Statements"]
+    B -->|all pass ✓| C[Classify diff]
+    C --> D["Phase 2 — parallel LLM agents\ncode-quality ‖ fe-review ‖ fe-performance?\n‖ fe-a11y? ‖ adversarial?\nselected by classifier"]
+    D --> E[Synthesize]
+    E --> F{Errors?}
+    F -->|none| G[READY TO MERGE]
+    F -->|yes| H[BLOCKED — list blockers]
+    B -->|any fail ✗| H
 ```
 
 #### /parallel-build
 
-```
-"build feature X" / "implement X" / "create a new screen" / "scaffold a module"
-                          │
-                          ▼
-               ┌──────────────────┐
-               │ /parallel-build  │
-               └───────┬──────────┘
-                       │
-               ┌───────▼──────────┐
-               │   fe-context     │  sequential — must happen first
-               └───────┬──────────┘
-                       │
-               ┌───────▼──────────┐
-               │   fe-scaffold    │  sequential — creates 5-file module
-               └───────┬──────────┘
-                       │
-               ┌───────▼──────────┐
-               │    implement     │  guided by fe-patterns + fe-performance
-               └───────┬──────────┘
-                       │
-           ┌───────────▼───────────┐
-           │       Phase 3         │  parallel — fast gates
-           │  tsc  ‖  lint         │
-           └───────────┬───────────┘
-                       │ all pass ✓
-                       ▼
-           ┌───────────────────────────┐
-           │   classify what was built │
-           └───────────┬───────────────┘
-                       │
-           ┌───────────▼────────────────────────────────┐
-           │               Phase 5                       │  parallel
-           │  fe-review  ‖  fe-patterns  ‖  fe-a11y?    │
-           │       ‖  fe-performance?  ‖  adversarial?  │
-           └───────────┬────────────────────────────────┘
-                       │ no [ERROR]
-                       ▼
-               ┌───────────────┐
-               │    fe-test    │  sequential — write tests, enforce ≥93%
-               └───────┬───────┘
-                       ▼
-                    DONE
+> Triggered by: `"build feature X"` / `"implement X"` / `"create a new screen"`
+
+```mermaid
+flowchart TD
+    A[/parallel-build/] --> B["fe-context\nsequential · generate docs/context.md"]
+    B --> C["fe-scaffold\nsequential · create 5-file EVPMR module"]
+    C --> D["Implement\nguided by fe-patterns + fe-performance"]
+    D --> E["Phase 3 — parallel fast gates\ntsc ‖ lint"]
+    E -->|all pass ✓| F["Classify what was built\nread actual file content · select agents"]
+    F --> G["Phase 5 — parallel LLM agents\nfe-review ‖ fe-patterns ‖ fe-a11y?\n‖ fe-performance? ‖ adversarial?\nselected by classifier"]
+    G -->|no ERROR| H["fe-test\nsequential · write tests · enforce ≥93%"]
+    H --> I[DONE]
+    E -->|any fail ✗| J[BLOCKED — fix gates first]
+    G -->|ERROR found| J
 ```
 
 ---
@@ -336,58 +270,44 @@ auth / payment / credential paths   →   code-quality (security emphasis)
 test files only                     →   Phase 2 SKIPPED entirely
 ```
 
-**Examples:**
+**Example A — View + Presenter changed**
 
+```mermaid
+flowchart TD
+    A["diff: ViewCheckout.tsx · PresenterCheckout.ts"] --> B[Classify]
+    B --> C[code-quality]
+    B --> D[fe-review]
+    B --> E[fe-a11y]
+    C & D & E --> F[Synthesize → merged findings]
 ```
-── Example A: View + Presenter changed ──────────────────────
-diff: ViewCheckout.tsx, PresenterCheckout.ts
-           │
-    ┌──────▼──────────────┐
-    │      classify       │
-    └──┬────────┬────┬────┘
-       ▼        ▼    ▼
-  code-quality  fe-  fe-
-               review a11y
-       └────────┴────┘
-             ▼
-         synthesize → merged findings
 
-── Example B: Model only ────────────────────────────────────
-diff: ModelCheckout.ts
-           │
-    ┌──────▼──────────────┐
-    │      classify       │
-    └──────────┬──────────┘
-               ▼
-          code-quality
-      (type safety focus)
-               ▼
-      targeted findings
-      no EVPMR/a11y noise
+**Example B — Model only**
 
-── Example C: Test files only ───────────────────────────────
-diff: __tests__/ViewCheckout.test.tsx
-           │
-    ┌──────▼──────────────┐
-    │  classify: tests    │
-    │  Phase 2 SKIPPED   │  saves LLM agent cost entirely
-    └──────────┬──────────┘
-               ▼
-      Phase 1 only: tsc + lint + test
+```mermaid
+flowchart TD
+    A["diff: ModelCheckout.ts"] --> B[Classify]
+    B --> C["code-quality\ntype safety focus"]
+    C --> D["Targeted findings\nno EVPMR/a11y noise"]
+```
 
-── Example D: 4 EVPMR layers (adversarial triggered) ───────
-diff: Entry + View + Presenter + Model
-           │
-    ┌──────▼──────────────────┐
-    │  3+ layers → adversarial│
-    └──┬──────┬──────┬────┬───┘
-       ▼      ▼      ▼    ▼
-  code-  fe-   fe-  adver-
-  quality review a11y sarial
-       └──────┴──────┴────┘
-                  ▼
-         findings + "strongest
-         case against merging"
+**Example C — Test files only**
+
+```mermaid
+flowchart TD
+    A["diff: __tests__/ViewCheckout.test.tsx"] --> B["Classify: tests only\nPhase 2 SKIPPED — saves agent cost entirely"]
+    B --> C["Phase 1 only: tsc + lint + test"]
+```
+
+**Example D — 4 EVPMR layers → adversarial triggered**
+
+```mermaid
+flowchart TD
+    A["diff: Entry + View + Presenter + Model\n3+ layers → adversarial added"] --> B[Classify]
+    B --> C[code-quality]
+    B --> D[fe-review]
+    B --> E[fe-a11y]
+    B --> F["adversarial\nstrongest case against merging"]
+    C & D & E & F --> G[Synthesize]
 ```
 
 ---
@@ -493,22 +413,12 @@ type AsyncData<T> =
 
 `/fe-context` writes `docs/context.md` (≤ 600 lines). Every skill reads it instead of re-scanning the project — one diff scan, many skills benefit.
 
-```
-                    ┌──────────────────┐
-                    │   /fe-context    │
-                    │  reads diff      │
-                    │  writes docs/    │
-                    │  context.md      │
-                    └────────┬─────────┘
-                             │
-          ┌──────────────────┼──────────────────┐
-          ▼                  ▼                  ▼
-   ┌─────────────┐   ┌──────────────┐   ┌─────────────┐
-   │ /fe-scaffold│   │ /fe-review   │   │  /fe-test   │
-   │  5-file     │   │ /fe-patterns │   │  ≥93%       │
-   │  EVPMR      │   │ /fe-perf     │   │  coverage   │
-   │  module     │   │ /code-quality│   │             │
-   └─────────────┘   └──────────────┘   └─────────────┘
+```mermaid
+flowchart TD
+    A["/fe-context\nreads diff · writes docs/context.md"]
+    A --> B["/fe-scaffold\n5-file EVPMR module"]
+    A --> C["/fe-review · /fe-patterns\n/fe-performance · /code-quality"]
+    A --> D["/fe-test\n≥93% coverage"]
 ```
 
 | Level | Source | What |
@@ -527,10 +437,12 @@ Each skill runs on the everyday model. Escalation is inline — the AI consults 
 
 | AI | Everyday | Escalates to |
 |----|----------|-------------|
-| Claude Code | `claude-sonnet-4-6` | `claude-opus-4-7` |
+| Claude Code | `claude-sonnet-4-6` | `claude-opus-4-8` |
 | Gemini CLI | `gemini-2.5-flash` | `gemini-2.5-pro` |
 | Cursor | claude-sonnet / gpt-4o | claude-opus / o1 |
-| Copilot | `claude-sonnet-4-6` | `claude-opus-4-7` |
+| Copilot | `claude-sonnet-4-6` | `claude-opus-4-8` |
+| Codex CLI | `codex-mini-latest` | `o3` |
+| Crush | provider-dependent | provider-dependent |
 
 Escalation triggers: architecture decisions with non-obvious tradeoffs, security-sensitive code, debugging with no hypothesis after 2 attempts.
 
@@ -593,6 +505,9 @@ External tools and inspirations bundled or adopted into this repo.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| `v1.3.4` | 2026-06-19 | Replaced all ASCII flow diagrams with Mermaid — parallel-review, parallel-ship, parallel-build, classifier examples (A–D), and context flow. Fail/blocked paths added to ship and build diagrams. |
+| `v1.3.3` | 2026-06-19 | Added Codex CLI adapter (`~/.codex/AGENTS.md` managed block) and Crush adapter (`~/.config/crush/CRUSH.md` rules + `~/.config/crush/skills/` per-command files). Both wired into sync.sh auto-sync on `git pull`. |
+| `v1.3.2` | 2026-06-19 | Escalation model updated to `claude-opus-4-8` across all skills and commands. Context freshness check added to standard load procedure — detects branch/commit mismatch and auto-regenerates `docs/context.md`. Downgraded `fe-a11y`, `fe-scaffold` to cheapest model. Token optimizations: `fe-test` drops redundant context section + git log step. |
 | `v1.3.1` | 2026-06-18 | Skill routing upgraded to mandatory gate: classify before every response, announce match or "No skill matched.", added as failure mode #11. Hook injects skill-first reminder every turn for per-turn reinforcement |
 | `v1.3.0` | 2026-06-15 | Adopted ponytail: decision ladder in `karpathy-guidelines`, `ponytail:` comment convention, 3 new skills (`ponytail-review`, `ponytail-audit`, `ponytail-debt`), intent-first routing rule |
 | `v1.2.0` | 2026-06-14 | Dynamic parallel workflows made default for `/build`, `/review`, `/ship`. README restructured with workflow diagrams, TOC, and token savings examples |

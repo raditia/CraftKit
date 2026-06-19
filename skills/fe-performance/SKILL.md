@@ -6,7 +6,7 @@ alwaysApply: false
 
 **Commands:** `rtk tsc`, `rtk lint`, `rtk grep "pattern" .`
 **Tests:** `rtk test --testPathPattern=<path> --no-coverage` (run from workspace root)
-**Model:** everyday — escalate for Lighthouse regressions with non-obvious root cause or complex waterfall chains
+**Model:** everyday — escalate to `claude-opus-4-8` for Lighthouse regressions with non-obvious root cause or complex waterfall chains
 
 ---
 

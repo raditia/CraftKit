@@ -20,7 +20,7 @@ Three gates in order: tests pass → coverage met → review clean. All three mu
 
 1. Detect base branch: `rtk git remote show origin | grep 'HEAD branch'`
 2. Run: `rtk git diff <base>...HEAD --name-only`
-3. Read `docs/context.md` if present (selective: Summary + Key Changes only)
+3. Apply standard context loading (`using-agent-skills`) — freshness check (branch + commit), regenerate if stale or missing, read Summary + Key Changes
 
 ---
 

@@ -20,8 +20,7 @@ Runs in two passes: general quality first, then EVPMR-specific. Report all findi
 
 1. Detect base branch: `rtk git remote show origin | grep 'HEAD branch'`
 2. Run: `rtk git diff <base>...HEAD --name-only` then `rtk git diff <base>...HEAD`
-3. Read `docs/context.md` if present (selective: Summary + Key Changes only)
-4. If missing, run the fe-context workflow first
+3. Apply standard context loading (`using-agent-skills`) — freshness check (branch + commit), regenerate if stale or missing, read Summary + Key Changes
 
 ---
 

@@ -116,7 +116,7 @@ Create `docs/` if needed. If file exists, update changed sections — preserve m
 <!-- managed by fe-context — regenerate with /fe-context -->
 <!-- L1=rules(skills) L2=this file L3=source-files L4=errors/tests -->
 **Generated:** {{ISO timestamp}}
-**Branch:** {{branch}} | **Base:** {{base}} | **Budget:** ~{{lines}} lines (limit: 600)
+**Branch:** {{branch}} | **Base:** {{base}} | **Commit:** {{git rev-parse HEAD}} | **Budget:** ~{{lines}} lines (limit: 600)
 
 ---
 

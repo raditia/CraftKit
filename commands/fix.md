@@ -20,7 +20,7 @@ Run the `/debug` skill workflow in full: Reproduce → Isolate → Hypothesize �
 ## Step 1 — Context
 
 1. Detect base branch: `rtk git remote show origin | grep 'HEAD branch'`
-2. Read `docs/context.md` — Summary + Key Changes only
+2. Apply standard context loading (`using-agent-skills`) — freshness check (branch + commit), regenerate if stale or missing, read Summary + Key Changes
 3. Capture the exact failure: error message, stack trace, failing test output
 
 ---
@@ -30,7 +30,7 @@ Run the `/debug` skill workflow in full: Reproduce → Isolate → Hypothesize �
 Follow the `/debug` workflow exactly:
 - **Reproduce:** confirm bug is reproducible; write a failing test before touching code
 - **Isolate:** narrow to specific file and line — not "somewhere in the flow"
-- **Hypothesize:** `HYPOTHESIS / EXPECTED / ACTUAL / FIX PLAN` before any code change; escalate to `claude-opus-4-7` if no hypothesis after 2 attempts
+- **Hypothesize:** `HYPOTHESIS / EXPECTED / ACTUAL / FIX PLAN` before any code change; escalate to `claude-opus-4-8` if no hypothesis after 2 attempts
 - **Fix:** surgical changes only — every changed line traces to the hypothesis; `rtk tsc --noEmit` + `rtk lint` must pass
 
 ---

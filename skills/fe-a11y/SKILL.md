@@ -6,7 +6,7 @@ alwaysApply: false
 
 **Context:** `docs/context.md` → Summary + Key Changes only
 **Commands:** `rtk tsc`, `rtk lint`
-**Model:** everyday — escalate for complex focus flows spanning multiple routes
+**Model:** cheapest — `claude-haiku-4-5` (Claude). Escalate to everyday for complex focus flows spanning multiple routes
 
 ---
 

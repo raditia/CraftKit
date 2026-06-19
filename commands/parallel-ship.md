@@ -14,7 +14,7 @@ description: Dynamic parallel pre-merge check — Phase 1 (tsc + lint + test wit
 
 1. Detect base: `rtk git remote show origin | grep 'HEAD branch'`
 2. `rtk git diff <base>...HEAD --name-only` + `rtk git diff <base>...HEAD`
-3. Read `docs/context.md` (Summary + Key Changes only) if present
+3. Apply standard context loading (`using-agent-skills`) — freshness check (branch + commit), regenerate if stale or missing, read Summary + Key Changes
 
 ---
 

@@ -6,7 +6,7 @@ alwaysApply: false
 
 **Commands:** `rtk tsc`, `rtk lint`, `rtk grep "pattern" .`
 **Tests:** `rtk test --testPathPattern=<path> --no-coverage` (run from workspace root)
-**Model:** everyday — escalate if coverage cannot reach 93% and root cause is non-obvious
+**Model:** everyday — escalate to `claude-opus-4-8` if coverage cannot reach 93% and root cause is non-obvious
 
 > Triggered by: "write tests", "add tests", "test this", "coverage is low", "improve coverage", "I need tests for X", "test coverage is failing", "missing tests"
 
@@ -16,7 +16,7 @@ alwaysApply: false
 
 ---
 
-**Context:** `docs/context.md` — read: Summary, Key Changes, Test Coverage Needed. Standard load procedure in `/using-agent-skills`.
+**Context:** `docs/context.md` — read: Summary, Test Coverage Needed. Standard load procedure in `/using-agent-skills`.
 
 ---
 
@@ -29,15 +29,10 @@ alwaysApply: false
 Use project-level render wrapper — never bare `render`. Check for existing helper before creating one.
 
 ### Mocking shared package hooks
-Mock all hooks from shared packages. Match the call shape used in the Presenter:
+Mock all hooks from shared packages. Fluent tracker chaining (`track(...).send(...)`) requires `send` on the inner mock return — mismatch causes `TypeError`:
 ```ts
-jest.mock('@your-org/core', () => ({
-  useContentResource: jest.fn(),
-  useTracker: jest.fn(() => jest.fn(() => ({ send: jest.fn() }))),
-  useRouter: jest.fn(),
-}));
+useTracker: jest.fn(() => jest.fn(() => ({ send: jest.fn() }))),
 ```
-Fluent tracker chaining (`track(...).send(...)`) requires `send` on the mock return — mismatch causes `TypeError`.
 
 ### Network mocking
 Use MSW for fetch/React Query flows. Set `onUnhandledRequest: 'error'` — silent passes mask missing mocks.
@@ -89,7 +84,6 @@ Never `setTimeout` + assertion — flaky.
 
 ### 1. Diff first
 ```bash
-rtk git log --oneline main...HEAD
 rtk git diff main...HEAD --name-only
 rtk git diff main...HEAD
 ```
