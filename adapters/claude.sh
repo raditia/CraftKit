@@ -6,8 +6,11 @@
 
 CLAUDE_COMMANDS_DIR="$HOME/.claude/commands"
 CLAUDE_AGENTS_DIR="$HOME/.claude/agents"
+CLAUDE_HOOKS_DIR="$HOME/.claude/hooks"
+CLAUDE_SETTINGS="$HOME/.claude/settings.json"
 CLAUDE_RULES_DIR="$HOME/.craftkit/claude-rules"
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
+_CRAFTKIT_HOOK_SCRIPT="craftkit-routing.js"
 _CLAUDE_SECTION_START="<!-- BEGIN AGENTIC-SKILLS (managed — do not edit manually) -->"
 _CLAUDE_SECTION_END="<!-- END AGENTIC-SKILLS -->"
 
@@ -158,6 +161,99 @@ install_claude_skill() {
     fi
 }
 
+_resolve_node_bin() {
+    # Prefer fnm's stable installation path over session-scoped multishell symlink
+    local fnm_dir="$HOME/.local/share/fnm/node-versions"
+    if [[ -d "$fnm_dir" ]]; then
+        # Pick highest version available
+        local stable
+        stable="$(ls -1 "$fnm_dir" | sort -V | tail -1)"
+        local candidate="$fnm_dir/$stable/installation/bin/node"
+        if [[ -x "$candidate" ]]; then
+            echo "$candidate"
+            return
+        fi
+    fi
+    command -v node 2>/dev/null || echo "node"
+}
+
+_craftkit_hook_wire_settings() {
+    local hook_dest="$1"
+    local node_bin
+    node_bin="$(_resolve_node_bin)"
+    local hook_cmd="\"${node_bin}\" \"${hook_dest}\""
+
+    mkdir -p "$(dirname "$CLAUDE_SETTINGS")"
+
+    if [[ ! -f "$CLAUDE_SETTINGS" ]]; then
+        python3 -c "
+import json
+hook = {'type':'command','command':'${hook_cmd}','timeout':5,'statusMessage':'CraftKit routing...'}
+print(json.dumps({'hooks':{'UserPromptSubmit':[{'hooks':[hook]}]}},indent=2))
+" > "$CLAUDE_SETTINGS"
+        return
+    fi
+
+    python3 - "$CLAUDE_SETTINGS" "$hook_cmd" << 'PYEOF'
+import json, sys
+settings_path, hook_cmd = sys.argv[1], sys.argv[2]
+with open(settings_path) as f:
+    settings = json.load(f)
+hook = {'type': 'command', 'command': hook_cmd, 'timeout': 5, 'statusMessage': 'CraftKit routing...'}
+ups = settings.setdefault('hooks', {}).setdefault('UserPromptSubmit', [])
+for entry in ups:
+    for h in entry.get('hooks', []):
+        if 'craftkit-routing' in h.get('command', ''):
+            sys.exit(0)  # already registered
+if ups:
+    ups[0].setdefault('hooks', []).append(hook)
+else:
+    ups.append({'hooks': [hook]})
+with open(settings_path, 'w') as f:
+    json.dump(settings, f, indent=2)
+    f.write('\n')
+PYEOF
+}
+
+_craftkit_hook_unwire_settings() {
+    [[ ! -f "$CLAUDE_SETTINGS" ]] && return
+    python3 - "$CLAUDE_SETTINGS" << 'PYEOF'
+import json, sys
+settings_path = sys.argv[1]
+with open(settings_path) as f:
+    settings = json.load(f)
+ups = settings.get('hooks', {}).get('UserPromptSubmit', [])
+for entry in ups:
+    entry['hooks'] = [h for h in entry.get('hooks', []) if 'craftkit-routing' not in h.get('command', '')]
+settings['hooks']['UserPromptSubmit'] = [e for e in ups if e.get('hooks')]
+with open(settings_path, 'w') as f:
+    json.dump(settings, f, indent=2)
+    f.write('\n')
+PYEOF
+}
+
+install_claude_craftkit_hook() {
+    local src="$REPO_DIR/hooks/$_CRAFTKIT_HOOK_SCRIPT"
+    local dest="$CLAUDE_HOOKS_DIR/$_CRAFTKIT_HOOK_SCRIPT"
+    [[ ! -f "$src" ]] && return
+    mkdir -p "$CLAUDE_HOOKS_DIR"
+    if [[ ! -f "$dest" ]] || ! diff -q "$src" "$dest" &>/dev/null; then
+        cp "$src" "$dest"
+        chmod +x "$dest"
+        _craftkit_hook_wire_settings "$dest"
+        echo "    + hook: craftkit-routing"
+    fi
+}
+
+uninstall_claude_craftkit_hook() {
+    local dest="$CLAUDE_HOOKS_DIR/$_CRAFTKIT_HOOK_SCRIPT"
+    if [[ -f "$dest" ]]; then
+        rm -f "$dest"
+        _craftkit_hook_unwire_settings
+        echo "    - hook: craftkit-routing"
+    fi
+}
+
 # Called after every sync pass — rebuilds CLAUDE.md if the managed section is
 # missing or stale (e.g. file was manually edited or accidentally deleted).
 finalize_claude() {
@@ -177,6 +273,8 @@ finalize_claude() {
             _remove_claude_md_section
         fi
     fi
+
+    install_claude_craftkit_hook
 }
 
 get_claude_agent_dest() {
