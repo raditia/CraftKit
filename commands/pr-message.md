@@ -23,7 +23,8 @@ PLAN:
 3. Check test coverage status (test files present / changed)
 4. Derive title + goal from commit messages + diff shape
 5. Write PR message (title + body)
-6. Copy to clipboard
+6. Humanize via /humanizer if installed (optional)
+7. Copy to clipboard
 → Proceeding unless redirected.
 ```
 
@@ -96,6 +97,21 @@ Rules:
 
 ---
 
+## Step 3.5 — Humanize pass (optional)
+
+If the [humanizer skill](https://github.com/blader/humanizer) is installed, run the full generated message through it to strip AI-writing tells before copying.
+
+```bash
+test -f ~/.claude/skills/humanizer/SKILL.md && echo "humanizer: present" || echo "humanizer: absent"
+```
+
+- **Present** → invoke `/humanizer` on the whole message from Step 3. Instruct it to preserve markdown structure verbatim — the `## Changes` table, the test-coverage checkboxes, and any inline `code` must pass through untouched (patterns #14–16 must not collapse them). Use the humanized output as the final message.
+- **Absent** → skip silently and use the Step 3 message as-is. No warning.
+
+> Only Claude Code and OpenCode support `/humanizer`. On the other synced tools (Cursor, Copilot, Gemini, Codex, Crush) the file check fails and this step is a no-op — by design.
+
+---
+
 ## Step 4 — Copy to clipboard
 
 ```bash
@@ -116,5 +132,6 @@ Branch:   <branch> → <base>
 Commits:  N
 Files:    N changed
 Tests:    COVERED / UNCOVERED (flag if no test files in diff)
+Humanized: YES / SKIPPED (humanizer not installed)
 Copied:   YES / FAILED (fallback: message printed above)
 ```
