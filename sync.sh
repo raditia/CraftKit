@@ -272,6 +272,21 @@ ensure_tools() {
         rtk init -g --auto-patch 2>/dev/null && echo "    rtk hook (ok)" || true
     fi
 
+    # Jumbo — per-project memory/context CLI. Global install so the binary is
+    # present on every device; per-project `.jumbo/` init stays a manual `jumbo`
+    # run inside each repo (Jumbo's memory is per-project by design).
+    if ! command -v jumbo &>/dev/null; then
+        if command -v npm &>/dev/null; then
+            echo "    + installing jumbo..."
+            npm install -g jumbo-cli 2>/dev/null && echo "    jumbo (ok)" \
+                || echo "    ! jumbo install failed — run 'npm i -g jumbo-cli' manually"
+        else
+            echo "    ! jumbo skipped — npm not found"
+        fi
+    else
+        echo "    jumbo $(jumbo --version 2>/dev/null | head -1) (ok)"
+    fi
+
 }
 
 echo "==> Syncing craftkit..."
