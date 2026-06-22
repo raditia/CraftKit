@@ -346,7 +346,7 @@ When you want a lightweight, single-pass run — use the explicit slash command.
   /fe-test  →  write tests for all changed paths, enforce ≥93% coverage
 
 "generate PR message" / "draft a PR" / "what should my PR say"
-  /pr-message  →  read diff → write summary + goal + changes + coverage → copy to clipboard
+  /pr-message  →  read diff → write title + summary + goal + changes + coverage → copy to clipboard
 ```
 
 ---

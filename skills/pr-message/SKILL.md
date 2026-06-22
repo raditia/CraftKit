@@ -1,6 +1,6 @@
 ---
 name: pr-message
-description: Generate a pull request message from branch changes — summary, goal, changed files, test coverage status, and reviewer notes. Copies result to clipboard.
+description: Generate a pull request message from branch changes — title, summary, goal, changed files, test coverage status, and reviewer notes. Copies result to clipboard.
 alwaysApply: false
 ---
 

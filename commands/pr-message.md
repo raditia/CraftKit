@@ -1,6 +1,6 @@
 ---
 name: pr-message
-description: Generate a pull request message from branch commits and diff — summary, goal, changed files, test coverage status, and reviewer notes. Copies result to clipboard.
+description: Generate a pull request message from branch commits and diff — title, summary, goal, changed files, test coverage status, and reviewer notes. Copies result to clipboard.
 ---
 
 **Commands:** `rtk git log`, `rtk git diff`, `rtk git status`, `rtk git remote`
@@ -21,8 +21,8 @@ PLAN:
 1. Detect base branch and current branch name
 2. Collect commits and file diff on this branch
 3. Check test coverage status (test files present / changed)
-4. Derive goal from commit messages + diff shape
-5. Write PR message
+4. Derive title + goal from commit messages + diff shape
+5. Write PR message (title + body)
 6. Copy to clipboard
 → Proceeding unless redirected.
 ```
@@ -59,6 +59,8 @@ From the diff, extract:
 ## Step 3 — Write PR message
 
 ```markdown
+# <PR title — concise, imperative, < 70 chars. Conventional-commit prefix if branch commits use one (feat:/fix:/etc.).>
+
 ## Summary
 
 <1–3 sentences. What this PR does and why. Derived from commits — not generic.>
@@ -86,6 +88,7 @@ From the diff, extract:
 ```
 
 Rules:
+- Title must be concrete and imperative — match the branch's conventional-commit prefix if its commits use one
 - Goal must be concrete — "adds X to enable Y" not "improves code"
 - File table: only files that matter to the reviewer — skip auto-generated, lock files, trivial renames
 - Test coverage: if no test files changed, always flag it explicitly
@@ -108,6 +111,7 @@ Detect OS and use the appropriate command. After copying, print the full message
 
 ```
 PR MESSAGE GENERATED
+Title:    <PR title>
 Branch:   <branch> → <base>
 Commits:  N
 Files:    N changed
