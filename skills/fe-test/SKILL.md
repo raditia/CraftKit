@@ -112,6 +112,8 @@ rtk lint path/to/__tests__/FileName.test.tsx
 ```
 Fix all errors. No `// eslint-disable` without documented reason.
 
+If `rtk lint <file>` fails with `JSON parse failed: EOF` (wrapper choked), fall back to `pnpm exec oxlint <file>`.
+
 ### 7. Done
 Report: tests added, pass/fail count, final coverage numbers per metric.
 List testing patterns not covered above as **Suggested skill updates**.
