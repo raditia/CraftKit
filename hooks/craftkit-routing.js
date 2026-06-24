@@ -21,6 +21,7 @@ process.stdin.on('end', () => {
         "   PR message/description         → /pr-message\n" +
         "   scaffold only                  → /build\n" +
         "   Or a skill: /fe-context /fe-scaffold /fe-review /fe-patterns /fe-a11y /fe-performance /code-quality /debug /ponytail-review /ponytail-audit /ponytail-debt\n" +
+        "   iOS (Traveloka bus/train, native Swift/ObjC only): /ios-patterns /ios-scaffold /ios-review /ios-test\n" +
         "3A match:    output 'Running /skill-name [tier] — reason.' then invoke. Do NOT respond before invoking.\n" +
         "3B no match: output 'No skill matched for this request. Responding directly.' then respond.\n" +
         "Skipping steps 1-3 = rule violation. Silent bypass = rule violation."

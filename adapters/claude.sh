@@ -55,7 +55,7 @@ with open(section_path) as f:
     replacement = f.read().strip()
 new_content = re.sub(
     r'<!-- BEGIN AGENTIC-SKILLS.*?<!-- END AGENTIC-SKILLS -->',
-    replacement,
+    lambda _: replacement,
     content,
     flags=re.DOTALL,
 )
