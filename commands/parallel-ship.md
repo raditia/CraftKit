@@ -55,7 +55,7 @@ Apply the parallel workflow classifier from `using-agent-skills`. Announce selec
 
 ## Phase 2 — Dynamic parallel agents
 
-Spawn selected agents simultaneously in a single response using the Agent tool. Agent definitions live in `agents/` — the harness loads their system prompt and tool restrictions automatically. Each agent is cold — pass content as the user message.
+Spawn **all** selected agents in **one** message — N `Agent` tool-use blocks in a single response, never in sequential waves. They are independent (cold, read-only, no shared state) and must run concurrently; splitting them across turns serializes the slow ones behind the fast ones and is a defect. Agent definitions live in `agents/` — the harness loads their system prompt and tool restrictions automatically. Each agent is cold — pass content as the user message.
 
 **Agent: code-quality** (`subagent_type: "code-quality"`)
 
