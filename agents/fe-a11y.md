@@ -2,7 +2,7 @@
 name: fe-a11y
 description: Cold accessibility reviewer for React Native and Next.js. Spawned by parallel workflows when View*.tsx changes — receives diff or file content inline. Never edits files.
 tools: Read, Grep, Glob
-model: haiku
+model: sonnet
 color: green
 ---
 

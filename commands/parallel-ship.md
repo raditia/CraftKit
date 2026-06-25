@@ -120,6 +120,8 @@ CONTEXT:
 
 ## Phase 3 — Synthesize
 
+Apply **Step 5 — Handle agent failures** (`using-agent-skills`): any selected agent that returned no findings is a coverage gap, not a clean axis — surface it, mark it skipped, and gate the verdict to `INCOMPLETE` (never `READY TO MERGE` with an infra-skipped review agent).
+
 This is a pre-merge code review → apply **Track B** (structured synthesis). Deduplicate by `file:line`, then classify each finding's confidence:
 
 - `[CONSENSUS]` — flagged by 2+ agents independently → highest-confidence signal, fix first
@@ -137,7 +139,7 @@ PARALLEL SHIP COMPLETE
 ────────────────────────────────────────
 Phase 1:   tsc PASS | lint PASS | test PASS (N tests)
            Coverage: Lines N% / Branches N% / Functions N% / Statements N%
-Agents:    [list of agents that ran]
+Agents:    ran [list] | skipped [agent — reason, if any]
 
 FINDINGS
 [ERROR][CONSENSUS]   file:line — description  (caught by: agent-a + agent-b)
@@ -160,5 +162,6 @@ Consensus findings: N  (2+ agents — highest confidence)
 Errors:      N  (must fix before merge)
 Warnings:    N
 Suggestions: N
-Verdict: READY TO MERGE / BLOCKED — <list blockers>
+Skipped:     N  (infra failures — coverage gaps, not clean)
+Verdict: READY TO MERGE / BLOCKED — <list blockers> / INCOMPLETE — <axes unverified due to skipped agents>
 ```

@@ -137,7 +137,7 @@ CONTEXT:
 <docs/context.md full content>
 ```
 
-**Synthesize Phase 5 findings** — apply **Track B** (structured synthesis):
+**Synthesize Phase 5 findings** — first apply **Step 5 — Handle agent failures** (`using-agent-skills`): any selected agent that returned no findings is a coverage gap, not a clean axis — surface it, mark it skipped, gate verdict to `INCOMPLETE`. Then apply **Track B** (structured synthesis):
 - `[CONSENSUS]` — flagged by 2+ agents independently → fix before proceeding
 - Standard — flagged by one agent
 - `[UNIQUE]` — notable finding from one agent only → preserve, note lower confidence
@@ -162,7 +162,7 @@ PARALLEL BUILD COMPLETE
 ────────────────────────────────────────
 Files created:   [list all 5 EVPMR files]
 Phase 3:         tsc PASS | lint PASS
-Agents (Phase 5): [list of agents that ran]
+Agents (Phase 5): ran [list] | skipped [agent — reason, if any]
 
 FINDINGS (from validation)
 [ERROR][CONSENSUS]   file:line — description  (caught by: agent-a + agent-b)
@@ -175,5 +175,5 @@ FINDINGS (from validation)
 
 Tests:     PASS (N tests, N new)
 Coverage:  Lines N% / Branches N% / Functions N% / Statements N%
-Verdict:   DONE / BLOCKED — <list blockers>
+Verdict:   DONE / BLOCKED — <list blockers> / INCOMPLETE — <axes unverified due to skipped agents>
 ```

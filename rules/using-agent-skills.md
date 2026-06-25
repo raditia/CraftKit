@@ -131,6 +131,18 @@ Classifier selected: [agent-a, agent-b, agent-c] based on: View*.tsx + Presenter
 Spawning N agents in parallel...
 ```
 
+### Step 5 — Handle agent failures (graceful degrade)
+
+An agent can die before producing findings — model-key 401, rate limit, or other infra error returns no result. This is **not** a clean review: a skipped agent is missing coverage, not absence of findings. Never let a dead agent pass silently as if its axis were clean.
+
+For every selected agent that did not return findings:
+
+1. **Surface it** in synthesis as `[WARNING] <agent> skipped: <reason> — coverage gap on <axis>`.
+2. **List it as skipped** in the `Agents:` line, not as ran.
+3. **Gate the verdict** — if a review/build agent (not a fast Bash gate) was skipped by infra, the verdict is `INCOMPLETE`, never `READY TO MERGE` / `DONE`. State which axis is unverified so the user can re-run or accept the gap.
+
+Do not retry a dead model spawn inline — the model key won't change mid-turn. Report, and if the failing agent has a `model:` override that differs from peers (e.g. `haiku` vs `sonnet`), name that override as the likely cause.
+
 ---
 
 ## Standard context loading
