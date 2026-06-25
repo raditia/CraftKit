@@ -3,3 +3,8 @@
 .agents/
 skills/caveman*/
 skills/cavecrew/
+# iOS skills — local-only overlay (contain private-codebase specifics, must not ship to public npm)
+skills/ios-patterns/
+skills/ios-review/
+skills/ios-scaffold/
+skills/ios-test/
