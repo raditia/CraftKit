@@ -43,7 +43,7 @@ with open(section_path) as f:
 
 new_content = re.sub(
     r'<!-- BEGIN AGENTIC-SKILLS.*?<!-- END AGENTIC-SKILLS -->',
-    replacement,
+    lambda _: replacement,
     content,
     flags=re.DOTALL,
 )

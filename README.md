@@ -1,4 +1,4 @@
-# craftkit `v1.6.2`
+# craftkit `v1.7.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **GitHub Copilot**, **Gemini CLI**, **Codex CLI**, and **Crush**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
@@ -388,6 +388,17 @@ Use when a task is narrower than a full workflow.
 | [`ponytail-audit`](skills/ponytail-audit/SKILL.md) | Whole-repo bloat scan — ranked list of removals | — |
 | [`ponytail-debt`](skills/ponytail-debt/SKILL.md) | Ledger of all `ponytail:` shortcuts — surfaces deferred simplifications | — |
 
+### iOS skills — on demand
+
+For an iOS monorepo (bus/train MVVM-C). Native Swift/ObjC only — not React Native or web. These do **not** use `docs/context.md` or EVPMR; they read a real sibling feature folder as the template.
+
+| Skill | When to use | Escalate if |
+|-------|-------------|-------------|
+| [`ios-patterns`](skills/ios-patterns/SKILL.md) | Understand the MVVM-C architecture — Contract/VC/View/VM/Factory/Fetcher/Coordinator, DI, navigation, strings | Screen with novel state/effect orchestration |
+| [`ios-scaffold`](skills/ios-scaffold/SKILL.md) | Scaffold a new bus/train screen following the per-screen file contract | Needs structure outside MVVM-C |
+| [`ios-review`](skills/ios-review/SKILL.md) | Review an iOS diff — layer boundaries, DI, coordinator-only nav, retain cycles, SwiftLint | Architectural conflict with non-obvious resolution |
+| [`ios-test`](skills/ios-test/SKILL.md) | Write/improve Quick + Nimble ViewModel tests with mocked Dependency struct | VM path unreachable without production refactor |
+
 ---
 
 ## Agents reference
@@ -580,6 +591,7 @@ External tools and inspirations bundled or adopted into this repo.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| `v1.7.0` | 2026-06-24 | Added iOS skill set for an iOS monorepo (bus/train **MVVM-C**): `ios-patterns` (architecture map — Contract/VC/View/VM/Factory/Fetcher/Coordinator), `ios-scaffold` (new screen following the per-screen file contract), `ios-review` (layer boundaries, DI, coordinator-only nav, retain cycles, SwiftLint), `ios-test` (Quick + Nimble ViewModel specs with mocked Dependency struct). On-demand only — no always-on rule; native Swift/ObjC, not EVPMR. Discovery tree + routing hook updated. |
 | `v1.6.2` | 2026-06-22 | `/pr-message` runs the generated message through the [humanizer](https://github.com/blader/humanizer) skill when installed (`~/.claude/skills/humanizer`) to strip AI-writing tells — optional, preserves markdown structure, no-op on tools without `/humanizer`. |
 | `v1.6.1` | 2026-06-22 | `/pr-message` now emits a PR title (`#` heading) alongside the body — concise imperative, matches the branch's conventional-commit prefix when present. |
 | `v1.6.0` | 2026-06-22 | Bundled [Jumbo](https://github.com/jumbocontext/jumbo.cli) — per-project memory/context CLI installed globally via `ensure_tools` (npm), alongside RTK. Per-project `.jumbo/` init stays a manual `jumbo` run inside each repo by design. Added to Tooling table. |
