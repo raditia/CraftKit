@@ -4,7 +4,7 @@ description: Review an iOS bus/train diff against the MVVM-C contract — layer 
 alwaysApply: false
 ---
 
-**Commands:** `git diff <base>...HEAD`, `swiftlint lint --path <file>`, `grep -rn "pattern" Traveloka/Modules`
+**Commands:** `git diff <base>...HEAD`, `swiftlint lint --path <file>`, `grep -rn "pattern" Modules`
 **Model:** everyday — escalate to `claude-opus-4-8` if the review surfaces an architectural conflict with non-obvious resolution
 
 ---
@@ -13,7 +13,7 @@ alwaysApply: false
 
 ---
 
-**Context:** No `docs/context.md` (iOS is not EVPMR). Read the changed files plus, when a violation is unclear, the matching sibling feature in `Traveloka/Modules/<Module>/<Module>/` to confirm the established convention.
+**Context:** No `docs/context.md` (iOS is not EVPMR). Read the changed files plus, when a violation is unclear, the matching sibling feature in `Modules/<Module>/<Module>/` to confirm the established convention.
 
 ---
 
@@ -25,7 +25,7 @@ alwaysApply: false
 - [ ] **View (`…View.swift`)** — pure `UIView`, programmatic layout? **Flag** any state, ViewModel reference, or networking.
 - [ ] **ViewModel** — holds all state/logic, returns nothing to UIKit directly? **Flag** any imported view type, any `import`-free direct `push/present/pop`, or `UIViewController` reference.
 - [ ] **Contract** — both seam protocols (`…ViewModelProtocol` + `…ViewModelAction`) declared here, not scattered?
-- [ ] **Fetcher** — all network/Realm access behind a `…FetcherProtocol`? **Flag** raw `TVLNetworkService` or `RealmManager` calls inside a ViewModel.
+- [ ] **Fetcher** — all network/Realm access behind a `…FetcherProtocol`? **Flag** raw network-service or local-DB calls inside a ViewModel.
 
 ### Navigation
 
@@ -42,7 +42,7 @@ alwaysApply: false
 ### Strings / localization
 
 - [ ] No hardcoded display text in View or VC — all via `NSLocalizedString`.
-- [ ] Keys follow `<module>.<screen>.<widget>.<descriptor>`; new keys added to `Traveloka/Traveloka/<lang>.lproj/Localizable.strings`.
+- [ ] Keys follow `<module>.<screen>.<widget>.<descriptor>`; new keys added to `App/<lang>.lproj/Localizable.strings`.
 
 ### Memory / correctness
 
@@ -52,13 +52,13 @@ alwaysApply: false
 
 ### SwiftLint
 
-- [ ] `swiftlint lint --path <file>` on every changed Swift file — zero violations (config `Traveloka/.swiftlint.yml`).
+- [ ] `swiftlint lint --path <file>` on every changed Swift file — zero violations (config `.swiftlint.yml`).
 - [ ] No `// swiftlint:disable` without a documented reason on the same line.
 
 ### Tests
 
-- [ ] ViewModel changes have matching Quick/Nimble specs in `Traveloka/Modules/<Module>/Tests/<Feature>/` — see `/ios-test`.
-- [ ] New Fetcher protocols have a `…Mock` in `Traveloka/Modules/<Module>/Mocks/`.
+- [ ] ViewModel changes have matching Quick/Nimble specs in `Modules/<Module>/Tests/<Feature>/` — see `/ios-test`.
+- [ ] New Fetcher protocols have a `…Mock` in `Modules/<Module>/Mocks/`.
 
 ---
 

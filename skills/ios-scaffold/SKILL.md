@@ -1,10 +1,10 @@
 ---
 name: ios-scaffold
-description: Scaffold a new bus/train screen in the Traveloka iOS monorepo following the MVVM-C contract — Contract + ViewController + View + ViewModel + Factory + Fetcher stub. Bazel/CocoaPods globs auto-wire new files.
+description: Scaffold a new bus/train screen in the iOS monorepo following the MVVM-C contract — Contract + ViewController + View + ViewModel + Factory + Fetcher stub. Bazel/CocoaPods globs auto-wire new files.
 alwaysApply: false
 ---
 
-**Commands:** `ls Traveloka/Modules/Bus/Bus/<Feature>`, `grep -rn "pattern" Traveloka/Modules`, `swiftlint lint --path <file>`
+**Commands:** `ls Modules/Bus/Bus/<Feature>`, `grep -rn "pattern" Modules`, `swiftlint lint --path <file>`
 **Model:** cheapest — `claude-haiku-4-5`. Escalate to everyday if the screen needs state/effect orchestration not covered by MVVM-C
 
 ---
@@ -13,7 +13,7 @@ alwaysApply: false
 
 ---
 
-**Context:** No `docs/context.md` (iOS is not EVPMR). **Mandatory first step:** read one existing sibling feature in `Traveloka/Modules/<Module>/<Module>/<Feature>/` to copy exact naming, imports, and ObjC/Swift split.
+**Context:** No `docs/context.md` (iOS is not EVPMR). **Mandatory first step:** read one existing sibling feature in `Modules/<Module>/<Module>/<Feature>/` to copy exact naming, imports, and ObjC/Swift split.
 
 ---
 
@@ -37,7 +37,7 @@ Read the sibling folder first. Bus is the cleaner template — prefer copying a 
 
 ## Step 2 — Create the feature folder
 
-All files in `Traveloka/Modules/<Module>/<Module>/<Feature>/`. Naming: **`<Module><Feature><Role>`**.
+All files in `Modules/<Module>/<Module>/<Feature>/`. Naming: **`<Module><Feature><Role>`**.
 
 ### `<Module><Feature>Contract.h` (or `.swift` if module is Swift-forward)
 The View↔VM seam — two protocols:
@@ -80,7 +80,7 @@ extension <Prefix>ViewController: <Prefix>ViewModelAction {
 ```
 
 ### `<Module><Feature>View.swift`
-`UIView`, programmatic SnapKit + MUIKit. **No state, no VM reference:**
+`UIView`, programmatic SnapKit + the design-system kit. **No state, no VM reference:**
 ```swift
 final class <Prefix>View: UIView {
     override init(frame: CGRect) {
@@ -134,11 +134,11 @@ enum <Prefix>Factory {
 Data layer behind a protocol — stub the methods the VM needs:
 ```swift
 protocol <Prefix>FetcherProtocol {
-    func fetch(completion: @escaping (Result<<Model>, TVLErrorResponse>) -> Void)
+    func fetch(completion: @escaping (Result<<Model>, ErrorResponse>) -> Void)
 }
 final class <Prefix>Fetcher: <Prefix>FetcherProtocol {
-    func fetch(completion: @escaping (Result<<Model>, TVLErrorResponse>) -> Void) {
-        // TVLNetworkService.sharedInstance().POST(...) or Realm read
+    func fetch(completion: @escaping (Result<<Model>, ErrorResponse>) -> Void) {
+        // NetworkService.sharedInstance().POST(...) or Realm read
     }
 }
 ```
@@ -158,7 +158,7 @@ State the wiring you did or skipped — don't silently leave a screen unreachabl
 
 ## Step 4 — Strings
 
-No resource file. Add keys to `Traveloka/Traveloka/en.lproj/Localizable.strings` (and other `.lproj` if the team requires), reference via:
+No resource file. Add keys to `App/en.lproj/Localizable.strings` (and other `.lproj` if the team requires), reference via:
 ```swift
 NSLocalizedString("<module>.<screen>.<widget>.<descriptor>", comment: "<Zeplin link or context>")
 ```
@@ -177,10 +177,10 @@ Never hardcode display text in the View or VC.
 
 ## After generating
 
-- [ ] `swiftlint lint --path <each-new-swift-file>` — zero violations (config: `Traveloka/.swiftlint.yml`)
+- [ ] `swiftlint lint --path <each-new-swift-file>` — zero violations (config: `.swiftlint.yml`)
 - [ ] New files sit in the correct folder so Bazel/CocoaPods globs pick them up — no `BUILD`/`podspec` edit needed unless you added a cross-module dependency
-- [ ] If you added a cross-module dep: update both `Traveloka/Modules/<Module>/BUILD` (`deps=[…]`) and `<Module>.podspec` (`s.dependency`)
-- [ ] Build check (optional, slow): `bazel build //Traveloka/Modules/<Module>:<Module>`
+- [ ] If you added a cross-module dep: update both `Modules/<Module>/BUILD` (`deps=[…]`) and `<Module>.podspec` (`s.dependency`)
+- [ ] Build check (optional, slow): `bazel build //Modules/<Module>:<Module>`
 - List each file created with its path
 - Note the sibling you copied and any naming/wiring assumptions
 - List patterns observed not covered by `/ios-patterns` as **Suggested skill updates**

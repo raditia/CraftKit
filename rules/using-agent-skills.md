@@ -81,7 +81,7 @@ Task arrives
   └── List all deliberate shortcuts (ponytail:)? ───→ /ponytail-debt
 ```
 
-**iOS (Traveloka monorepo — bus/train MVVM-C).** Route here only when the task targets native iOS Swift/ObjC code (`Traveloka/Modules/<Module>`), not React Native or web. These do NOT use `docs/context.md` or EVPMR.
+**iOS (monorepo — bus/train MVVM-C).** Route here only when the task targets native iOS Swift/ObjC code (`Modules/<Module>`), not React Native or web. These do NOT use `docs/context.md` or EVPMR.
 
 ```
 iOS task arrives

@@ -1,10 +1,10 @@
 ---
 name: ios-patterns
-description: MVVM-C architecture reference for the Traveloka iOS monorepo — Bus and Train modules. Per-screen Contract/ViewController/View/ViewModel/Factory contract, Fetcher data layer, Coordinator navigation, Dependency-struct DI. Use when designing or understanding an iOS bus/train feature.
+description: MVVM-C architecture reference for the iOS monorepo — Bus and Train modules. Per-screen Contract/ViewController/View/ViewModel/Factory contract, Fetcher data layer, Coordinator navigation, Dependency-struct DI. Use when designing or understanding an iOS bus/train feature.
 alwaysApply: false
 ---
 
-**Commands:** `grep -rn "pattern" Traveloka/Modules/Bus`, `swiftlint lint --path <file>`
+**Commands:** `grep -rn "pattern" Modules/Bus`, `swiftlint lint --path <file>`
 **Model:** everyday — escalate for a screen with novel state/effect orchestration not covered below
 
 > Triggered by: "how does bus/train work", "iOS architecture", "explain this screen", "where does state live", "how do I structure an iOS feature"
@@ -15,7 +15,7 @@ alwaysApply: false
 
 ---
 
-**Context:** No `docs/context.md` — iOS modules are not EVPMR. Instead, read one real sibling feature in `Traveloka/Modules/Bus/Bus/<Feature>/` (e.g. `SearchForm/`) to confirm exact naming and imports before acting.
+**Context:** No `docs/context.md` — iOS modules are not EVPMR. Instead, read one real sibling feature in `Modules/Bus/Bus/<Feature>/` (e.g. `SearchForm/`) to confirm exact naming and imports before acting.
 
 ---
 
@@ -25,16 +25,16 @@ alwaysApply: false
 
 ### Per-screen file contract
 
-Naming is rigid: **`<Module><Feature><Role>`** (e.g. `BusSearchForm…`). One folder per screen under `Traveloka/Modules/<Module>/<Module>/<Feature>/`.
+Naming is rigid: **`<Module><Feature><Role>`** (e.g. `BusSearchForm…`). One folder per screen under `Modules/<Module>/<Module>/<Feature>/`.
 
 | File | Role | Hard rule |
 |------|------|-----------|
 | `…Contract.h` (or `.swift`) | Declares the two seam protocols (below) | The View↔VM boundary lives here, nowhere else |
 | `…ViewController.swift` | Thin UIKit `UIViewController`. Owns the `…View`, forwards UIKit events to the VM, implements `…ViewModelAction` to push state into the view | **No business logic** — forward and repaint only |
-| `…View.swift` | `UIView` subclass, programmatic layout (SnapKit + MUIKit). No logic | **No state, no VM reference** |
+| `…View.swift` | `UIView` subclass, programmatic layout (SnapKit + the design-system kit). No logic | **No state, no VM reference** |
 | `…ViewModel.swift` | `final class …: NSObject, …ViewModelProtocol`. All state, logic, tracking. `weak var action` (→ VC) + `weak var delegate` (→ Coordinator). Init takes a `Dependency` struct | **Never imports UIKit views; never navigates directly** |
 | `…Factory.swift` | `makeViewModel(...)` + `makeViewController(...)`. Declares the `…ViewModelDependency` struct + `static getProductionDeps()` | DI assembly point |
-| `Fetcher/…Fetcher` (`.swift` or `.m`) | Data layer behind a `…FetcherProtocol` (network via `TVLNetworkService`, local via Realm) | Injected through the Dependency struct |
+| `Fetcher/…Fetcher` (`.swift` or `.m`) | Data layer behind a `…FetcherProtocol` (network via `NetworkService`, local via Realm) | Injected through the Dependency struct |
 | `Model/…` | Domain models (ObjC `.h/.m` or Swift) | No view concerns |
 
 ### The two seam protocols (the heart of the pattern)
@@ -130,8 +130,8 @@ Two mechanisms, both manual — no app-wide Swinject/Resolver container:
    ```
 2. **`Factory` library `@Injected`** — reserved for cross-cutting app singletons only (metrics, etc.):
    ```swift
-   @Injected(\TVLMetricsCoreExternalContainer.metricsManager)
-   private var metricsManager: TVLMetricsManagerProtocol?
+   @Injected(\MetricsContainer.metricsManager)
+   private var metricsManager: MetricsManagerProtocol?
    ```
 
 **Rule:** feature deps → Dependency struct (init injection). App-level services → `@Injected` container.
@@ -142,15 +142,15 @@ Two mechanisms, both manual — no app-wide Swinject/Resolver container:
 
 Every network/DB access is wrapped in a `…Fetcher` behind a `…FetcherProtocol`, injected via the Dependency struct.
 
-- **Network:** `TVLNetworkService.sharedInstance().POST(url, params, success:, failureResponse:)` → JSON mapped via `modelObjectWithDictionary`. URLs from `…URLProvider`.
-- **Local:** Realm (`RealmManager.manager().defaultRealm()`).
-- **Async:** completion closures or a custom cancellable poller (`TVLNetworkTask` + observer). No async/await, no Combine.
+- **Network:** `NetworkService.sharedInstance().POST(url, params, success:, failureResponse:)` → JSON mapped via `modelObjectWithDictionary`. URLs from `…URLProvider`.
+- **Local:** Realm (`realmManager.defaultRealm()`).
+- **Async:** completion closures or a custom cancellable poller (`NetworkTask` + observer). No async/await, no Combine.
 
 ---
 
 ## Module API boundary
 
-`Traveloka/Modules/Bus/Bus/ModuleApi/BusModule.swift` — a single public façade exposing only `static` factory methods that return **base/protocol types**, hiding concrete VC/VM/Coordinator classes. `@objc` so the ObjC app delegate can call it.
+`Modules/Bus/Bus/ModuleApi/BusModule.swift` — a single public façade exposing only `static` factory methods that return **base/protocol types**, hiding concrete VC/VM/Coordinator classes. `@objc` so the ObjC app delegate can call it.
 
 ```swift
 public final class BusModule: NSObject {
@@ -166,10 +166,10 @@ public final class BusModule: NSObject {
 
 ## Strings / localization
 
-**No per-module resource file for text.** Strings are centralized in the app target: `Traveloka/Traveloka/<lang>.lproj/Localizable.strings`. Referenced inline via `NSLocalizedString` with dotted keys:
+**No per-module resource file for text.** Strings are centralized in the app target: `App/<lang>.lproj/Localizable.strings`. Referenced inline via `NSLocalizedString` with dotted keys:
 
 ```swift
-NSLocalizedString("bus.home.label.origin-text-field-default", comment: "https://zpl.io/...")
+NSLocalizedString("bus.home.label.origin-text-field-default", comment: "<design-link>")
 ```
 
 Key scheme: `<module>.<screen>.<widget>.<descriptor>`. Plurals via `String(format: NSLocalizedString("bus.home.label.seat-%ld-passengers", ...), count)`. The `comment:` field usually holds the Zeplin design link. `BusResources/` holds **only** image assets + `.xib` — not text.
@@ -195,8 +195,8 @@ Both share: VM-centric logic, `…Action`/`…Delegate` reverse-binding, Fetcher
 
 **Bazel (primary) + CocoaPods (secondary)**, both glob-driven. A new file dropped in the correct folder is auto-picked-up — no manifest edit. You manually manage only: new cross-module dep (add to `BUILD` `deps=[…]` AND `…podspec` `s.dependency`), new public entry point (`BusModule.swift`), new string (central `Localizable.strings`).
 
-- Build a module: `bazel build //Traveloka/Modules/Bus:Bus`
-- Or via Xcode: `xcodebuild -workspace Traveloka/Traveloka.xcworkspace -scheme <scheme> ...` (see `/xcode-build` in the iOS repo's own skills).
+- Build a module: `bazel build //Modules/Bus:Bus`
+- Or via Xcode: `xcodebuild -workspace App.xcworkspace -scheme <scheme> ...` (see `/xcode-build` in the iOS repo's own skills).
 
 ---
 

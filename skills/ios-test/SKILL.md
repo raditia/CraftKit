@@ -4,7 +4,7 @@ description: Write or improve Quick + Nimble unit tests for an iOS bus/train Vie
 alwaysApply: false
 ---
 
-**Commands:** `git diff <base>...HEAD`, `bazel test //Traveloka/Modules/<Module>:<Module>TestsBundle`, `swiftlint lint --path <file>`
+**Commands:** `git diff <base>...HEAD`, `bazel test //Modules/<Module>:<Module>TestsBundle`, `swiftlint lint --path <file>`
 **Model:** everyday — escalate to `claude-opus-4-8` if a ViewModel path can't be reached without refactoring the production code
 
 > Triggered by: "write iOS tests", "test this view model", "add bus/train tests", "improve iOS coverage"
@@ -15,14 +15,14 @@ alwaysApply: false
 
 ---
 
-**Context:** No `docs/context.md`. Read the changed ViewModel(s) and one existing spec in `Traveloka/Modules/<Module>/Tests/<Feature>/` to copy the Quick/Nimble style and the existing mocks.
+**Context:** No `docs/context.md`. Read the changed ViewModel(s) and one existing spec in `Modules/<Module>/Tests/<Feature>/` to copy the Quick/Nimble style and the existing mocks.
 
 ---
 
 ## Convention (observed in the codebase)
 
 - Framework: **Quick + Nimble** (`QuickSpec`, `describe / context / it`, `expect(...) == ...`). No XCTest `func test…`, no swift-testing.
-- Mocks live in `Traveloka/Modules/<Module>/Mocks/` and are compiled into both the test target and the EarlGrey target.
+- Mocks live in `Modules/<Module>/Mocks/` and are compiled into both the test target and the EarlGrey target.
 - Dependencies are injected by passing a hand-built `…ViewModelDependency` struct of `…Mock` objects.
 - The View↔VM seam is tested by setting `viewModel.action = mockAction` and asserting on the values the mock captured.
 
@@ -107,7 +107,7 @@ Each `it` comment must state **why** the behavior matters (the rule being protec
 3. **Write specs** for every behavior path from the diff.
 4. **Run** — all must pass:
    ```bash
-   bazel test //Traveloka/Modules/<Module>:<Module>TestsBundle
+   bazel test //Modules/<Module>:<Module>TestsBundle
    ```
    (Or run the module's test scheme in Xcode if Bazel is unavailable locally.) Fix failures — never skip or comment out an `it`.
 5. **SwiftLint** — `swiftlint lint --path <each-new-test-file>`; fix all.
