@@ -80,6 +80,8 @@ Announce selected agents before proceeding.
 
 Spawn **all** selected agents in **one** message — N `Agent` tool-use blocks in a single response, never in sequential waves. They are independent (cold, read-only, no shared state) and must run concurrently; splitting them across turns serializes the slow ones behind the fast ones and is a defect. Agent definitions live in `agents/` — the harness loads their system prompt and tool restrictions automatically. Each agent is cold — pass content as the user message. Pass full file contents, not just the diff — agents need the full implementation context.
 
+**Do not wait by polling.** Never `grep`/`sleep`-loop over task output files (`tasks/*.output`) to detect completion — the harness wakes the main thread automatically when every spawned agent comes to rest, and re-invokes you with their results. Spin-loops keep running for minutes after the agents already finished. On wake, read the returned results and go straight to synthesis.
+
 **Agent: fe-review** (`subagent_type: "fe-review"`)
 
 Pass as user message:
