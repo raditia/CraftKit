@@ -497,10 +497,10 @@ Each skill runs on the everyday model. Escalation is inline — the AI consults 
 
 | AI | Everyday | Escalate | Fusion panel |
 |----|----------|----------|-------------|
-| Claude Code | `claude-sonnet-4-6` | `claude-opus-4-8` | 2× opus → opus judge |
+| Claude Code | `claude-sonnet-5` | `claude-opus-4-8` | 2× opus → opus judge |
 | Gemini CLI | `gemini-2.5-flash` | `gemini-2.5-pro` | — |
 | Cursor | claude-sonnet / gpt-4o | claude-opus / o1 | — |
-| Copilot | `claude-sonnet-4-6` | `claude-opus-4-8` | — |
+| Copilot | `claude-sonnet-5` | `claude-opus-4-8` | — |
 | Codex CLI | `codex-mini-latest` | `o3` | — |
 | Crush | provider-dependent | provider-dependent | — |
 
