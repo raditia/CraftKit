@@ -1,4 +1,4 @@
-# craftkit `v1.8.2`
+# craftkit `v1.9.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **GitHub Copilot**, **Gemini CLI**, **Codex CLI**, and **Crush**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
@@ -378,6 +378,34 @@ Use when a task is narrower than a full workflow.
 | [`fe-a11y`](skills/fe-a11y/SKILL.md) | Labels, roles, focus management, reduced motion — RN & Next.js | Complex focus flows spanning multiple routes |
 | [`fe-test`](skills/fe-test/SKILL.md) | Write/improve tests — enforces ≥93% coverage | Can't reach 93%, root cause unclear |
 
+### Native mobile skills — on demand
+
+Sanitized, architecture-agnostic references. Native mobile does **not** use EVPMR or `docs/context.md` for single-screen work — read a real sibling screen first. For an internal codebase with concrete module names, drop a project-scoped override at `<repo>/.claude/skills/<name>/` (same skill name shadows the global one inside that repo).
+
+**Android** — MVP + Core framework, Dagger, Gradle Dynamic Feature Modules:
+
+| Skill | When to use | Escalate if |
+|-------|-------------|-------------|
+| [`android-patterns`](skills/android-patterns/SKILL.md) | Architecture reference — MVP layers, DI, module split, navigation | Novel state/effect orchestration |
+| [`android-scaffold`](skills/android-scaffold/SKILL.md) | Scaffold a new screen (View/Presenter/ViewModel + Dagger wiring) | Outside the Core MVP contract |
+| [`android-review`](skills/android-review/SKILL.md) | Review a diff against the MVP contract | Architectural conflict, non-obvious resolution |
+| [`android-a11y`](skills/android-a11y/SKILL.md) | TalkBack labels/state, touch targets, Compose semantics | Complex focus flows across screens |
+| [`android-performance`](skills/android-performance/SKILL.md) | Main-thread/coroutine, RecyclerView, recomposition, leaks | Jank/leak with non-obvious root cause |
+| [`android-test`](skills/android-test/SKILL.md) | JUnit + MockK Presenter tests (Turbine for Flow) | Path unreachable without production refactor |
+| [`android-context`](skills/android-context/SKILL.md) | Branch-scoping doc for multi-screen work | Multi-module cross-feature `-api` changes |
+
+**iOS** — MVVM-C, Bazel + CocoaPods, Quick + Nimble:
+
+| Skill | When to use | Escalate if |
+|-------|-------------|-------------|
+| [`ios-patterns`](skills/ios-patterns/SKILL.md) | Architecture reference — MVVM-C, Fetcher, Coordinator, Dependency-struct DI | Novel state/effect orchestration |
+| [`ios-scaffold`](skills/ios-scaffold/SKILL.md) | Scaffold a new screen (Contract/VC/View/ViewModel/Factory/Fetcher) | Outside the MVVM-C contract |
+| [`ios-review`](skills/ios-review/SKILL.md) | Review a diff against the MVVM-C contract | Architectural conflict, non-obvious resolution |
+| [`ios-a11y`](skills/ios-a11y/SKILL.md) | VoiceOver labels/traits, focus, Dynamic Type, reduce motion | Complex focus flows across screens |
+| [`ios-performance`](skills/ios-performance/SKILL.md) | Main-thread, cell reuse, image downsampling, retain-cycle leaks | Jank/leak with non-obvious root cause |
+| [`ios-test`](skills/ios-test/SKILL.md) | Quick + Nimble ViewModel specs, mock via Dependency struct | Path unreachable without production refactor |
+| [`ios-context`](skills/ios-context/SKILL.md) | Branch-scoping doc for multi-screen work | Multi-module cross-module coordinator changes |
+
 ### General skills — on demand
 
 | Skill | When to use | Escalate if |
@@ -580,6 +608,7 @@ External tools and inspirations bundled or adopted into this repo.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| `v1.9.0` | 2026-07-14 | Added sanitized, architecture-agnostic **native mobile skill sets** for Android (MVP + Core framework, Dagger, Gradle DFMs) and iOS (MVVM-C, Bazel/CocoaPods, Quick+Nimble) — each with `patterns`/`scaffold`/`review`/`a11y`/`performance`/`test`/`context` (14 skills). iOS skills that were a gitignored local-only overlay (v1.8.0) are now generalized and shipped publicly. Shared orchestrators (`build`/`review`/`ship`/`fix`/`pr-message`) gained a **Step 0 platform-routing** block that detects RN/web vs Android vs iOS and dispatches to the matching skills. Routing hook + discovery tree updated. For concrete internal module names, drop a project-scoped override at `<repo>/.claude/skills/<name>/`. |
 | `v1.8.2` | 2026-06-25 | Fixed a multi-minute stall in parallel workflows. The spawn → synthesize gap left no wait guidance, so the main thread improvised a `grep`/`while` busy-wait on `tasks/*.output` that kept spinning ~12 min after the agents had already come to rest (<2 min). Added a **Do not wait by polling** directive after the spawn paragraph in `parallel-review`, `parallel-ship`, `parallel-build`: the harness auto-wakes the main thread on agent completion — go straight to synthesis, never poll task files. |
 | `v1.8.1` | 2026-06-25 | Fixed silent coverage loss in parallel workflows. `fe-a11y` agent was the only one on `model: haiku`; a haiku key 401 killed it and the run reported 4-of-5 agents as if the a11y axis were clean. Aligned `fe-a11y` to `sonnet` and added **Step 5 — Handle agent failures** to the classifier (`using-agent-skills`): a dead agent is now surfaced as a skipped coverage gap and gates the verdict to `INCOMPLETE` instead of `READY TO MERGE`/`DONE`. |
 | `v1.8.0` | 2026-06-25 | Removed the iOS skill set from the public package — moved to a local-only overlay (gitignored, kept on disk so local sync still installs it, like `caveman*/` and `cavecrew/`). The skills hardcoded a private codebase's module layout and so don't generalize. |

@@ -65,8 +65,10 @@ Match natural language to the right command. **Dynamic parallel is the default**
 
 ### Individual skills (use when task is narrower than a full workflow)
 
+**Platform first.** Classify the codebase before the task: React Native / web (EVPMR, `*.tsx`, `package.json`) → `fe-*`. Native Android (`*.kt/*.java`, Gradle, MVP) → `android-*`. Native iOS (`*.swift/*.m`, `Modules/`, MVVM-C) → `ios-*`. Native mobile does **not** use EVPMR or `docs/context.md` for single-screen work — read a real sibling instead.
+
 ```
-Task arrives
+Frontend (React Native / web — EVPMR)
   ├── Need context only? ──────────────────────────→ /fe-context
   ├── Scaffold only (existing context)? ────────────→ /fe-scaffold
   ├── EVPMR pattern review only? ──────────────────→ /fe-review
@@ -79,7 +81,18 @@ Task arrives
   ├── Over-engineering audit on a diff/file? ───────→ /ponytail-review
   ├── Whole-repo bloat scan? ───────────────────────→ /ponytail-audit
   └── List all deliberate shortcuts (ponytail:)? ───→ /ponytail-debt
+
+Native Android (MVP + Core framework)          Native iOS (MVVM-C)
+  ├── Architecture / how a screen works? → /android-patterns    /ios-patterns
+  ├── Scaffold a new screen? ──────────→ /android-scaffold   /ios-scaffold
+  ├── Review a diff? ──────────────────→ /android-review     /ios-review
+  ├── Accessibility (TalkBack/VoiceOver)? → /android-a11y     /ios-a11y
+  ├── Performance (jank, memory, lists)? → /android-performance /ios-performance
+  ├── Write/improve unit tests? ───────→ /android-test       /ios-test
+  └── Branch context (multi-screen)? ──→ /android-context    /ios-context
 ```
+
+Native build / fix / ship / PR-message reuse the shared `/build` `/fix` `/ship` `/pr-message` — these detect the platform and dispatch to the matching `{android,ios}-*` skills (no parallel-agent variants for native).
 
 ---
 

@@ -16,6 +16,18 @@ Execute each step in order. Each step has a gate — do not proceed until the ga
 
 ---
 
+## Step 0 — Platform routing
+
+Detect the platform from the project root + changed files, then dispatch:
+
+- **Android** (`settings.gradle`/`build.gradle`, `*.kt`/`*.java`) → `/android-scaffold` (Step 2) → `/android-patterns` + `/android-performance` while implementing (Step 3) → `/android-review` (Step 4) → `/android-test` (Step 5). Gates below become their `./gradlew :<module>:lintGeneralDebug` + `:testGeneralDebugUnitTest` equivalents. **Skip the EVPMR steps.**
+- **iOS** (`*.xcodeproj`/`Podfile`/`Package.swift`, `Modules/` + `*.swift`) → `/ios-scaffold` → `/ios-patterns` + `/ios-performance` → `/ios-review` → `/ios-test`. Gates become `swiftlint` + `bazelisk test //Modules/<M>:<M>TestsBundle`. **Skip the EVPMR steps.**
+- **React Native / web** (`package.json` + `*.tsx`, EVPMR) → continue with the steps below.
+
+For native, Step 1 context is optional — run `/android-context` or `/ios-context` only for multi-screen branches; otherwise read a real sibling screen first.
+
+---
+
 ## Step 1 — Context
 
 Run the `/fe-context` workflow:
