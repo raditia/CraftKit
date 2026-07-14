@@ -13,7 +13,17 @@ description: Bug fix workflow — orchestrates fe-context, debug (reproduce → 
 
 ## How to run this workflow
 
-Run the `/debug` skill workflow in full: Reproduce → Isolate → Hypothesize → Fix → Verify. Never skip to fix without a hypothesis.
+Run the `/debug` skill workflow in full: Reproduce → Isolate → Hypothesize → Fix → Verify. Never skip to fix without a hypothesis. `/debug` is platform-agnostic.
+
+---
+
+## Step 0 — Platform routing
+
+Detect the platform from the changed/failing files. The debug loop is identical; only the verify tooling changes:
+
+- **Android** (`*.kt`/`*.java`) → regression test via `/android-test`; verify with `./gradlew :<module>:testGeneralDebugUnitTest` + `:lintGeneralDebug`. No fixed 93% coverage bar.
+- **iOS** (`*.swift`/`*.m`) → regression test via `/ios-test`; verify with `bazelisk test //Modules/<M>:<M>TestsBundle` + `swiftlint lint`. No fixed 93% coverage bar.
+- **React Native / web** → the `rtk tsc` / `rtk test` gates below apply (coverage ≥ 93%).
 
 ---
 

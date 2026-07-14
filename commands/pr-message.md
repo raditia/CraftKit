@@ -53,7 +53,7 @@ rtk git diff <base>...HEAD
 From the diff, extract:
 - **Goal** — infer from commit messages + what changed (be specific, not generic)
 - **Changed files** — group by layer or domain (e.g. View, Presenter, tests, config)
-- **Test coverage** — are there `*.test.*` or `*.spec.*` files in the diff? If yes: note what's covered. If no: flag as untested.
+- **Test coverage** — test files in the diff? Web/RN: `*.test.*` / `*.spec.*`. Android: `*Test.kt` under `src/test/`. iOS: `*Test.swift` / `*Spec.swift` (Quick). If yes: note what's covered. If no: flag as untested.
 
 ---
 

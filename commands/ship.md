@@ -16,6 +16,18 @@ Three gates in order: tests pass → coverage met → review clean. All three mu
 
 ---
 
+## Step 0 — Platform routing
+
+Detect the platform from the changed files, then dispatch:
+
+- **Android** (`*.kt`/`*.java`, Gradle) → tests via `/android-test` + `./gradlew :<module>:testGeneralDebugUnitTest`; type/lint gate = `./gradlew :<module>:lintGeneralDebug`; review = `/android-review`. **Skip the EVPMR/tsc/jest gates below** (no fixed 93% coverage bar unless the team sets one — report the module's actual coverage).
+- **iOS** (`*.swift`/`*.m`, `Modules/`) → tests via `/ios-test` + `bazelisk test //Modules/<M>:<M>TestsBundle`; lint gate = `swiftlint lint`; review = `/ios-review`. **Skip the EVPMR/tsc/jest gates below.**
+- **React Native / web** (`*.tsx`, EVPMR) → continue with the steps below.
+
+The `SHIP READINESS` verdict block (Done) applies to all platforms — swap in the platform's test/lint tooling.
+
+---
+
 ## Step 1 — Context
 
 1. Detect base branch: `rtk git remote show origin | grep 'HEAD branch'`
