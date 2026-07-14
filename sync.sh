@@ -287,6 +287,28 @@ ensure_tools() {
         echo "    jumbo $(jumbo --version 2>/dev/null | head -1) (ok)"
     fi
 
+    # Humanizer — de-AI-writing skill (used by /pr-message). Clone SKILL.md from
+    # upstream into ~/.agents/skills and symlink into ~/.claude/skills as a native
+    # Agent Skill. The vendored skills/humanizer/ copy fans out to the other 5 tools
+    # via the adapter sync; this wires only Claude's native skill path.
+    hz_src="$HOME/.agents/skills/humanizer"
+    if [[ ! -f "$hz_src/SKILL.md" ]]; then
+        echo "    + installing humanizer..."
+        hz_tmp="$(mktemp -d)"
+        if git clone --depth 1 https://github.com/blader/humanizer.git "$hz_tmp" 2>/dev/null; then
+            mkdir -p "$hz_src"
+            cp "$hz_tmp/SKILL.md" "$hz_src/SKILL.md"
+            mkdir -p "$HOME/.claude/skills"
+            ln -sfn "$hz_src" "$HOME/.claude/skills/humanizer"
+            echo "    humanizer (ok)"
+        else
+            echo "    ! humanizer install failed — clone https://github.com/blader/humanizer manually"
+        fi
+        rm -rf "$hz_tmp"
+    else
+        echo "    humanizer (ok)"
+    fi
+
 }
 
 echo "==> Syncing craftkit..."
