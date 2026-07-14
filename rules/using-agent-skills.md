@@ -277,7 +277,7 @@ Ambiguous between two skills → name both, ask user which applies.
 ### 11. Announce skill invocation
 Before invoking any skill or command, tell the user which one you're using and what model will run it:
 ```
-Running /fe-test [everyday: claude-sonnet-4-6] — write and verify tests for changed code paths.
+Running /fe-test [everyday: claude-sonnet-5] — write and verify tests for changed code paths.
 Running /pr-message [cheapest: claude-haiku-4-5] — generate PR message from branch diff.
 Running /fe-context [cheapest: claude-haiku-4-5] — generate context doc from staged changes.
 ```
@@ -365,10 +365,10 @@ Use the everyday model by default. Escalate inline when you detect genuine uncer
 
 | AI | Everyday | Escalate | Fusion panel |
 |---|---|---|---|
-| Claude Code | `claude-sonnet-4-6` | `claude-opus-4-8` | 2× `claude-opus-4-8` → opus judge |
+| Claude Code | `claude-sonnet-5` | `claude-opus-4-8` | 2× `claude-opus-4-8` → opus judge |
 | Gemini CLI | `gemini-2.5-flash` | `gemini-2.5-pro` | 2× `gemini-2.5-pro` → pro judge |
 | Cursor | claude-sonnet / gpt-4o | claude-opus / o1 | 2× claude-opus → opus judge |
-| Copilot | `claude-sonnet-4-6` | `claude-opus-4-8` | 2× `claude-opus-4-8` → opus judge |
+| Copilot | `claude-sonnet-5` | `claude-opus-4-8` | 2× `claude-opus-4-8` → opus judge |
 
 ### Escalation triggers → single opus
 - Architecture decision with significant, non-obvious tradeoffs
