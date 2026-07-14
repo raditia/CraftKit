@@ -4,7 +4,7 @@ description: Read-only ledger of all ponytail: comment markers in the repo. Show
 alwaysApply: false
 ---
 
-**Commands:** `rtk grep "ponytail:" . --include="*.ts" --include="*.tsx" --include="*.js"`
+**Commands:** `rtk grep "ponytail:" . --include="*.ts" --include="*.tsx" --include="*.js" --include="*.kt" --include="*.java" --include="*.swift" --include="*.m"` (all source languages — web/RN, Android, iOS)
 **Model:** cheapest — `claude-haiku-4-5` (Claude), `gemini-2.5-flash` (Gemini), `gpt-4o-mini` (Copilot/Cursor). No escalation — task is pure extraction.
 
 ---

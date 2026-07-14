@@ -4,7 +4,7 @@ description: Whole-repository over-engineering scan. Ranks what to delete, simpl
 alwaysApply: false
 ---
 
-**Commands:** `rtk grep "pattern" .`, `find . -name "*.ts" -not -path "*/node_modules/*"`
+**Commands:** `rtk grep "pattern" .`, `find . \( -name "*.ts" -o -name "*.tsx" -o -name "*.kt" -o -name "*.java" -o -name "*.swift" -o -name "*.m" \) -not -path "*/node_modules/*" -not -path "*/build/*" -not -path "*/Pods/*"`
 **Model:** cheapest — `claude-haiku-4-5` (Claude), `gemini-2.5-flash` (Gemini), `gpt-4o-mini` (Copilot/Cursor). No escalation — task is grep + classify across repo, not design decisions.
 
 > Diff-scoped review: use `/ponytail-review` instead. This skill scans the full repo.
