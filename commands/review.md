@@ -16,6 +16,18 @@ Runs in two passes: general quality first, then EVPMR-specific. Report all findi
 
 ---
 
+## Step 0 — Platform routing
+
+Detect the platform from the changed files, then dispatch:
+
+- **Android** (`*.kt`/`*.java`, Gradle) → run `/code-quality` (5-axis) + `/android-review` (MVP contract). Skip the EVPMR pass.
+- **iOS** (`*.swift`/`*.m`, `Modules/`) → run `/code-quality` (5-axis) + `/ios-review` (MVVM-C contract). Skip the EVPMR pass.
+- **React Native / web** (`*.tsx`, EVPMR) → continue with the steps below (`/code-quality` + `/fe-review`).
+
+Report format (Step 4) is identical for all platforms.
+
+---
+
 ## Step 1 — Context
 
 1. Detect base branch: `rtk git remote show origin | grep 'HEAD branch'`

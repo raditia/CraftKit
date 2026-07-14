@@ -21,6 +21,10 @@ process.stdin.on('end', () => {
         "   PR message/description         → /pr-message\n" +
         "   scaffold only                  → /build\n" +
         "   Or a skill: /fe-context /fe-scaffold /fe-review /fe-patterns /fe-a11y /fe-performance /code-quality /debug /ponytail-review /ponytail-audit /ponytail-debt\n" +
+        "   NATIVE MOBILE (not RN/web — no EVPMR, no docs/context.md for single screens):\n" +
+        "     Android (*.kt/*.java, Gradle, MVP) → /android-patterns /android-scaffold /android-review /android-test /android-a11y /android-performance /android-context\n" +
+        "     iOS (*.swift/*.m, Modules/, MVVM-C) → /ios-patterns /ios-scaffold /ios-review /ios-test /ios-a11y /ios-performance /ios-context\n" +
+        "     Native build/fix/ship/PR use the shared /build /fix /ship /pr-message — they platform-route.\n" +
         "3A match:    output 'Running /skill-name [tier] — reason.' then invoke. Do NOT respond before invoking.\n" +
         "3B no match: output 'No skill matched for this request. Responding directly.' then respond.\n" +
         "Skipping steps 1-3 = rule violation. Silent bypass = rule violation."
