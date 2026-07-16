@@ -63,6 +63,12 @@ Match natural language to the right command. **Dynamic parallel is the default**
 | `/ship` | Simple pre-merge gate, already know tests pass |
 | `/build` | Scaffold-only or parallel validation overhead not worth it |
 
+**Experimental escalation** — explicit invocation only, never auto-routed ("build feature X" still → `/parallel-build`):
+
+| Explicit command | When to prefer |
+|-----------------|----------------|
+| `/team-build` | Agent-teams build: this session leads (escalated model), everyday-model teammates implement in parallel via shared task list + direct teammate messaging. All platforms. Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`; ~5× token cost of a solo build |
+
 ### Individual skills (use when task is narrower than a full workflow)
 
 **Platform first.** Classify the codebase before the task: React Native / web (EVPMR, `*.tsx`, `package.json`) → `fe-*`. Native Android (`*.kt/*.java`, Gradle, MVP) → `android-*`. Native iOS (`*.swift/*.m`, `Modules/`, MVVM-C) → `ios-*`. Native mobile does **not** use EVPMR or `docs/context.md` for single-screen work — read a real sibling instead.

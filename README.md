@@ -1,4 +1,4 @@
-# craftkit `v1.9.0`
+# craftkit `v1.10.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **GitHub Copilot**, **Gemini CLI**, **Codex CLI**, and **Crush**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
@@ -14,6 +14,7 @@ One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**,
   - [Dynamic workflows](#dynamic-workflows-default) — `/parallel-review`, `/parallel-ship`, `/parallel-build`
   - [How the classifier picks agents](#how-the-classifier-picks-agents)
   - [Sequential fallback](#sequential-fallback) — `/review`, `/ship`, `/build`
+  - [Experimental: /team-build](#experimental-team-build--agent-teams) — agent-teams build
   - [Fix, tests, and PR message](#fix-tests-and-pr-message)
 - [Skills reference](#skills-reference)
 - [Agents reference](#agents-reference)
@@ -336,6 +337,53 @@ When you want a lightweight, single-pass run — use the explicit slash command.
 
 ---
 
+### Experimental: /team-build — agent teams
+
+> Built on Claude Code's experimental [agent teams](https://code.claude.com/docs/en/agent-teams). Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Explicit `/team-build` only — saying "build feature X" still routes to `/parallel-build`.
+
+**The idea in one sentence:** instead of one AI building a feature file by file, your session becomes a **team lead** that plans the work, then spawns four AI teammates who build different files at the same time and talk to each other directly — a small dev team working off a shared task board.
+
+How it differs from the default build:
+
+| | `/parallel-build` (default) | `/team-build` (experimental) |
+|---|---|---|
+| Who writes the code | The main session, one file at a time | Two implementer teammates, in parallel |
+| Helpers | One-shot reviewers that report back once | Persistent teammates that claim tasks and message each other |
+| Coordination | None needed | Shared task board — finishing one task unblocks the next |
+| Model split | One session model | Lead on escalated (`opus`), teammates on everyday (`sonnet`) |
+| Token cost | ~1× | ~5× |
+| Best for | Most features | Larger multi-file features where parallel implementation pays for the overhead |
+
+Two rules make it safe and cheap:
+
+- **One file, one owner.** Every file belongs to exactly one teammate for the whole build, so nobody overwrites anyone's work. Questions travel directly between teammates — the Presenter owner asks the Model owner about a type contract without round-tripping through the lead.
+- **Staged spawn.** The reviewer and tester only spawn once there is something to review or test — nobody sits idle burning tokens.
+
+```mermaid
+flowchart TD
+    A[/team-build/] --> B["Preflight\nteams enabled? · Claude Code? · lead model check"]
+    B --> C["Lead plans\ncontext + scaffold → task board\none file, one owner"]
+    C --> D
+    subgraph team ["Teammates (everyday model, staged spawn)"]
+        D["impl-a ‖ impl-b\nbuild files in parallel\nmessage each other directly"] --> E["reviewer\nspawns when implementation done"]
+        E --> F["tester\nspawns when review done"]
+    end
+    F --> G["Lead verifies integration\ntypecheck · lint · tests"]
+    G --> H[Report + verdict]
+```
+
+Works on all three platforms — React Native/web (EVPMR), Android (MVP), iOS (MVVM-C) — the task board adapts to each architecture's file layout.
+
+**Know before you run it:**
+
+- **Claude Code only.** Teams are a harness runtime feature, not a model capability — on Cursor, Copilot, Gemini CLI, Codex CLI, or Crush the command's preflight falls back to `/parallel-build` or `/build`.
+- **~5× the tokens** of a solo build — reserve it for features big enough to justify the overhead.
+- **Teammates don't survive `/resume`** — an interrupted build restarts coordination from the task board, not the conversation.
+
+Full workflow: [`commands/team-build.md`](commands/team-build.md).
+
+---
+
 ### Fix, tests, and PR message
 
 ```
@@ -608,6 +656,7 @@ External tools and inspirations bundled or adopted into this repo.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| `v1.10.0` | 2026-07-16 | Added experimental **`/team-build`** orchestrator on Claude Code [agent teams](https://code.claude.com/docs/en/agent-teams): the session acts as team lead (escalated model) that scaffolds, writes a dependency-ordered task list, and spawns four everyday-model teammates (impl-a, impl-b, reviewer, tester) that claim tasks and message each other directly. One-file-one-owner law prevents teammate write conflicts; shared wiring files are single-owner tasks. Platform-routed (EVPMR / Android MVP / iOS MVVM-C); FE reviewer reuses the `fe-review` agent definition, native reviewers run the review skills. Explicit invocation only — never auto-routed; requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. |
 | `v1.9.0` | 2026-07-14 | Added sanitized, architecture-agnostic **native mobile skill sets** for Android (MVP + Core framework, Dagger, Gradle DFMs) and iOS (MVVM-C, Bazel/CocoaPods, Quick+Nimble) — each with `patterns`/`scaffold`/`review`/`a11y`/`performance`/`test`/`context` (14 skills). iOS skills that were a gitignored local-only overlay (v1.8.0) are now generalized and shipped publicly. Shared orchestrators (`build`/`review`/`ship`/`fix`/`pr-message`) gained a **Step 0 platform-routing** block that detects RN/web vs Android vs iOS and dispatches to the matching skills. Routing hook + discovery tree updated. For concrete internal module names, drop a project-scoped override at `<repo>/.claude/skills/<name>/`. |
 | `v1.8.2` | 2026-06-25 | Fixed a multi-minute stall in parallel workflows. The spawn → synthesize gap left no wait guidance, so the main thread improvised a `grep`/`while` busy-wait on `tasks/*.output` that kept spinning ~12 min after the agents had already come to rest (<2 min). Added a **Do not wait by polling** directive after the spawn paragraph in `parallel-review`, `parallel-ship`, `parallel-build`: the harness auto-wakes the main thread on agent completion — go straight to synthesis, never poll task files. |
 | `v1.8.1` | 2026-06-25 | Fixed silent coverage loss in parallel workflows. `fe-a11y` agent was the only one on `model: haiku`; a haiku key 401 killed it and the run reported 4-of-5 agents as if the a11y axis were clean. Aligned `fe-a11y` to `sonnet` and added **Step 5 — Handle agent failures** to the classifier (`using-agent-skills`): a dead agent is now surfaced as a skipped coverage gap and gates the verdict to `INCOMPLETE` instead of `READY TO MERGE`/`DONE`. |
