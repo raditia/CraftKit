@@ -20,7 +20,7 @@ process.stdin.on('end', () => {
         "   tests/coverage/write tests     → /fe-test\n" +
         "   PR message/description         → /pr-message\n" +
         "   scaffold only                  → /build\n" +
-        "   Or a skill: /fe-context /fe-scaffold /fe-review /fe-patterns /fe-a11y /fe-performance /code-quality /debug /ponytail-review /ponytail-audit /ponytail-debt\n" +
+        "   Or a skill: /fe-context /fe-scaffold /fe-review /fe-patterns /fe-a11y /fe-performance /code-quality /debug /ideate /think /ponytail-review /ponytail-audit /ponytail-debt\n" +
         "   NATIVE MOBILE (not RN/web — no EVPMR, no docs/context.md for single screens):\n" +
         "     Android (*.kt/*.java, Gradle, MVP) → /android-patterns /android-scaffold /android-review /android-test /android-a11y /android-performance /android-context\n" +
         "     iOS (*.swift/*.m, Modules/, MVVM-C) → /ios-patterns /ios-scaffold /ios-review /ios-test /ios-a11y /ios-performance /ios-context\n" +

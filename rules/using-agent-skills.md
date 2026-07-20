@@ -84,6 +84,8 @@ Frontend (React Native / web — EVPMR)
   ├── Writing or improving tests only? ────────────→ /fe-test
   ├── Review or simplify code quality? ────────────→ /code-quality
   ├── Debug a bug (reproduce → isolate → fix)? ─────→ /debug
+  ├── Open-ended design/naming/fuzzy debug — need OPTIONS? → /ideate
+  ├── Complex system / architecture / non-obvious downstream effects? → /think
   ├── Over-engineering audit on a diff/file? ───────→ /ponytail-review
   ├── Whole-repo bloat scan? ───────────────────────→ /ponytail-audit
   └── List all deliberate shortcuts (ponytail:)? ───→ /ponytail-debt

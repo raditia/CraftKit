@@ -24,6 +24,23 @@ source "$REPO_DIR/adapters/crush.sh"
 
 ADAPTERS=("claude" "cursor" "copilot" "gemini" "codex" "crush")
 
+# Routing drift guard: every skill in skills/ must be named in the routing hook,
+# else the skill-first gate silently can't route it. Fail loud before syncing.
+# (Sensor for the routing-duplication seam — the curated tables stay hand-authored.)
+_routing_hook="$REPO_DIR/hooks/craftkit-routing.js"
+if [[ -f "$_routing_hook" ]]; then
+    _drift=""
+    for _d in "$SKILLS_DIR"/*/; do
+        _n="$(basename "$_d")"
+        grep -Eq "/$_n([^A-Za-z0-9-]|\$)" "$_routing_hook" || _drift="$_drift $_n"
+    done
+    if [[ -n "$_drift" ]]; then
+        echo "ROUTING DRIFT — skill(s) missing from hooks/craftkit-routing.js:$_drift" >&2
+        echo "Add each to the hook's routing list (and rules/using-agent-skills.md) before syncing." >&2
+        exit 1
+    fi
+fi
+
 # Returns 0 if needle is in the remaining args
 contains() {
     local needle="$1"; shift

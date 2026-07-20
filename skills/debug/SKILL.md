@@ -37,6 +37,8 @@ alwaysApply: false
 
 If multiple possible causes: address most likely first, note the others.
 
+No clear root cause after 2 isolation attempts → offer `/ideate` (fuzzy-debug: frames become candidate cause-classes). Opt-in — cost gate applies.
+
 ---
 
 ## Scope discipline

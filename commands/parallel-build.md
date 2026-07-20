@@ -19,6 +19,8 @@ Run the `/fe-context` workflow:
 
 **Gate:** `docs/context.md` exists and covers the feature scope.
 
+If the architecture/approach is genuinely open (not a routine EVPMR feature) → offer `/ideate` before scaffold; feed the chosen shortlist in as the design decision. Opt-in — cost gate applies.
+
 ---
 
 ## Phase 1 — Scaffold (sequential)
