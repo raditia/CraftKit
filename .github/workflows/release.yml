@@ -64,7 +64,12 @@ jobs:
         if: steps.tag_check.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Pass notes via env, never spliced into the shell source. Interpolating
+          # ${{ }} directly into `run:` lets backticks/$() in a changelog row execute
+          # as shell (command injection). $NOTES expansion does not re-evaluate them.
+          VERSION: ${{ steps.version.outputs.version }}
+          NOTES: ${{ steps.notes.outputs.notes }}
         run: |
-          gh release create "${{ steps.version.outputs.version }}" \
-            --title "craftkit ${{ steps.version.outputs.version }}" \
-            --notes "${{ steps.notes.outputs.notes }}"
+          gh release create "$VERSION" \
+            --title "craftkit $VERSION" \
+            --notes "$NOTES"
