@@ -77,13 +77,56 @@ ResourceFeature.ts  all display strings
 
 ## Critical authoring rules
 
-These live in `rules/using-agent-skills.md` (the "Skill authoring rules" section) and apply to **every** add/update/remove in this repo:
+This is the canonical home for the authoring checklist — it is **repo-local on purpose** (see `rules/using-agent-skills.md` → "Skill authoring rules", which points here rather than duplicating it into every synced global session). Applies to **every** add/update/remove in this repo:
 
 1. **Conflict check first.** Scan `rules/`, `skills/`, `commands/`, `agents/` for duplicate concepts, duplicate slash commands, or contradicting rules before writing. Surface conflicts — never silently merge.
 2. **Token audit.** Every line must earn its place. Content already in an always-active rule must not be repeated in a skill — reference it instead.
 3. **README sync is mandatory.** Adding/removing/renaming any rule, skill, command, or agent requires updating the matching table in `README.md` in the same change. Renaming an agent also means updating every `subagent_type:` reference in `commands/`.
 4. **Agents are cold copies.** Agent system prompts don't inherit `rules/`. If an agent duplicates rule content (e.g. EVPMR constraints), updating the rule means manually updating the agent file too.
 5. **Skill naming = implicit namespace.** The skill's directory basename *is* its slash command (`skills/think/` → `/think`), so the name carries the grouping — there are no subfolders (see Conventions). Platform-scoped skills are prefixed with their platform (`fe-*`, `android-*`, `ios-*`); a **cross-cutting / general skill takes no prefix** (`code-quality`, `debug`, `ideate`, `think`, `ponytail-*`). Pick the name by this rule: platform work → prefix it; general reasoning/quality skill → bare name.
+
+### Conflict check — what to scan for
+
+| Check | How |
+|-------|-----|
+| Duplicate concept | Same pattern, constraint, or checklist item already defined elsewhere |
+| Duplicate command | Same slash command or trigger phrase registered in multiple files |
+| Contradicting rule | Two files prescribe opposite behavior for the same situation |
+| Redundant section | Content that already lives in an always-active rule and doesn't need repeating |
+
+On a hit, surface it before proceeding — never silently merge or overwrite:
+```
+CONFLICT: [description]
+Existing: [file:section]
+Proposed: [new content]
+Resolution: A) extend existing  B) replace  C) both are needed — why? → Which?
+```
+
+### Token audit — before finalizing any file
+
+| Signal | Action |
+|--------|--------|
+| Section already covered by an always-active rule | Remove — rules are always in context |
+| Prose that could be a table or bullet | Convert |
+| Code example longer than needed | Trim to the minimal illustrative case |
+| Repeated boilerplate across skills | Move once to `using-agent-skills` or a rule; reference from skills |
+| Step restating what another skill does | Replace with "run `/skill-name`" |
+
+Target: every line teaches something unique or is a reference a reader couldn't infer elsewhere. If removing a line loses no information, remove it.
+
+### README sync matrix — after every add/update/remove
+
+| Change | README update required |
+|--------|----------------------|
+| New skill added | Add row to the correct skills table (name, when to use, escalate-if) |
+| Skill removed | Remove its row |
+| Skill renamed | Update name in table + cross-references in commands |
+| New rule added | Add row to the Rules table |
+| New command added | Add row to the Orchestrators table |
+| New agent added | Add row to the Agents reference table (name, role, spawned-by, model) |
+| Agent removed / renamed | Remove row / update name + all `subagent_type:` references in commands |
+| Skill discovery tree changed | Update the tree in `using-agent-skills.md` AND README |
+| Version bumped | Update `# craftkit \`vX.Y.Z\`` header + add changelog row (GH Action creates the release on push) |
 
 ## Conventions that bite
 
