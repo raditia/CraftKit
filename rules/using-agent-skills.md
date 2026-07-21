@@ -308,59 +308,7 @@ One line, before the skill executes. Lets the user redirect before work begins. 
 
 ## Skill authoring rules
 
-Apply these checks every time a skill, rule, or command is **added or updated** in this repo. Non-negotiable — same weight as the core operating behaviors.
-
-### 1. Conflict check (before writing anything)
-
-Scan all files in `rules/`, `skills/`, `commands/`, and `agents/` for:
-
-| Check | How |
-|-------|-----|
-| Duplicate concept | Same pattern, constraint, or checklist item already defined elsewhere |
-| Duplicate command | Same slash command or trigger phrase registered in multiple files |
-| Contradicting rule | Two files prescribe opposite behavior for the same situation |
-| Redundant section | Content that already lives in an always-active rule and doesn't need repeating |
-
-If a conflict is found: surface it explicitly before proceeding. Do not silently merge or overwrite.
-
-```
-CONFLICT: [description]
-Existing: [file:section]
-Proposed: [new content]
-Resolution: A) extend existing  B) replace  C) both are needed — why?
-→ Which?
-```
-
-### 2. Token audit (before finalizing any file)
-
-Every token in a skill file must earn its place. Run this check before saving:
-
-| Signal | Action |
-|--------|--------|
-| Section already covered by an always-active rule | Remove — rules are always in context |
-| Prose that could be a table or bullet | Convert |
-| Code example longer than needed to illustrate the point | Trim to the minimal illustrative case |
-| Repeated boilerplate across multiple skills | Move once to `using-agent-skills` or a rule; reference from skills |
-| Step restating what another skill already does | Replace with "run `/skill-name`" |
-
-Target: every line either teaches something unique or provides a reference a reader couldn't infer from elsewhere. If removing a line loses no information, remove it.
-
-### 3. README update (after every add/update/remove)
-
-`README.md` must stay in sync with the repo state. Update immediately — not as an afterthought.
-
-| Change | README update required |
-|--------|----------------------|
-| New skill added | Add row to the correct skills table with skill name, when to use, escalate-if |
-| Skill removed | Remove its row |
-| Skill renamed | Update name in table and any cross-references in commands |
-| New rule added | Add row to the Rules table |
-| New command added | Add row to the Orchestrators table |
-| New agent added | Add row to the Agents reference table (name, role, spawned-by, model) |
-| Agent removed | Remove its row from agents table |
-| Agent renamed | Update name in agents table and all `subagent_type:` references in commands |
-| Skill discovery tree changed | Update the tree in `using-agent-skills.md` AND README |
-| Version bumped | Update `# craftkit \`vX.Y.Z\`` header AND add changelog row — GH Action auto-creates the release on push |
+Authoring/updating craftkit content (rules, skills, commands, agents) is **repo-local** work — it only happens inside the craftkit source repo, where that repo's own `CLAUDE.md` is always loaded. The full authoring checklist (conflict check, token audit, README-sync matrix) lives there under **"Critical authoring rules"** — not duplicated into this always-on global rule. When editing craftkit source, follow that section. Everywhere else, this section is inert.
 
 ---
 
@@ -405,45 +353,23 @@ Use when a single higher-model pass might still miss something and being wrong h
 
 ### Escalation process (single opus)
 
-Do NOT ask the user to switch models. Escalate inline:
-
-1. **Inform the user** — one line, before escalating:
-   ```
-   Low confidence on [specific problem] — consulting higher model.
-   ```
-2. **Spawn a higher-model agent** with the specific question or task (not the whole skill — isolate the uncertain part)
-3. **Incorporate the result** and continue on the everyday model
-4. **Note what was consulted** at the end of your response:
-   ```
-   [consulted claude-opus-4-8 for: architecture tradeoff on X]
-   ```
-
-Escalation is for a targeted question, not a full hand-off. Stay in control; use the higher model as a specialist you consult for one decision.
+Never ask the user to switch models — escalate inline. (1) Tell the user one line first: `Low confidence on [problem] — consulting higher model.` (2) Spawn a higher-model agent scoped to the uncertain part only, not the whole skill. (3) Incorporate the result, continue on the everyday model. (4) Note at end: `[consulted claude-opus-4-8 for: X]`. Targeted question, not a hand-off — you stay in control.
 
 ### Fusion panel process
 
-Adopted from the independence-then-synthesis principle: same prompt → multiple independent runs → judge synthesizes. Two independent models diverge on reasoning paths, tool calls, and edge cases — synthesis of those divergences beats one model run once.
+Independence-then-synthesis: same prompt → 2 independent runs → judge synthesizes. Independent models diverge on reasoning/tool-calls/edge-cases; synthesizing the divergence beats one run.
 
-1. **Inform the user** — one line:
-   ```
-   High-stakes decision on [X] — routing to fusion panel (2× opus).
-   ```
-2. Write the question **verbatim** — no lenses, no personas assigned. Every panelist gets the task straight.
-3. **Spawn 2 independent panelists** with the same prompt, no cross-contamination. Spawn mechanism varies by AI:
+1. Tell the user one line: `High-stakes decision on [X] — routing to fusion panel (2× opus).`
+2. Write the question **verbatim** — no lenses/personas; every panelist gets it straight.
+3. Spawn 2 independent panelists, same prompt, no cross-contamination. Spawn mechanism per AI:
+   - **Claude Code** — Agent tool, both in one message (concurrent), `model: claude-opus-4-8`
+   - **Gemini CLI** — shell `&`-parallelism into temp files, judge call reads both
+   - **Cursor** — two background agent tabs at once, same model (`claude-opus`/`o1`)
+   - **Copilot** — two parallel chat windows, paste both into a third judge window
+4. Classify the deliverable, then synthesize:
+   - **Artifact (code/config/script)** → run both candidates, merge by what demonstrably works, verify — the graft seam is where merges silently break, so run the merged result and fix until it passes.
+   - **Research/analysis** → five sections: **Consensus** (agreement = highest confidence) · **Contradictions** (state both, adjudicate — never bury) · **Partial coverage** (depth only some engaged) · **Unique insights** (one panelist's non-obvious point — highest leverage) · **Blind spots** (what the whole panel missed; add one they didn't name).
+5. Final answer follows from the synthesis, not one panelist lightly edited.
+6. Note at end: `[consulted fusion panel (2× claude-opus-4-8) for: X]`.
 
-   | AI | Spawn mechanism |
-   |---|---|
-   | Claude Code | Agent tool — both in a single message so they run concurrently; `model: claude-opus-4-8` |
-   | Gemini CLI | Shell parallelism — `gemini --model gemini-2.5-pro -p "..." > /tmp/p1.txt & gemini --model gemini-2.5-pro -p "..." > /tmp/p2.txt & wait`, then judge call reads both |
-   | Cursor | Two background agent tabs opened simultaneously; same model (`claude-opus` or `o1`) |
-   | Copilot | Two parallel chat windows (no programmatic spawn — trigger both then copy outputs to a third judge window) |
-4. **Classify the deliverable**, then synthesize:
-   - **Artifact (code, config, script)** → Track A: run both candidates, merge by what demonstrably works, verify. The seam between grafted pieces is where merges silently break — run the merged result and fix until it passes.
-   - **Research / analysis** → Track B: five sections — **Consensus** (independent agreement = highest confidence), **Contradictions** (state both positions and adjudicate — never bury a conflict), **Partial coverage** (depth only some panelists engaged), **Unique insights** (non-obvious points from one panelist — highest-leverage payoff), **Blind spots** (what the panel as a whole missed — you as judge may add one none of them named).
-5. Write the final answer grounded in the synthesis. It must follow from the analysis, not be one panelist's answer lightly edited.
-6. **Note at end of response:**
-   ```
-   [consulted fusion panel (2× claude-opus-4-8) for: X]
-   ```
-
-Evidence over assertion: a panelist that ran the code or read a primary source outranks one reasoning from memory.
+Evidence over assertion: a panelist that ran the code / read a primary source outranks one reasoning from memory.
