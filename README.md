@@ -1,4 +1,4 @@
-# craftkit `v1.13.0`
+# craftkit `v1.14.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **GitHub Copilot**, **Gemini CLI**, **Codex CLI**, and **Crush**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
@@ -14,6 +14,7 @@ One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**,
   - [Dynamic workflows](#dynamic-workflows-default) — `/parallel-review`, `/parallel-ship`, `/parallel-build`
   - [How the classifier picks agents](#how-the-classifier-picks-agents)
   - [Sequential fallback](#sequential-fallback) — `/review`, `/ship`, `/build`
+  - [Planning pipeline: /define](#planning-pipeline-define--before-you-build) — `/interview` → `/spec` → `/plan`
   - [Experimental: /team-build](#experimental-team-build--agent-teams) — agent-teams build
   - [Fix, tests, and PR message](#fix-tests-and-pr-message)
 - [Skills reference](#skills-reference)
@@ -202,6 +203,7 @@ skills/ and commands/  →  ON-DEMAND
 Natural language routes to the right command automatically. No slash commands required.
 
 ```
+"plan this feature"     →  /define   (interview → spec → plan, checkpoint-gated)
 "review this"           →  /parallel-review
 "build this feature"    →  /parallel-build
 "ship this"             →  /parallel-ship
@@ -337,6 +339,19 @@ When you want a lightweight, single-pass run — use the explicit slash command.
 
 ---
 
+### Planning pipeline: /define — before you build
+
+`/define` chains the Define→Plan phase **checkpoint-gated**: `/interview` (de-fuzz the ask) → `/spec` (PRD) → `/plan` (task breakdown), pausing for your approval between each so a bad spec never silently becomes bad tasks. It offers `/ideate` when the approach is open and `plan-roaster` before build. Output lands in the `docs/context.md` PLANNING block, which every execution skill reads — so `/parallel-build` runs with intent, not guesses.
+
+```
+/define ──► interview ─(gate)─► spec ─(gate)─► plan ─(gate)─► [ready] ──► /parallel-build ──► /parallel-ship
+             de-fuzz           PRD            tasks                        build            └─► offers /adr + /docs
+```
+
+Pre-build only — it stops at a reviewed plan and hands off. The post-build docs (`/adr` for the *why*, `/docs` for dual-audience engineer + stakeholder pages) are offered as an opt-in tail of `/parallel-ship`, when the code is final. Every planning skill is also invocable alone (`/spec`, `/plan`, …) when you only want one phase.
+
+---
+
 ### Experimental: /team-build — agent teams
 
 > Built on Claude Code's experimental [agent teams](https://code.claude.com/docs/en/agent-teams). Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Explicit `/team-build` only — saying "build feature X" still routes to `/parallel-build`.
@@ -465,6 +480,18 @@ Sanitized, architecture-agnostic references. Native mobile does **not** use EVPM
 | [`ponytail-review`](skills/ponytail-review/SKILL.md) | Over-engineering audit on a diff or file — what to delete/shrink | Correctness or security concerns → use `code-quality` |
 | [`ponytail-audit`](skills/ponytail-audit/SKILL.md) | Whole-repo bloat scan — ranked list of removals | — |
 | [`ponytail-debt`](skills/ponytail-debt/SKILL.md) | Ledger of all `ponytail:` shortcuts — surfaces deferred simplifications | — |
+
+### Planning & docs skills — on demand
+
+The **Define → Plan → Document** layer. All opt-in — never auto-run from `/parallel-build`. `/spec` `/plan` `/adr` write a forward-planning block into `docs/context.md`, so downstream execution skills run with intent instead of guesses. `/define` chains the pre-build phases checkpoint-gated (`/interview → /spec → /plan`); `/adr` + `/docs` are offered post-build as a tail of `/parallel-ship`. Full arc: `/define` → `/parallel-build` → `/parallel-ship` (→ `/adr` + `/docs`). See [Planning pipeline](#planning-pipeline-define--before-you-build).
+
+| Skill | When to use | Escalate if |
+|-------|-------------|-------------|
+| [`interview`](skills/interview/SKILL.md) | De-fuzz an underspecified ask — one question at a time to ~95% confidence, then hand to `/spec` | — |
+| [`spec`](skills/spec/SKILL.md) | Write a PRD before coding — objective, scope, boundaries, acceptance criteria | Hard-to-reverse (schema, public API, payment/auth) — escalate to opus |
+| [`plan`](skills/plan/SKILL.md) | Break a spec into ordered, verifiable tasks + deps + executing skill; offers `plan-roaster` | Large dependency graph or > 5 interdependent files |
+| [`adr`](skills/adr/SKILL.md) | Record one architectural decision — context, options, decision, consequences (the *why*) | — |
+| [`docs`](skills/docs/SKILL.md) | Dual-audience docs — technical (engineers) + non-technical (stakeholders), run through `/humanizer` | Accuracy depends on subtle system behavior — escalate to everyday |
 
 ---
 
@@ -658,6 +685,7 @@ External tools and inspirations bundled or adopted into this repo.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| `v1.14.0` | 2026-07-23 | Added the **Define → Plan → Document** layer — five opt-in general skills adapted from [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) (MIT), filling the repo's forward-planning gap (it was strong on execution + reasoning but had no spec/plan/discovery/docs step). **`/interview`** de-fuzzes an underspecified ask one question at a time to ~95% confidence; **`/spec`** writes a PRD (objective, scope, boundaries, acceptance); **`/plan`** breaks it into ordered verifiable tasks + deps and offers the existing `plan-roaster`; **`/adr`** records one decision (the *why*); **`/docs`** produces dual-audience docs (engineer + stakeholder) run through `/humanizer`. `/spec` `/plan` `/adr` write a delimited **PLANNING** block into `docs/context.md` that `/fe-context` now preserves verbatim — so downstream skills execute with intent, not guesses. Overlap avoided: `idea-refine` maps to existing `/ideate`, so it was not duplicated. Also added **`/define`** — a checkpoint-gated orchestrator chaining `/interview → /spec → /plan` (pausing for approval between phases, offering `/ideate` + `plan-roaster`) so an underspecified ask becomes a reviewed spec + task plan in one invoke; and wired the post-build pair as an **opt-in tail of `/parallel-ship`** (offers `/adr` + `/docs` once the verdict is READY TO MERGE). Ordering enforces dependencies: spec precedes plan, adr/docs are post-build. Opt-in only — `/parallel-build` unchanged. Routing wired in `hooks/craftkit-routing.js` (drift guard) + orchestrator table, tiebreaker, and discovery tree in `using-agent-skills.md`. |
 | `v1.13.0` | 2026-07-21 | **Token diet for long/subagent-heavy sessions** — no behavior change. (1) Slimmed `hooks/craftkit-routing.js` (~2.3KB→~1.2KB, injected on *every* prompt): dropped the prose that duplicated the always-on routing table, kept the terse gate + the full skill roster (still required by the drift guard) + a pointer to `rules/using-agent-skills.md`. (2) Removed the **Skill authoring rules** detail from the synced always-on `using-agent-skills.md` — relocated to this repo's own `CLAUDE.md` ("Critical authoring rules"), which loads only when editing craftkit source, i.e. exactly when needed. Trims ~2KB from every global session baseline. (3) Compressed the **Model routing** escalation/fusion-panel *process* prose in place (kept triggers + tier table always-on — escalation is global runtime behavior with no reliable on-demand home). Net: lighter per-prompt injection + lighter per-session baseline, no routing/escalation semantics changed. |
 | `v1.12.0` | 2026-07-20 | Added **`/think`** skill — curated systems/strategy reasoning router from [tjboudreaux/cc-thinking-skills](https://github.com/tjboudreaux/cc-thinking-skills) (MIT). Six gap-filling frameworks (cynefin, systems, feedback loops, theory-of-constraints, leverage points, second-order) for architecture and complex-system decisions. Deliberately **not** the full 39-skill set — the ~12 overlapping models (first-principles, inversion, red-team, via-negativa, five-whys, …) route to existing `/ideate`, `ponytail`, `adversarial`, `/debug` instead of duplicating them. One routing entry, not seven. Also added a **routing drift guard** to `sync.sh`: every skill in `skills/` must be named in `hooks/craftkit-routing.js` or the sync fails loud — closes the silent-drift seam where a new skill's routing wiring is forgotten (curated orchestrator/native tables stay hand-authored). |
 | `v1.11.0` | 2026-07-20 | Added **`/ideate`** skill — parallel divergent ideation adapted from [UditAkhourii/adhd](https://github.com/UditAkhourii/adhd) (MIT). Spawns 5 isolated generators under distinct cognitive frames (first-principles, adversary, steal-from-adjacent, radical-simplicity, …), then a critic scores (`novelty·0.35 + viability·0.40 + fit·0.25`), clusters, flags traps, and deepens the top 3. Gated behind a 3-check pre-flight (open scope · no single right answer · high stakes) — ~10 agent calls, 5–10× a direct answer. Distinct from the fusion panel (generates options vs verifies one decision). Offered as opt-in escalation from `/debug` (fuzzy debugging) and `/parallel-build` (open architecture). Full spawn only on Claude Code + Gemini CLI; degraded/manual on Cursor/Copilot/Codex/Crush. |
