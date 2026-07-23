@@ -111,6 +111,8 @@ If requirements are missing or ambiguous — stop and ask, do not invent.
 
 Create `docs/` if needed. If file exists, update changed sections — preserve manually added notes.
 
+**Preserve the forward-planning block.** If a `<!-- BEGIN PLANNING … -->` … `<!-- END PLANNING -->` block exists (written by `/spec` `/plan` `/adr`), copy it through verbatim — never regenerate or drop it. It holds the forward spec/tasks/decisions the backward diff sections below complement.
+
 ```markdown
 # Feature Context
 <!-- managed by fe-context — regenerate with /fe-context -->

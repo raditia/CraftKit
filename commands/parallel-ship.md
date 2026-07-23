@@ -167,3 +167,21 @@ Suggestions: N
 Skipped:     N  (infra failures — coverage gaps, not clean)
 Verdict: READY TO MERGE / BLOCKED — <list blockers> / INCOMPLETE — <axes unverified due to skipped agents>
 ```
+
+---
+
+## Phase 4 — Document (opt-in, only if verdict READY TO MERGE)
+
+Code is final at this point — the natural moment to capture the *why* and explain the *what*. Offer, never auto-run:
+
+```
+→ Before merge, capture documentation? (both optional)
+  (a) /adr  — record any architectural decision made on this branch (the why)
+  (d) /docs — write engineer + stakeholder documentation for this feature
+  (n) skip
+```
+
+- **`/adr`** — if the branch made a non-obvious, hard-to-reverse decision, run `/adr` to record it and link it into the `docs/context.md` PLANNING block. One ADR per decision; skip for reversible/local choices.
+- **`/docs`** — run `/docs` to produce the dual-audience pair (technical + stakeholder), humanized. Pulls from the PLANNING block + ADRs + the diff.
+
+Skip entirely if the user declines or the change is trivial. Do not block merge on documentation.

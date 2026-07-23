@@ -40,6 +40,7 @@ Match natural language to the right command. **Dynamic parallel is the default**
 
 | User says | Run | Mode |
 |-----------|-----|------|
+| "plan this feature", "define feature X", "spec and plan X", "let's plan before building", "help me scope this out" — **planning intent before build; ask/scope/approach not yet clear** | `/define` | sequential (checkpoint-gated) |
 | "build feature X", "create a new screen", "implement X", "I want to create X" — **object must be a feature/screen/module, not a test** | `/parallel-build` | dynamic |
 | "scaffold a module", "scaffold X", "scaffold only" — **scaffold intent without full build** | `/build` | sequential |
 | "help me review", "review the changes", "code review", "LGTM check", "can you check my changes?" — **feedback intent, no merge signal** | `/parallel-review` | dynamic |
@@ -51,6 +52,7 @@ Match natural language to the right command. **Dynamic parallel is the default**
 **Tiebreakers:**
 - Vague complaint ("this looks wrong", "something seems off") — no error/crash/fail signal → `/parallel-review`
 - "scaffold" verb alone → `/build` not `/parallel-build`
+- "plan"/"spec"/"define"/"scope" intent (before code exists) → `/define`; "build"/"implement" intent → `/parallel-build`. Planning verb wins only when no build-now signal.
 - Merge intent ("ready to merge", "can I merge", "ship") → `/parallel-ship` over `/parallel-review`
 - Coverage mentioned + failing/CI context → `/fix`; coverage mentioned + authoring/update context → `/fe-test`
 - Any ambiguous test query ("any tests?", "tests needed?", "should tests change?") → `/fe-test`
@@ -89,6 +91,16 @@ Frontend (React Native / web — EVPMR)
   ├── Over-engineering audit on a diff/file? ───────→ /ponytail-review
   ├── Whole-repo bloat scan? ───────────────────────→ /ponytail-audit
   └── List all deliberate shortcuts (ponytail:)? ───→ /ponytail-debt
+
+Planning & docs (general, opt-in — never auto-run; feed docs/context.md before execution)
+  ├── Ask underspecified — de-fuzz before building? → /interview
+  ├── Widen the approach — need OPTIONS? ───────────→ /ideate
+  ├── Write a PRD / spec before coding? ────────────→ /spec
+  ├── Break a spec into ordered verifiable tasks? ──→ /plan  (then plan-roaster agent to stress-test)
+  ├── Record WHY a decision was made? ──────────────→ /adr
+  └── Document a feature for engineers + stakeholders? → /docs  (dual-audience, humanized)
+  Chain them: /define runs interview → spec → plan checkpoint-gated (one invoke). adr + docs offered as tail of /parallel-ship.
+  Full arc: /define (interview→spec→plan) → /parallel-build → /parallel-ship (→ offers /adr + /docs)
 
 Native Android (MVP + Core framework)          Native iOS (MVVM-C)
   ├── Architecture / how a screen works? → /android-patterns    /ios-patterns
