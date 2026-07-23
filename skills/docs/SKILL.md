@@ -1,6 +1,6 @@
 ---
 name: docs
-description: Produce feature documentation in two registers from one source of truth — a technical version for engineers and a non-technical version for stakeholders — then run both through /humanizer to strip AI-writing tells. Use after a feature ships or a spec is settled. Adapted from addyosmani/agent-skills documentation (MIT).
+description: Produce feature documentation in two registers from one source of truth — a technical version for engineers and a non-technical version for stakeholders — as Confluence-paste-ready markdown, then run both through /humanizer to strip AI-writing tells. Use after a feature ships or a spec is settled. Adapted from addyosmani/agent-skills documentation (MIT).
 alwaysApply: false
 ---
 
@@ -53,12 +53,30 @@ Optional voice match: if the user points to a writing sample, pass it to `/human
 
 ---
 
-## Output
+## Output format — Confluence-paste-ready markdown
+
+Both documents are **plain markdown meant to be pasted into Confluence** (via the editor's `/Markdown` insert or the `+` → *Markdown* option). Write markdown that survives that paste — stick to constructs Confluence maps cleanly:
+
+| Use | Avoid (Confluence mangles or drops) |
+|-----|-------------------------------------|
+| `#`–`####` headings, `**bold**`, `*italic*` | Raw HTML tags (`<div>`, `<br>`, `<details>`) |
+| GitHub-style pipe tables with a header row | HTML tables, merged/nested cells |
+| Fenced code blocks with a language (```ts) | Indented (4-space) code blocks — become paragraphs |
+| Standard `-` bullets, `1.` ordered lists | Deep nesting (> 3 levels) — flattens |
+| `[text](url)` links, inline `code` | Footnotes, task-list checkboxes, emoji shortcodes |
+
+Rules: one H1 per doc; don't skip heading levels; blank line before every table and code fence; relative links (`docs/adr/0001-x.md`) → make absolute or drop, they won't resolve in Confluence.
+
+## Deliver
+
+1. **Write files** — `docs/<feature>.md` (technical) and `docs/<feature>-overview.md` (stakeholder).
+2. **Also print each full doc to the chat in one fenced block per doc** — so the raw markdown can be copied straight into Confluence without opening the file. Fence with `markdown` and note "select-all inside this block → paste into Confluence".
 
 ```
 DOCS — <feature>
-Technical:    docs/<feature>.md
-Stakeholder:  docs/<feature>-overview.md
+Technical:    docs/<feature>.md          (printed below for copy)
+Stakeholder:  docs/<feature>-overview.md (printed below for copy)
+Format:       Confluence-paste-ready markdown ✓
 Humanized:    YES / SKIPPED (humanizer absent)
 Consistency:  stakeholder claims trace to technical facts ✓
 ```
