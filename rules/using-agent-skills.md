@@ -344,37 +344,40 @@ Authoring/updating craftkit content (rules, skills, commands, agents) is **repo-
 
 Use the everyday model by default. Escalate inline when you detect genuine uncertainty — not as a reflex. For decisions where being confidently wrong is expensive, use the fusion panel instead of a single escalation.
 
-| AI | Everyday | Escalate | Fusion panel |
-|---|---|---|---|
-| Claude Code | `claude-sonnet-5` | `claude-opus-4-8` | 2× `claude-opus-4-8` → opus judge |
-| Gemini CLI | `gemini-2.5-flash` | `gemini-2.5-pro` | 2× `gemini-2.5-pro` → pro judge |
-| Cursor | claude-sonnet / gpt-4o | claude-opus / o1 | 2× claude-opus → opus judge |
-| Copilot | `claude-sonnet-5` | `claude-opus-4-8` | 2× `claude-opus-4-8` → opus judge |
+**Claude Code row is plan-aware.** `hooks/craftkit-routing.js` reads `~/.claude.json` → `oauthAccount` every turn and injects the detected tier as `additionalContext` (`Model tier (detected): ...`). Use the tier from that context when present — it overrides the static row below. Detection: Gmail-domain account → personal; else `organizationType` containing "enterprise" → enterprise; anything unreadable/unrecognized → personal (safe default).
 
-### Escalation triggers → single opus
+| AI | Plan | Everyday | Escalate | Fusion panel |
+|---|---|---|---|---|
+| Claude Code | personal (Pro, Gmail login) | `claude-sonnet-5` | `claude-opus-4-8` | 2× `claude-opus-4-8` → opus judge |
+| Claude Code | enterprise | `claude-opus-4-8` | `claude-fable-5` | 2× `claude-fable-5` → fable judge |
+| Gemini CLI | — | `gemini-2.5-flash` | `gemini-2.5-pro` | 2× `gemini-2.5-pro` → pro judge |
+| Cursor | — | claude-sonnet / gpt-4o | claude-opus / o1 | 2× claude-opus → opus judge |
+| Copilot | — | `claude-sonnet-5` | `claude-opus-4-8` | 2× `claude-opus-4-8` → opus judge |
+
+### Escalation triggers → single escalate-tier model
 - Architecture decision with significant, non-obvious tradeoffs
 - Security-sensitive code with unclear threat model
 - Debugging with no clear hypothesis after 2 isolation attempts
 - Refactor touching > 5 interdependent files with complex type constraints
 
-### Fusion panel triggers → 2× opus → opus judge
+### Fusion panel triggers → 2× escalate-tier model → same-tier judge
 Use when a single higher-model pass might still miss something and being wrong has real cost:
 - Irreversible production changes (schema migrations, data transforms, permanent deletes)
 - Security architecture with meaningful attack surface and unclear threat model
 - Complex tradeoff where multiple independent reasoning paths are likely to diverge
 
-### Escalation process (single opus)
+### Escalation process (single higher model)
 
-Never ask the user to switch models — escalate inline. (1) Tell the user one line first: `Low confidence on [problem] — consulting higher model.` (2) Spawn a higher-model agent scoped to the uncertain part only, not the whole skill. (3) Incorporate the result, continue on the everyday model. (4) Note at end: `[consulted claude-opus-4-8 for: X]`. Targeted question, not a hand-off — you stay in control.
+Never ask the user to switch models — escalate inline. (1) Tell the user one line first: `Low confidence on [problem] — consulting higher model.` (2) Spawn an agent on the tier's **Escalate** model (e.g. `claude-opus-4-8` on personal, `claude-fable-5` on enterprise — see plan-aware table above), scoped to the uncertain part only, not the whole skill. (3) Incorporate the result, continue on the everyday model. (4) Note at end: `[consulted <escalate-model> for: X]`. Targeted question, not a hand-off — you stay in control.
 
 ### Fusion panel process
 
 Independence-then-synthesis: same prompt → 2 independent runs → judge synthesizes. Independent models diverge on reasoning/tool-calls/edge-cases; synthesizing the divergence beats one run.
 
-1. Tell the user one line: `High-stakes decision on [X] — routing to fusion panel (2× opus).`
+1. Tell the user one line: `High-stakes decision on [X] — routing to fusion panel (2× <escalate-model>).`
 2. Write the question **verbatim** — no lenses/personas; every panelist gets it straight.
-3. Spawn 2 independent panelists, same prompt, no cross-contamination. Spawn mechanism per AI:
-   - **Claude Code** — Agent tool, both in one message (concurrent), `model: claude-opus-4-8`
+3. Spawn 2 independent panelists, same prompt, no cross-contamination, both on the tier's Escalate model. Spawn mechanism per AI:
+   - **Claude Code** — Agent tool, both in one message (concurrent), `model:` = tier's Escalate column (`claude-opus-4-8` personal / `claude-fable-5` enterprise)
    - **Gemini CLI** — shell `&`-parallelism into temp files, judge call reads both
    - **Cursor** — two background agent tabs at once, same model (`claude-opus`/`o1`)
    - **Copilot** — two parallel chat windows, paste both into a third judge window
@@ -382,6 +385,6 @@ Independence-then-synthesis: same prompt → 2 independent runs → judge synthe
    - **Artifact (code/config/script)** → run both candidates, merge by what demonstrably works, verify — the graft seam is where merges silently break, so run the merged result and fix until it passes.
    - **Research/analysis** → five sections: **Consensus** (agreement = highest confidence) · **Contradictions** (state both, adjudicate — never bury) · **Partial coverage** (depth only some engaged) · **Unique insights** (one panelist's non-obvious point — highest leverage) · **Blind spots** (what the whole panel missed; add one they didn't name).
 5. Final answer follows from the synthesis, not one panelist lightly edited.
-6. Note at end: `[consulted fusion panel (2× claude-opus-4-8) for: X]`.
+6. Note at end: `[consulted fusion panel (2× <escalate-model>) for: X]`.
 
 Evidence over assertion: a panelist that ran the code / read a primary source outranks one reasoning from memory.

@@ -1,4 +1,4 @@
-# craftkit `v1.14.0`
+# craftkit `v1.15.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **GitHub Copilot**, **Gemini CLI**, **Codex CLI**, and **Crush**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
@@ -600,18 +600,21 @@ flowchart TD
 
 Each skill runs on the everyday model. Escalation is inline — the AI consults the higher model for a specific question and continues without interrupting you.
 
-| AI | Everyday | Escalate | Fusion panel |
-|----|----------|----------|-------------|
-| Claude Code | `claude-sonnet-5` | `claude-opus-4-8` | 2× opus → opus judge |
-| Gemini CLI | `gemini-2.5-flash` | `gemini-2.5-pro` | — |
-| Cursor | claude-sonnet / gpt-4o | claude-opus / o1 | — |
-| Copilot | `claude-sonnet-5` | `claude-opus-4-8` | — |
-| Codex CLI | `codex-mini-latest` | `o3` | — |
-| Crush | provider-dependent | provider-dependent | — |
+**Claude Code is plan-aware.** `hooks/craftkit-routing.js` reads the logged-in account from `~/.claude.json` on every prompt and injects the detected tier as context: Gmail-domain login → personal, `organizationType` containing "enterprise" → enterprise, anything unreadable → personal (safe default).
+
+| AI | Plan | Everyday | Escalate | Fusion panel |
+|----|------|----------|----------|-------------|
+| Claude Code | personal (Pro, Gmail login) | `claude-sonnet-5` | `claude-opus-4-8` | 2× opus → opus judge |
+| Claude Code | enterprise | `claude-opus-4-8` | `claude-fable-5` | 2× fable → fable judge |
+| Gemini CLI | — | `gemini-2.5-flash` | `gemini-2.5-pro` | — |
+| Cursor | — | claude-sonnet / gpt-4o | claude-opus / o1 | — |
+| Copilot | — | `claude-sonnet-5` | `claude-opus-4-8` | — |
+| Codex CLI | — | `codex-mini-latest` | `o3` | — |
+| Crush | — | provider-dependent | provider-dependent | — |
 
 Escalation triggers: architecture decisions with non-obvious tradeoffs, security-sensitive code, debugging with no hypothesis after 2 attempts.
 
-Fusion panel triggers: irreversible production changes, security architecture with meaningful attack surface, decisions where a single-model opinion may miss divergent reasoning paths. Runs 2 independent opus passes → opus synthesizes using Track A (artifact: run+merge) or Track B (analysis: consensus/contradictions/unique/blind spots).
+Fusion panel triggers: irreversible production changes, security architecture with meaningful attack surface, decisions where a single-model opinion may miss divergent reasoning paths. Runs 2 independent passes on the tier's escalate model → same model synthesizes using Track A (artifact: run+merge) or Track B (analysis: consensus/contradictions/unique/blind spots).
 
 ---
 
@@ -685,6 +688,7 @@ External tools and inspirations bundled or adopted into this repo.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| `v1.15.0` | 2026-07-25 | **Plan-aware model routing for Claude Code.** `hooks/craftkit-routing.js` now reads `~/.claude.json` → `oauthAccount` on every prompt and detects account tier: Gmail-domain login → personal (everyday `claude-sonnet-5`, escalate `claude-opus-4-8`), `organizationType` containing "enterprise" → enterprise (everyday `claude-opus-4-8`, escalate `claude-fable-5`), anything unreadable/unrecognized → personal (safe default). Detected tier is injected as `additionalContext` each turn. `rules/using-agent-skills.md` **Model routing** table gains a Plan column and generalizes the escalation/fusion-panel process prose to reference "the tier's Escalate model" instead of a hardcoded `claude-opus-4-8`. README **Model routing** section synced to match. |
 | `v1.14.0` | 2026-07-23 | Added the **Define → Plan → Document** layer — five opt-in general skills adapted from [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) (MIT), filling the repo's forward-planning gap (it was strong on execution + reasoning but had no spec/plan/discovery/docs step). **`/interview`** de-fuzzes an underspecified ask one question at a time to ~95% confidence; **`/spec`** writes a PRD (objective, scope, boundaries, acceptance); **`/plan`** breaks it into ordered verifiable tasks + deps and offers the existing `plan-roaster`; **`/adr`** records one decision (the *why*); **`/docs`** produces dual-audience docs (engineer + stakeholder) run through `/humanizer`. `/spec` `/plan` `/adr` write a delimited **PLANNING** block into `docs/context.md` that `/fe-context` now preserves verbatim — so downstream skills execute with intent, not guesses. Overlap avoided: `idea-refine` maps to existing `/ideate`, so it was not duplicated. Also added **`/define`** — a checkpoint-gated orchestrator chaining `/interview → /spec → /plan` (pausing for approval between phases, offering `/ideate` + `plan-roaster`) so an underspecified ask becomes a reviewed spec + task plan in one invoke; and wired the post-build pair as an **opt-in tail of `/parallel-ship`** (offers `/adr` + `/docs` once the verdict is READY TO MERGE). Ordering enforces dependencies: spec precedes plan, adr/docs are post-build. Opt-in only — `/parallel-build` unchanged. Routing wired in `hooks/craftkit-routing.js` (drift guard) + orchestrator table, tiebreaker, and discovery tree in `using-agent-skills.md`. |
 | `v1.13.0` | 2026-07-21 | **Token diet for long/subagent-heavy sessions** — no behavior change. (1) Slimmed `hooks/craftkit-routing.js` (~2.3KB→~1.2KB, injected on *every* prompt): dropped the prose that duplicated the always-on routing table, kept the terse gate + the full skill roster (still required by the drift guard) + a pointer to `rules/using-agent-skills.md`. (2) Removed the **Skill authoring rules** detail from the synced always-on `using-agent-skills.md` — relocated to this repo's own `CLAUDE.md` ("Critical authoring rules"), which loads only when editing craftkit source, i.e. exactly when needed. Trims ~2KB from every global session baseline. (3) Compressed the **Model routing** escalation/fusion-panel *process* prose in place (kept triggers + tier table always-on — escalation is global runtime behavior with no reliable on-demand home). Net: lighter per-prompt injection + lighter per-session baseline, no routing/escalation semantics changed. |
 | `v1.12.0` | 2026-07-20 | Added **`/think`** skill — curated systems/strategy reasoning router from [tjboudreaux/cc-thinking-skills](https://github.com/tjboudreaux/cc-thinking-skills) (MIT). Six gap-filling frameworks (cynefin, systems, feedback loops, theory-of-constraints, leverage points, second-order) for architecture and complex-system decisions. Deliberately **not** the full 39-skill set — the ~12 overlapping models (first-principles, inversion, red-team, via-negativa, five-whys, …) route to existing `/ideate`, `ponytail`, `adversarial`, `/debug` instead of duplicating them. One routing entry, not seven. Also added a **routing drift guard** to `sync.sh`: every skill in `skills/` must be named in `hooks/craftkit-routing.js` or the sync fails loud — closes the silent-drift seam where a new skill's routing wiring is forgotten (curated orchestrator/native tables stay hand-authored). |
