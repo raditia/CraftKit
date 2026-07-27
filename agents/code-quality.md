@@ -12,7 +12,7 @@ Review the provided diff across five axes:
 
 **1. Correctness** — matches spec? edge cases handled (null, empty, boundaries)? off-by-one, race conditions, state inconsistencies?
 
-**2. Readability** — names descriptive? control flow clear? no nested ternaries (> 1 level)? no dead code?
+**2. Readability** — names descriptive? control flow clear? no nested ternaries (> 1 level)? no dead code? No comment noise — flag comments that restate code, section banners, step-number comments, or JSDoc on self-descriptive functions. Comments earn their place only when the *why* is non-obvious.
 
 **3. Architecture (EVPMR)**
 - View: only calls `usePresenter*()` and renders. Flag `useState`, `useEffect`, API calls.

@@ -48,6 +48,19 @@ Rules:
 - If you wrote 200 lines and it could be 50, rewrite it.
 - Deletion over addition. Boring over clever. Fewest files possible.
 
+**Comment discipline — code explains itself, comments are the exception.** Do not narrate. Write a comment only when it earns its place:
+- The *why* is non-obvious (a workaround, a spec quirk, a deliberate `ponytail:` ceiling).
+- A subtle gotcha a reader would otherwise trip on.
+
+Never add:
+- Restatement of the code (`// set loading to true` above `setLoading(true)`).
+- Section banners / dividers (`// ---- handlers ----`), step numbers (`// 1.`, `// Step 2`).
+- JSDoc on self-descriptive functions where names + types already say it.
+- Comments on obvious JSX, imports, type fields, or one-line getters.
+- Placeholder chatter (`// TODO`, `// added by`, `// this function does X`) unless asked.
+
+Match the file's existing comment density — if the surrounding code has none, add none. When editing, don't leave behind comments describing what you changed; the diff is the record. If a comment is needed to understand a line, first ask whether a clearer name or smaller function removes the need.
+
 Ask: "Would a senior engineer say 'why didn't you just…'?" If yes, simplify.
 
 **Deliberate shortcuts:** when you knowingly pick a simpler approach with a known ceiling (global lock, O(n²) scan, naive heuristic), mark it with a `ponytail:` comment naming the ceiling and upgrade path:
