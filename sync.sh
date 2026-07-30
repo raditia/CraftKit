@@ -213,13 +213,24 @@ sync_agents_adapter() {
 
     for agent in "${current_agents[@]+"${current_agents[@]}"}"; do
         local source_file="$AGENTS_DIR/${agent}.md"
-        local dest
+        local dest cmp_src cmp_tmp=""
         dest="$("get_${adapter}_agent_dest" "$agent")"
-        if [[ ! -f "$dest" ]] || ! diff -q "$source_file" "$dest" &>/dev/null; then
+        cmp_src="$source_file"
+        # An adapter may transform agents on install (e.g. Claude splices craftkitInject
+        # rules). If it declares effective_<adapter>_agent_source, diff against the rendered
+        # output so the skip-unchanged check stays honest instead of re-syncing every run.
+        if declare -f "effective_${adapter}_agent_source" >/dev/null 2>&1; then
+            cmp_src="$("effective_${adapter}_agent_source" "$agent" "$source_file")"
+            cmp_tmp="$cmp_src"
+        fi
+        if [[ ! -f "$dest" ]] || ! diff -q "$cmp_src" "$dest" &>/dev/null; then
             echo "    + agent: $agent"
             "install_${adapter}_agent" "$agent" "$source_file"
             changed=1
         fi
+        # Guard: only remove a genuine temp, never the source (a future adapter whose
+        # effective_ hook returns the real source path must not self-destruct).
+        [[ -n "$cmp_tmp" && "$cmp_tmp" != "$source_file" ]] && rm -f "$cmp_tmp"
     done
 
     [[ $changed -eq 0 ]] && echo "    agents: (up to date)"
