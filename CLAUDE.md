@@ -52,12 +52,17 @@ After all adapters, `finalize_<adapter>` runs if defined (Claude uses it to rebu
 
 Each `adapters/<tool>.sh` implements a fixed set of function names that `sync.sh` calls by string interpolation (`"install_${adapter}_skill"`). To add a tool, implement: `get_<a>_dest`, `install_<a>_skill`, `uninstall_<a>_skill`, and the `_rule` / `_command` / `_agent` variants, plus an optional `finalize_<a>`. Add the tool name to the `ADAPTERS` array.
 
+**Agents are Claude-only.** Only `adapters/claude.sh` defines `install_<a>_agent` — the other five tools have no cold sub-agent concept, so `sync.sh` skips the agent pass for them (guarded on `declare -f install_${adapter}_agent`). Agent-related contract functions are therefore Claude-specific in practice.
+
+**Optional `effective_<a>_agent_source` hook.** An adapter that *transforms* an agent on install (rather than plain-copying) can define `effective_<a>_agent_source <name> <source>` returning a path to the rendered output. `sync_agents_adapter` diffs the dest against that rendered file (and removes it after) instead of the raw source — so the skip-unchanged check stays honest and a transformed agent doesn't re-sync every run. Only Claude defines it today (for `craftkitInject`).
+
 **Managed-block pattern (Claude, Gemini, Codex, Crush):** rules are concatenated into a delimited block (`<!-- BEGIN AGENTIC-SKILLS ... END -->`) inside a shared file like `~/.claude/CLAUDE.md`, edited in place with a Python regex sub. Everything outside the markers is the user's own content and must be preserved. `claude.sh:_rebuild_claude_md` / `_remove_claude_md_section` are the reference implementation.
 
 **Claude specifics (`adapters/claude.sh`):**
 - Rules → managed block in `~/.claude/CLAUDE.md`. Commands → `~/.claude/commands/<name>.md`. Agents → `~/.claude/agents/<name>.md`.
 - A skill that flips between rule and command (via `alwaysApply`) is migrated: installing as a rule removes the stale command file and vice-versa.
 - `install_claude_craftkit_hook` copies `hooks/craftkit-routing.js` to `~/.claude/hooks/` and registers it as a `UserPromptSubmit` hook in `~/.claude/settings.json` (idempotent — checks for `craftkit-routing` substring before appending).
+- **`craftkitInject` — live rule injection into cold agents.** An agent whose frontmatter has `craftkitInject: ruleA, ruleB` gets the bodies of `rules/ruleA.md ...` (frontmatter stripped) spliced in as a managed block (`<!-- BEGIN CRAFTKIT-INJECTED-RULES ... END -->`) right after its own frontmatter, at install time. This is the escape hatch for the cold-copy problem below: the agent carries the *live* rule text, regenerated on every sync, instead of a hand-maintained duplicate. Reference impl: `claude.sh:_claude_render_agent` (+ `_claude_agent_inject_list`, `_claude_strip_frontmatter`, `effective_claude_agent_source`). A missing rule name warns to stderr and is skipped; no opt-in field → plain copy. `agents/fe-review.md` is the reference consumer. Runtime injection via a `SubagentStart` hook is **not** possible — that event is display-only and cannot add `additionalContext` to a subagent; sync-time splicing is the only mechanism.
 
 ### Routing hook
 
@@ -82,7 +87,7 @@ This is the canonical home for the authoring checklist — it is **repo-local on
 1. **Conflict check first.** Scan `rules/`, `skills/`, `commands/`, `agents/` for duplicate concepts, duplicate slash commands, or contradicting rules before writing. Surface conflicts — never silently merge.
 2. **Token audit.** Every line must earn its place. Content already in an always-active rule must not be repeated in a skill — reference it instead.
 3. **README sync is mandatory.** Adding/removing/renaming any rule, skill, command, or agent requires updating the matching table in `README.md` in the same change. Renaming an agent also means updating every `subagent_type:` reference in `commands/`.
-4. **Agents are cold copies.** Agent system prompts don't inherit `rules/`. If an agent duplicates rule content (e.g. EVPMR constraints), updating the rule means manually updating the agent file too.
+4. **Agents are cold copies.** Agent system prompts don't inherit `rules/`. If an agent duplicates rule content (e.g. EVPMR constraints), updating the rule means manually updating the agent file too — **unless** it opts into `craftkitInject:` (Claude adapter), which splices the live rule body in at sync time. Prefer `craftkitInject` over hand-copying rule text into a new agent. Hooks can't fix this at runtime (`SubagentStart` is display-only).
 5. **Skill naming = implicit namespace.** The skill's directory basename *is* its slash command (`skills/think/` → `/think`), so the name carries the grouping — there are no subfolders (see Conventions). Platform-scoped skills are prefixed with their platform (`fe-*`, `android-*`, `ios-*`); a **cross-cutting / general skill takes no prefix** (`code-quality`, `debug`, `ideate`, `think`, `ponytail-*`). Pick the name by this rule: platform work → prefix it; general reasoning/quality skill → bare name.
 
 ### Conflict check — what to scan for

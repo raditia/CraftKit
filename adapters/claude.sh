@@ -13,6 +13,8 @@ CLAUDE_MD="$HOME/.claude/CLAUDE.md"
 _CRAFTKIT_HOOK_SCRIPT="craftkit-routing.js"
 _CLAUDE_SECTION_START="<!-- BEGIN AGENTIC-SKILLS (managed — do not edit manually) -->"
 _CLAUDE_SECTION_END="<!-- END AGENTIC-SKILLS -->"
+_CLAUDE_AGENT_RULES_START="<!-- BEGIN CRAFTKIT-INJECTED-RULES (managed — regenerated on sync from rules/) -->"
+_CLAUDE_AGENT_RULES_END="<!-- END CRAFTKIT-INJECTED-RULES -->"
 
 # Returns 0 if the skill's SKILL.md has alwaysApply: true
 _claude_is_rule() {
@@ -281,11 +283,82 @@ get_claude_agent_dest() {
     echo "$CLAUDE_AGENTS_DIR/${1}.md"
 }
 
+# Reads the comma-separated rule names from an agent's `craftkitInject:` frontmatter
+# line (only inside the leading --- block). Empty output = no injection requested.
+_claude_agent_inject_list() {
+    awk '
+        NR==1 && $0=="---" { infm=1; next }
+        infm && $0=="---" { exit }
+        infm && /^craftkitInject:/ { sub(/^craftkitInject:[[:space:]]*/, ""); print; exit }
+    ' "$1"
+}
+
+# Prints a markdown file with its leading YAML frontmatter stripped.
+_claude_strip_frontmatter() {
+    awk '
+        NR==1 && $0=="---" { infm=1; next }
+        infm && $0=="---" { infm=0; next }
+        !infm { print }
+    ' "$1"
+}
+
+# Renders an agent source file into $out. If the agent opts in via
+# `craftkitInject: ruleA, ruleB`, the bodies of rules/<ruleA>.md ... are spliced
+# in as a managed block right after the agent's frontmatter — so cold agents
+# carry the live rule text instead of a hand-maintained copy. No opt-in → plain copy.
+_claude_render_agent() {
+    local src="$1" out="$2"
+    local list
+    list="$(_claude_agent_inject_list "$src")"
+    if [[ -z "$list" ]]; then
+        cp "$src" "$out"
+        return
+    fi
+
+    local block
+    block="$(mktemp)"
+    {
+        echo "$_CLAUDE_AGENT_RULES_START"
+        echo "$list" | tr ',' '\n' | while IFS= read -r r; do
+            r="$(echo "$r" | tr -d '[:space:]')"
+            [[ -z "$r" ]] && continue
+            local rf="$RULES_DIR/${r}.md"
+            if [[ -f "$rf" ]]; then
+                echo ""
+                _claude_strip_frontmatter "$rf"
+            else
+                echo "    ! craftkitInject: rule '$r' not found in rules/ — skipped" >&2
+            fi
+        done
+        echo ""
+        echo "$_CLAUDE_AGENT_RULES_END"
+    } > "$block"
+
+    awk -v blockfile="$block" '
+        BEGIN { while ((getline line < blockfile) > 0) blk = blk line "\n" }
+        NR==1 && $0=="---" { infm=1; print; next }
+        infm && $0=="---" { print; printf "\n%s", blk; infm=0; next }
+        { print }
+    ' "$src" > "$out"
+    rm -f "$block"
+}
+
+# Optional currency hook used by sync.sh's agent loop: renders the agent to a temp
+# file so the diff-skip check compares dest against the *rendered* output, not the
+# raw source. sync.sh removes the returned temp file after diffing.
+effective_claude_agent_source() {
+    local source_file="$2"
+    local tmp
+    tmp="$(mktemp)"
+    _claude_render_agent "$source_file" "$tmp"
+    echo "$tmp"
+}
+
 install_claude_agent() {
     local name="$1"
     local source_file="$2"
     mkdir -p "$CLAUDE_AGENTS_DIR"
-    cp "$source_file" "$CLAUDE_AGENTS_DIR/${name}.md"
+    _claude_render_agent "$source_file" "$CLAUDE_AGENTS_DIR/${name}.md"
 }
 
 uninstall_claude_agent() {
