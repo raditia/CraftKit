@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `rtk grep "pattern" .`, `rtk git status`, `rtk tsc`, `rtk jest`
-**Model:** cheapest — `claude-haiku-4-5` (Claude), `gemini-2.5-flash` (Gemini), `gpt-4o-mini` (Copilot/Cursor). Escalate to everyday after 2 failed hypotheses with no clear root cause.
+**Model:** cheapest tier (see the plan-aware Model routing table in `using-agent-skills`). Escalate to everyday after 2 failed hypotheses with no clear root cause.
 
 ---
 

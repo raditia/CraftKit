@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `git diff`, `git log`, `git status`, `swiftlint lint --path <file>`
-**Model:** cheapest — `claude-haiku-4-5`. Escalate to everyday if the diff spans > 8 files across multiple modules with cross-module coordinator changes.
+**Model:** cheapest tier (see the plan-aware Model routing table in `using-agent-skills`). Escalate to everyday if the diff spans > 8 files across multiple modules with cross-module coordinator changes.
 
 ---
 

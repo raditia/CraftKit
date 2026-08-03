@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `grep -rn "contentDescription\|semantics" <feature>/src`, `./gradlew :<module>:lintGeneralDebug`
-**Model:** cheapest — `claude-haiku-4-5`. Escalate to everyday for complex focus flows spanning multiple screens.
+**Model:** cheapest tier (see the plan-aware Model routing table in `using-agent-skills`). Escalate to everyday for complex focus flows spanning multiple screens.
 
 ---
 

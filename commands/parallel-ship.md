@@ -74,6 +74,17 @@ CONTEXT:
 <docs/context.md Summary + Key Changes>
 ```
 
+**Agent: ponytail-review** (`subagent_type: "ponytail-review"`) — _include whenever non-test, non-resource source changed_
+
+Pass as user message:
+```
+DIFF:
+<full diff>
+
+CONTEXT:
+<docs/context.md Summary + Key Changes>
+```
+
 **Agent: fe-review** (`subagent_type: "fe-review"`)
 
 Pass as user message:

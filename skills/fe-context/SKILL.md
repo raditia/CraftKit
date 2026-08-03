@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `rtk git diff`, `rtk git log`, `rtk git status`, `rtk ls .`
-**Model:** cheapest — `claude-haiku-4-5` (Claude), `gemini-2.5-flash` (Gemini), `gpt-4o-mini` (Copilot/Cursor). Escalate to everyday if diff spans > 10 files with complex interdependencies.
+**Model:** cheapest tier (see the plan-aware Model routing table in `using-agent-skills`). Escalate to everyday if diff spans > 10 files with complex interdependencies.
 
 ---
 

@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `git diff`, `git log`, `git status`, `./gradlew :<module>:lintGeneralDebug`
-**Model:** cheapest — `claude-haiku-4-5`. Escalate to everyday if the diff spans multiple feature modules with cross-feature `-api`/navigator changes.
+**Model:** cheapest tier (see the plan-aware Model routing table in `using-agent-skills`). Escalate to everyday if the diff spans multiple feature modules with cross-feature `-api`/navigator changes.
 
 ---
 

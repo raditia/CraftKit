@@ -14,8 +14,8 @@ const path = require('path');
 // non-Gmail personal accounts, personal as the safe default on any read/parse failure.
 // See rules/using-agent-skills.md → "Model routing" for the full tier table.
 function detectModelTier() {
-  const PERSONAL = { label: 'personal', everyday: 'claude-sonnet-5', escalate: 'claude-opus-4-8' };
-  const ENTERPRISE = { label: 'enterprise', everyday: 'claude-opus-4-8', escalate: 'claude-fable-5' };
+  const PERSONAL = { label: 'personal', cheapest: 'claude-haiku-4-5', everyday: 'claude-sonnet-5', escalate: 'claude-opus-4-8' };
+  const ENTERPRISE = { label: 'enterprise', cheapest: 'claude-sonnet-5', everyday: 'claude-opus-4-8', escalate: 'claude-fable-5' };
   try {
     const cfg = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude.json'), 'utf8'));
     const oa = cfg.oauthAccount || {};
@@ -44,7 +44,7 @@ process.stdin.on('end', () => {
         "Android (*.kt/*.java, MVP): /android-patterns /android-scaffold /android-review /android-test /android-a11y /android-performance /android-context\n" +
         "iOS (*.swift/*.m, MVVM-C): /ios-patterns /ios-scaffold /ios-review /ios-test /ios-a11y /ios-performance /ios-context\n" +
         "Native build/fix/ship/pr-message platform-route via the shared orchestrators (no EVPMR, no docs/context.md for single native screens).\n\n" +
-        `Model tier (detected from ~/.claude.json): ${tier.label} — everyday=${tier.everyday}, escalate=${tier.escalate}. Use these for Claude Code rows in the Model routing table in rules/using-agent-skills.md.`
+        `Model tier (detected from ~/.claude.json): ${tier.label} — cheapest=${tier.cheapest}, everyday=${tier.everyday}, escalate=${tier.escalate}. Use these for Claude Code rows in the Model routing table in rules/using-agent-skills.md.`
     }
   }));
 });

@@ -69,6 +69,7 @@ Additional build-specific rules:
 
 | What was built | Add to agent set |
 |----------------|-----------------|
+| Any non-test, non-resource source | `ponytail-review` (over-engineering — fresh builds accrete speculative abstraction) |
 | View with form inputs or interactive elements | `fe-a11y` |
 | Presenter with data fetching or complex state | `fe-performance` |
 | New component used in navigation | `fe-a11y` |
@@ -96,6 +97,17 @@ CONTEXT:
 ```
 
 **Agent: fe-patterns** (`subagent_type: "fe-patterns"`)
+
+Pass as user message:
+```
+FILES:
+<content of all newly created/modified files>
+
+CONTEXT:
+<docs/context.md full content>
+```
+
+**Agent: ponytail-review** (`subagent_type: "ponytail-review"`) — _include whenever non-test, non-resource source built_
 
 Pass as user message:
 ```

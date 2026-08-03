@@ -144,6 +144,8 @@ For each changed file, read enough of its actual content to confirm what layer i
 
 Dedup the set. Always include `code-quality` if any non-test, non-resource code changed.
 
+> `parallel-build` and `parallel-ship` additionally include `ponytail-review` (over-engineering axis) for any non-test, non-resource change — defined in those command files, not this base table (see extensions note below). It overlaps `code-quality` only on `delete:`/dead-code; a same-`file:line` hit becomes `[CONSENSUS]` in synthesis, which is the dedup, not waste.
+
 > **Command-specific extensions:** `parallel-build` and `parallel-ship` add agents beyond this base table (e.g. `fe-patterns`, `fe-performance`). Those additions are defined in the command file itself, not here — this table is the shared base.
 
 ### Step 3 — Flag conditions
@@ -346,13 +348,15 @@ Use the everyday model by default. Escalate inline when you detect genuine uncer
 
 **Claude Code row is plan-aware.** `hooks/craftkit-routing.js` reads `~/.claude.json` → `oauthAccount` every turn and injects the detected tier as `additionalContext` (`Model tier (detected): ...`). Use the tier from that context when present — it overrides the static row below. Detection: Gmail-domain account → personal; else `organizationType` containing "enterprise" → enterprise; anything unreadable/unrecognized → personal (safe default).
 
-| AI | Plan | Everyday | Escalate | Fusion panel |
-|---|---|---|---|---|
-| Claude Code | personal (Pro, Gmail login) | `claude-sonnet-5` | `claude-opus-4-8` | 2× `claude-opus-4-8` → opus judge |
-| Claude Code | enterprise | `claude-opus-4-8` | `claude-fable-5` | 2× `claude-fable-5` → fable judge |
-| Gemini CLI | — | `gemini-2.5-flash` | `gemini-2.5-pro` | 2× `gemini-2.5-pro` → pro judge |
-| Cursor | — | claude-sonnet / gpt-4o | claude-opus / o1 | 2× claude-opus → opus judge |
-| Copilot | — | `claude-sonnet-5` | `claude-opus-4-8` | 2× `claude-opus-4-8` → opus judge |
+| AI | Plan | Cheapest | Everyday | Escalate | Fusion panel |
+|---|---|---|---|---|---|
+| Claude Code | personal (Pro, Gmail login) | `claude-haiku-4-5` | `claude-sonnet-5` | `claude-opus-4-8` | 2× `claude-opus-4-8` → opus judge |
+| Claude Code | enterprise | `claude-sonnet-5` | `claude-opus-4-8` | `claude-fable-5` | 2× `claude-fable-5` → fable judge |
+| Gemini CLI | — | `gemini-2.5-flash` | `gemini-2.5-flash` | `gemini-2.5-pro` | 2× `gemini-2.5-pro` → pro judge |
+| Cursor | — | `gpt-4o-mini` | claude-sonnet / gpt-4o | claude-opus / o1 | 2× claude-opus → opus judge |
+| Copilot | — | `gpt-4o-mini` | `claude-sonnet-5` | `claude-opus-4-8` | 2× `claude-opus-4-8` → opus judge |
+
+Cheapest = the floor for pure pattern-matching/extraction skills (scaffold, context, a11y, ponytail-*, debug's first pass). On enterprise the floor is `claude-sonnet-5`, not haiku — cold review **agents** (`agents/*.md`) also pin to `sonnet` for this reason (static frontmatter can't branch on plan, so sonnet is the value valid on both plans).
 
 ### Escalation triggers → single escalate-tier model
 - Architecture decision with significant, non-obvious tradeoffs

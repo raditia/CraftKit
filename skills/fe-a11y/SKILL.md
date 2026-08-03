@@ -6,7 +6,7 @@ alwaysApply: false
 
 **Context:** `docs/context.md` → Summary + Key Changes only
 **Commands:** `rtk tsc`, `rtk lint`
-**Model:** cheapest — `claude-haiku-4-5` (Claude). Escalate to everyday for complex focus flows spanning multiple routes
+**Model:** cheapest tier (see the plan-aware Model routing table in `using-agent-skills`). Escalate to everyday for complex focus flows spanning multiple routes
 
 ---
 

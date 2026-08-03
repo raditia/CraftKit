@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `rtk ls .`, `rtk grep "pattern" .`, `rtk git status`, `rtk tsc`, `rtk jest`
-**Model:** cheapest — `claude-haiku-4-5` (Claude). Escalate to everyday if feature requires novel architecture not covered by EVPMR
+**Model:** cheapest tier (see the plan-aware Model routing table in `using-agent-skills`). Escalate to everyday if feature requires novel architecture not covered by EVPMR
 
 ---
 

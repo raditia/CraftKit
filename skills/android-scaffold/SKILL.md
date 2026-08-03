@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `ls <feature>/src/main/java/.../<screen>`, `grep -rn "pattern" <feature>/src`, `./gradlew :<feature>:lintGeneralDebug`
-**Model:** cheapest — `claude-haiku-4-5`. Escalate to everyday if the screen needs state/effect orchestration not covered by the Core MVP contract
+**Model:** cheapest tier (see the plan-aware Model routing table in `using-agent-skills`). Escalate to everyday if the screen needs state/effect orchestration not covered by the Core MVP contract
 
 ---
 

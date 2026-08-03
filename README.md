@@ -1,4 +1,4 @@
-# craftkit `v1.15.0`
+# craftkit `v1.16.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **GitHub Copilot**, **Gemini CLI**, **Codex CLI**, and **Crush**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
@@ -147,52 +147,40 @@ bash ~/craftkit/scripts/init-copilot-agents.sh
 
 ## How it works
 
-Every `git pull` triggers a sync that installs rules and skills into each AI tool:
+Every `git pull` triggers a sync that installs rules, skills, commands, and agents into each AI tool:
 
-```
-git pull
-   │
-   └─► post-merge hook
-           │
-           └─► sync.sh
-                   │
-                   ├─► RTK + Caveman          (token compression tools)
-                   ├─► rules/*.md             → always-on rules (every session)
-                   ├─► skills/*/SKILL.md      → on-demand slash commands
-                   └─► commands/*.md          → on-demand workflow orchestrators
+```mermaid
+flowchart TD
+    A[git pull] --> B[post-merge hook]
+    B --> C[sync.sh]
+    C --> T["RTK + Caveman\ntoken-compression tools"]
+    C --> R["rules/*.md\nalways-on · every session"]
+    C --> S["skills/*/SKILL.md\non-demand slash commands"]
+    C --> M["commands/*.md\nworkflow orchestrators"]
+    C --> G["agents/*.md\ncold sub-agents · Claude only"]
 ```
 
-Three namespaces, one source of truth:
+Four namespaces, one source of truth:
 
 | Directory | Loaded | Invoked |
 |-----------|--------|---------|
 | `rules/` | Every session, automatically | Never — always present |
 | `skills/` | On demand | Slash command or natural language |
 | `commands/` | On demand | Slash command or natural language |
+| `agents/` | Spawned by an orchestrator | `subagent_type:` — never directly (Claude only) |
 
 ### Where files land per AI tool
 
-```
-rules/  →  ALWAYS-ON
-┌──────────────┬────────────────────────────────────────────────────┐
-│ Claude Code  │ ~/.claude/CLAUDE.md           (managed block)      │
-│ Cursor       │ ~/.cursor/rules/*.mdc         (alwaysApply)        │
-│ Copilot      │ codeGeneration.instructions                        │
-│ Gemini CLI   │ ~/GEMINI.md                   (managed block)      │
-│ Codex CLI    │ ~/.codex/AGENTS.md            (managed block)      │
-│ Crush        │ ~/.config/crush/CRUSH.md      (managed block)      │
-└──────────────┴────────────────────────────────────────────────────┘
+| Tool | Always-on (`rules/`) | On-demand (`skills/` + `commands/`) | Agents (`agents/`) |
+|------|----------------------|--------------------------------------|--------------------|
+| Claude Code | `~/.claude/CLAUDE.md` (managed block) | `~/.claude/commands/<name>.md` → `/<name>` | `~/.claude/agents/<name>.md` |
+| Cursor | `~/.cursor/rules/*.mdc` (alwaysApply) | `~/.cursor/rules/*.mdc` (alwaysApply:false) | — |
+| Copilot | `codeGeneration.instructions` | `codeGeneration.instructions` | — |
+| Gemini CLI | `~/GEMINI.md` (managed block) | `~/GEMINI.md` (managed block) | — |
+| Codex CLI | `~/.codex/AGENTS.md` (managed block) | `~/.codex/AGENTS.md` (managed block) | — |
+| Crush | `~/.config/crush/CRUSH.md` (managed block) | `~/.config/crush/skills/<name>.md` → command | — |
 
-skills/ and commands/  →  ON-DEMAND
-┌──────────────┬────────────────────────────────────────────────────┐
-│ Claude Code  │ ~/.claude/commands/<name>.md  → /<name>            │
-│ Cursor       │ ~/.cursor/rules/*.mdc         (alwaysApply:false)  │
-│ Copilot      │ codeGeneration.instructions                        │
-│ Gemini CLI   │ ~/GEMINI.md                   (managed block)      │
-│ Codex CLI    │ ~/.codex/AGENTS.md            (managed block)      │
-│ Crush        │ ~/.config/crush/skills/<name>.md → command         │
-└──────────────┴────────────────────────────────────────────────────┘
-```
+Agents are Claude-only — the other five tools have no cold sub-agent concept, so `sync.sh` skips the agent pass for them.
 
 ---
 
@@ -240,7 +228,7 @@ flowchart TD
 flowchart TD
     A[/parallel-ship/] --> B["Phase 1 — parallel fast gates\ntsc ‖ lint ‖ test + coverage\n≥93% Lines · Branches · Functions · Statements"]
     B -->|all pass ✓| C[Classify diff]
-    C --> D["Phase 2 — parallel LLM agents\ncode-quality ‖ fe-review ‖ fe-performance?\n‖ fe-a11y? ‖ adversarial?\nselected by classifier"]
+    C --> D["Phase 2 — parallel LLM agents\ncode-quality ‖ ponytail-review ‖ fe-review\n‖ fe-performance? ‖ fe-a11y? ‖ adversarial?\nselected by classifier"]
     D --> E[Synthesize]
     E --> F{Errors?}
     F -->|none| G[READY TO MERGE]
@@ -259,7 +247,7 @@ flowchart TD
     C --> D["Implement\nguided by fe-patterns + fe-performance"]
     D --> E["Phase 3 — parallel fast gates\ntsc ‖ lint"]
     E -->|all pass ✓| F["Classify what was built\nread actual file content · select agents"]
-    F --> G["Phase 5 — parallel LLM agents\nfe-review ‖ fe-patterns ‖ fe-a11y?\n‖ fe-performance? ‖ adversarial?\nselected by classifier"]
+    F --> G["Phase 5 — parallel LLM agents\nfe-review ‖ fe-patterns ‖ ponytail-review\n‖ fe-a11y? ‖ fe-performance? ‖ adversarial?\nselected by classifier"]
     G -->|no ERROR| H["fe-test\nsequential · write tests · enforce ≥93%"]
     H --> I[DONE]
     E -->|any fail ✗| J[BLOCKED — fix gates first]
@@ -279,6 +267,7 @@ View*.tsx                           →   code-quality + fe-review + fe-a11y
 Presenter*.ts                       →   code-quality + fe-review
 Model*.ts                           →   code-quality (type/correctness focus)
 Entry*.tsx or Resource*.ts          →   fe-review
+any non-test src + build/ship       →   + ponytail-review (over-engineering)
 View or Presenter + /parallel-ship  →   + fe-performance
 3+ EVPMR layers changed             →   + adversarial (devil's advocate)
 auth / payment / credential paths   →   code-quality (security emphasis)
@@ -508,6 +497,7 @@ Auto-synced to `~/.claude/agents/` on `git pull` (Claude Code only).
 | [`fe-a11y`](agents/fe-a11y.md) | Accessibility: labels, roles, focus, announcements, reduced motion | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
 | [`fe-patterns`](agents/fe-patterns.md) | Composition patterns, hooks discipline, state location | `parallel-build` | sonnet |
 | [`fe-performance`](agents/fe-performance.md) | Waterfalls, bundle size, re-renders, server-side, RN patterns | `parallel-build`, `parallel-ship` | sonnet |
+| [`ponytail-review`](agents/ponytail-review.md) | Over-engineering: reinvented stdlib, speculative abstraction, dead flexibility (complexity only) | `parallel-build`, `parallel-ship` | sonnet |
 | [`adversarial`](agents/adversarial.md) | Devil's advocate — strongest case against merging/shipping | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
 | [`plan-roaster`](agents/plan-roaster.md) | Stress-test a plan before implementation — weakest assumption + failure modes | On demand | sonnet |
 
@@ -688,6 +678,7 @@ External tools and inspirations bundled or adopted into this repo.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| `v1.16.0` | 2026-08-03 | **Automatic over-engineering guard + cheapest-tier reconcile.** New cold agent **`ponytail-review`** (`agents/ponytail-review.md`, `craftkitInject: karpathy-guidelines`, `model: sonnet`) — spawned by `/parallel-build` (Phase 5) and `/parallel-ship` (Phase 2) whenever non-test, non-resource source changes, so bloat (reinvented stdlib, speculative abstraction, dead flexibility) gets caught without a manual `/ponytail-review`. `/fix` gained an inline bloat check on the fix diff. Overlaps `code-quality` only on dead-code (→ `[CONSENSUS]` in synthesis, not waste); `parallel-review` deliberately excluded. Injection (not invocation) is how the discipline reaches cold agents — write-time reach for any future cold *writing* agent is the same `craftkitInject` hook. Also reconciled the plan-blind `cheapest — claude-haiku-4-5` label across 13 skills: the **Model routing** table gains a **Cheapest** column (personal `claude-haiku-4-5` / enterprise `claude-sonnet-5`), skills now reference the table instead of hardcoding haiku, and `hooks/craftkit-routing.js` injects the detected `cheapest=` alongside everyday/escalate. Enterprise floor is `claude-sonnet-5`, matching the sonnet pin on all cold agents (static frontmatter can't branch on plan). |
 | `v1.15.0` | 2026-07-25 | **Plan-aware model routing for Claude Code.** `hooks/craftkit-routing.js` now reads `~/.claude.json` → `oauthAccount` on every prompt and detects account tier: Gmail-domain login → personal (everyday `claude-sonnet-5`, escalate `claude-opus-4-8`), `organizationType` containing "enterprise" → enterprise (everyday `claude-opus-4-8`, escalate `claude-fable-5`), anything unreadable/unrecognized → personal (safe default). Detected tier is injected as `additionalContext` each turn. `rules/using-agent-skills.md` **Model routing** table gains a Plan column and generalizes the escalation/fusion-panel process prose to reference "the tier's Escalate model" instead of a hardcoded `claude-opus-4-8`. README **Model routing** section synced to match. |
 | `v1.14.0` | 2026-07-23 | Added the **Define → Plan → Document** layer — five opt-in general skills adapted from [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) (MIT), filling the repo's forward-planning gap (it was strong on execution + reasoning but had no spec/plan/discovery/docs step). **`/interview`** de-fuzzes an underspecified ask one question at a time to ~95% confidence; **`/spec`** writes a PRD (objective, scope, boundaries, acceptance); **`/plan`** breaks it into ordered verifiable tasks + deps and offers the existing `plan-roaster`; **`/adr`** records one decision (the *why*); **`/docs`** produces dual-audience docs (engineer + stakeholder) run through `/humanizer`. `/spec` `/plan` `/adr` write a delimited **PLANNING** block into `docs/context.md` that `/fe-context` now preserves verbatim — so downstream skills execute with intent, not guesses. Overlap avoided: `idea-refine` maps to existing `/ideate`, so it was not duplicated. Also added **`/define`** — a checkpoint-gated orchestrator chaining `/interview → /spec → /plan` (pausing for approval between phases, offering `/ideate` + `plan-roaster`) so an underspecified ask becomes a reviewed spec + task plan in one invoke; and wired the post-build pair as an **opt-in tail of `/parallel-ship`** (offers `/adr` + `/docs` once the verdict is READY TO MERGE). Ordering enforces dependencies: spec precedes plan, adr/docs are post-build. Opt-in only — `/parallel-build` unchanged. Routing wired in `hooks/craftkit-routing.js` (drift guard) + orchestrator table, tiebreaker, and discovery tree in `using-agent-skills.md`. |
 | `v1.13.0` | 2026-07-21 | **Token diet for long/subagent-heavy sessions** — no behavior change. (1) Slimmed `hooks/craftkit-routing.js` (~2.3KB→~1.2KB, injected on *every* prompt): dropped the prose that duplicated the always-on routing table, kept the terse gate + the full skill roster (still required by the drift guard) + a pointer to `rules/using-agent-skills.md`. (2) Removed the **Skill authoring rules** detail from the synced always-on `using-agent-skills.md` — relocated to this repo's own `CLAUDE.md` ("Critical authoring rules"), which loads only when editing craftkit source, i.e. exactly when needed. Trims ~2KB from every global session baseline. (3) Compressed the **Model routing** escalation/fusion-panel *process* prose in place (kept triggers + tier table always-on — escalation is global runtime behavior with no reliable on-demand home). Net: lighter per-prompt injection + lighter per-session baseline, no routing/escalation semantics changed. |

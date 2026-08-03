@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `ls Modules/<Module>/<Module>/<Feature>`, `grep -rn "pattern" Modules`, `swiftlint lint --path <file>`
-**Model:** cheapest — `claude-haiku-4-5`. Escalate to everyday if the screen needs state/effect orchestration not covered by MVVM-C
+**Model:** cheapest tier (see the plan-aware Model routing table in `using-agent-skills`). Escalate to everyday if the screen needs state/effect orchestration not covered by MVVM-C
 
 ---
 
