@@ -68,6 +68,22 @@ Ask: "Would a senior engineer say 'why didn't you just…'?" If yes, simplify.
 // ponytail: linear scan over all items. ceiling: >10k rows gets slow. upgrade: add index when perf becomes issue.
 ```
 
+**Ponytail rubric — one list for writing and for reviewing.** `/ponytail-review`, `/ponytail-audit`, and the `ponytail-review` agent judge code by these five tags. Author under them, so review has nothing left to change:
+
+| Tag | Fails when |
+|-----|-----------|
+| `delete:` | Dead code, or flexibility nothing uses |
+| `stdlib:` | Hand-rolled logic the standard library already provides |
+| `native:` | Dependency doing what the platform natively offers |
+| `yagni:` | Abstraction with one implementation, or a single-caller layer |
+| `shrink:` | Same logic achievable in fewer lines |
+
+Protected — never counted as over-engineering by either side: validation at trust boundaries, error handling that prevents data loss, security and accessibility code, smoke tests / basic assertions, and anything already marked `ponytail:` (the marker is the contract).
+
+**Self-pass before reporting done.** Any turn that writes or edits code scans its own diff against those five tags before claiming completion. Each hit is cut now, or marked `ponytail:` with its ceiling. Report one line — `ponytail self-pass: clean` or `ponytail self-pass: cut <what>, marked <what>`. Bloat that reaches review unmarked is a defect in the write step, not a review finding.
+
+**Applying ponytail findings is deletion, not rewrite.** A finding names `file:line` plus a tag — act on exactly those lines: remove them, or swap in the named stdlib/native call. Never restructure surrounding code, rename, reorder, or tidy while in there. If a finding looks like it needs a rewrite, say so and stop; file churn costs more than the complexity does.
+
 **EVPMR corollary:** don't pre-split a View into sub-components until it exceeds ~80 lines. Don't pre-split a Presenter until it exceeds ~100 lines. Split when complex, not speculatively.
 
 ---

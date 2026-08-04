@@ -56,6 +56,11 @@ alwaysApply: false
 - [ ] `swiftlint lint --path <file>` on every changed Swift file — zero violations (config `.swiftlint.yml`).
 - [ ] No `// swiftlint:disable` without a documented reason on the same line.
 
+### Over-engineering
+
+- [ ] Diff scanned against the ponytail rubric (`karpathy-guidelines` rule 2) — `delete:` `stdlib:` `native:` `yagni:` `shrink:`, protected list respected. Common iOS hits: a protocol with one conformer and one call site, a Fetcher wrapper that only forwards, hand-rolled logic Foundation/Swift stdlib covers (`compactMap`, `first(where:)`, `Result`, `DateFormatter`), an `enum` state with a single case, a Dependency-struct field nothing reads.
+- [ ] Findings are applied as deletion at the named `file:line` — never a restructure of the surrounding ViewModel/VC.
+
 ### Tests
 
 - [ ] ViewModel changes have matching Quick/Nimble specs in `Modules/<Module>/Tests/<Feature>/` — see `/ios-test`.

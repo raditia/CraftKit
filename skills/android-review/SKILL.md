@@ -55,6 +55,11 @@ alwaysApply: false
 - [ ] `./gradlew :<module>:lintGeneralDebug` — zero new violations (custom rules on).
 - [ ] No `@Suppress`/`tools:ignore` without a documented reason.
 
+### Over-engineering
+
+- [ ] Diff scanned against the ponytail rubric (`karpathy-guidelines` rule 2) — `delete:` `stdlib:` `native:` `yagni:` `shrink:`, protected list respected. Common Android hits: a UseCase that only forwards to one Repository call, a hand-rolled mapper Kotlin stdlib covers (`map`/`associateBy`/`takeIf`), a `sealed class` state hierarchy with one subclass, an interface with one implementation and one caller.
+- [ ] Findings are applied as deletion at the named `file:line` — never a restructure of the surrounding Presenter/VM.
+
 ### Tests
 
 - [ ] Presenter changes have matching JUnit + MockK tests in `src/test/...` mirroring the source path — see `/android-test`.

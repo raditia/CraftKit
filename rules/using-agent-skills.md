@@ -257,8 +257,9 @@ Every skill has a verification step. "Seems right" is never sufficient — there
 
 1. **Lint** — `rtk pnpm deplint` — catches ESLint violations that block CI
 2. **Type check** — `rtk tsc --project tsconfig.json` — Jest uses babel and skips types; passing tests do not guarantee type-correctness
+3. **Ponytail self-pass** — scan your own diff against the ponytail rubric (`karpathy-guidelines` rule 2); cut each hit or mark it `ponytail:`. Catching bloat here is why a later `/ponytail-review` has nothing to rewrite
 
-Both must be clean. Common type misses: spread arg types (TS2556), missing required props (TS2322), incompatible types in mocks.
+All three must be clean. Common type misses: spread arg types (TS2556), missing required props (TS2322), incompatible types in mocks.
 
 ### 7. Use the model for judgment, not mechanics
 

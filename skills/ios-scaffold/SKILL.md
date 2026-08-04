@@ -177,6 +177,7 @@ Never hardcode display text in the View or VC.
 
 ## After generating
 
+- [ ] Ponytail self-pass — scan every generated file against the five tags in `karpathy-guidelines` rule 2; cut each hit or mark it `ponytail:`. Report `ponytail self-pass: clean` or what was cut/marked
 - [ ] `swiftlint lint --path <each-new-swift-file>` — zero violations (config: `.swiftlint.yml`)
 - [ ] New files sit in the correct folder so Bazel/CocoaPods globs pick them up — no `BUILD`/`podspec` edit needed unless you added a cross-module dependency
 - [ ] If you added a cross-module dep: update both `Modules/<Module>/BUILD` (`deps=[…]`) and `<Module>.podspec` (`s.dependency`)

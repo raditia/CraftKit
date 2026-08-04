@@ -20,21 +20,9 @@ User says: "review for over-engineering", "what can we delete", "is this over-en
 ## Process
 
 1. Read the diff or file(s) specified.
-2. Apply the decision ladder from `karpathy-guidelines` rule 2 — flag anything that fails an earlier rung.
+2. Apply the decision ladder + **ponytail rubric** from `karpathy-guidelines` rule 2 — the five tags (`delete:` `stdlib:` `native:` `yagni:` `shrink:`) and the protected list live there, always active. Flag anything that fails an earlier rung.
 3. Output one finding per line.
 4. End with net line estimate.
-
----
-
-## Finding tags
-
-| Tag | Meaning |
-|-----|---------|
-| `delete:` | Dead code or unused flexibility — no replacement needed |
-| `stdlib:` | Hand-rolled logic the standard library already provides |
-| `native:` | Dependency doing what the platform natively offers |
-| `yagni:` | Abstraction with single implementation or single-caller layer |
-| `shrink:` | Same logic achievable in fewer lines |
 
 ---
 
@@ -55,9 +43,6 @@ If nothing to cut: `Lean already. Ship.`
 
 ## Boundaries
 
-Never flag:
-- Input validation at trust boundaries
-- Error handling that prevents data loss
-- Security or accessibility code
-- `ponytail:` marked shortcuts (already acknowledged)
-- Smoke tests / basic assertions
+Protected code is listed in the ponytail rubric (`karpathy-guidelines` rule 2) — never flag it.
+
+Findings are applied as **deletion, not rewrite**: act on the named `file:line` only. A finding that appears to need a restructure gets said out loud and left alone.

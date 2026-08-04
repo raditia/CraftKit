@@ -35,7 +35,7 @@ Follow the `/fe-scaffold` workflow — surface assumptions first, create the 5-f
 
 Build the feature. Apply `/fe-patterns` and `/fe-performance` continuously as you build — not as a post-pass. `fe-rules` (always active) enforces layer constraints throughout.
 
-**Gate:** `rtk tsc --noEmit` passes after every logical chunk.
+**Gate:** `rtk tsc --noEmit` passes after every logical chunk, and the ponytail self-pass (`karpathy-guidelines` rule 2) runs on the built files before Phase 3 — cut or mark `ponytail:` now, while the code is still yours. The `ponytail-review` agent in Phase 5 is the backstop, not the first pass; findings there mean this gate was skipped.
 
 ---
 
@@ -177,6 +177,7 @@ Run the `/fe-test` workflow — write tests covering all new code paths. Coverag
 PARALLEL BUILD COMPLETE
 ────────────────────────────────────────
 Files created:   [list all 5 EVPMR files]
+Ponytail:        self-pass clean / cut <what>, marked <what>
 Phase 3:         tsc PASS | lint PASS
 Agents (Phase 5): ran [list] | skipped [agent — reason, if any]
 

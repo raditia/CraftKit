@@ -33,15 +33,7 @@ Exclude: `node_modules/`, `.git/`, build output dirs.
 
 ## Finding tags
 
-Same as `/ponytail-review`:
-
-| Tag | Meaning |
-|-----|---------|
-| `delete:` | Unused code / dead flexibility |
-| `stdlib:` | Hand-rolled stdlib duplicate |
-| `native:` | Dep replicating platform capability |
-| `yagni:` | Single-impl abstraction or single-caller layer |
-| `shrink:` | Logic expressible in fewer lines |
+The five tags (`delete:` `stdlib:` `native:` `yagni:` `shrink:`) and the protected list are the **ponytail rubric** in `karpathy-guidelines` rule 2 — always active, same list `/ponytail-review` and the writing skills use.
 
 ---
 

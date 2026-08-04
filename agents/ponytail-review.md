@@ -15,13 +15,7 @@ Scope is **complexity only**. Correctness bugs, security, and performance belong
 
 ## Finding tags
 
-| Tag | Meaning |
-|-----|---------|
-| `delete:` | Dead code or unused flexibility — no replacement needed |
-| `stdlib:` | Hand-rolled logic the standard library already provides |
-| `native:` | Dependency doing what the platform natively offers |
-| `yagni:` | Abstraction with single implementation or single-caller layer |
-| `shrink:` | Same logic achievable in fewer lines |
+Use the five tags of the **ponytail rubric** injected above — `delete:` `stdlib:` `native:` `yagni:` `shrink:`, with the meanings given there. Same list the writing side authors under, so a finding should be rare, not routine.
 
 ## Output
 
@@ -39,8 +33,6 @@ If nothing to cut: `Lean already. Ship.`
 
 ## Never flag
 
-- Input validation at trust boundaries
-- Error handling that prevents data loss
-- Security or accessibility code
-- `ponytail:` marked shortcuts (already acknowledged — the marker is the contract)
-- Smoke tests / basic assertions
+The protected list in the injected rubric — validation at trust boundaries, error handling that prevents data loss, security/accessibility code, smoke tests, and anything already marked `ponytail:`.
+
+Each finding must be actionable by deletion alone: name the `file:line` and what goes away or what replaces it. Never propose a restructure — the author applies findings as removals, so a rewrite-shaped finding causes churn instead of shrinkage.

@@ -111,7 +111,7 @@ Every implementer's spawn prompt must state:
 1. Its owned files (from the DAG) — **never edit outside this set**.
 2. The platform skills to apply while implementing (Phase 0 table).
 3. Contract questions go **directly to the owning teammate** (e.g. impl-a owns the Model — impl-b messages impl-a about prop types), not to the lead.
-4. Definition of done per task: owned files typecheck clean → mark the task complete. Unmarked tasks block dependents.
+4. Definition of done per task: owned files typecheck clean **and** ponytail self-pass run on them (`karpathy-guidelines` rule 2 — cut each hit or mark it `ponytail:`, report the one-line result) → mark the task complete. Unmarked tasks block dependents.
 5. Do not spawn subagents (unsupported for teammates).
 
 Reviewer: findings only, severity labels per `using-agent-skills`, never edits files. Tester: coverage bar per platform (`/fe-test` enforces ≥93%; native reports module's actual coverage).
