@@ -174,13 +174,24 @@ sync_rules_adapter() {
     # Install or update all current rules
     for rule in "${current_rules[@]+"${current_rules[@]}"}"; do
         local source_file="$RULES_DIR/${rule}.md"
-        local dest
+        local dest cmp_src cmp_tmp=""
         dest="$("get_${adapter}_rule_dest" "$rule")"
-        if [[ ! -f "$dest" ]] || ! diff -q "$source_file" "$dest" &>/dev/null; then
+        cmp_src="$source_file"
+        # An adapter may transform rules on install (e.g. Cursor injects alwaysApply).
+        # If it declares effective_<adapter>_rule_source, diff against the rendered output
+        # so the skip-unchanged check stays honest instead of re-syncing every run.
+        if declare -f "effective_${adapter}_rule_source" >/dev/null 2>&1; then
+            cmp_src="$("effective_${adapter}_rule_source" "$rule" "$source_file")"
+            cmp_tmp="$cmp_src"
+        fi
+        if [[ ! -f "$dest" ]] || ! diff -q "$cmp_src" "$dest" &>/dev/null; then
             echo "    + rule: $rule"
             "install_${adapter}_rule" "$rule" "$source_file"
             changed=1
         fi
+        # Guard: only remove a genuine temp, never the source (a future adapter whose
+        # effective_ hook returns the real source path must not self-destruct).
+        [[ -n "$cmp_tmp" && "$cmp_tmp" != "$source_file" ]] && rm -f "$cmp_tmp"
     done
 
     [[ $changed -eq 0 ]] && echo "    rules: (up to date)"

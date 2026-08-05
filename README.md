@@ -1,4 +1,4 @@
-# craftkit `v1.18.0`
+# craftkit `v1.19.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **GitHub Copilot**, **Gemini CLI**, **Codex CLI**, and **Crush**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
@@ -145,6 +145,13 @@ bash ~/craftkit/scripts/init-copilot-agents.sh
 # commit .github/ to share with your team
 ```
 
+**Contributing to craftkit itself** — there is no build or test suite (the product is markdown), so `check.sh` is the gate:
+```bash
+bash check.sh   # content integrity — exit 0 required before commit
+bash sync.sh    # distribute; a second consecutive run must report no work
+```
+It catches what a reader can't hold in their head: dangling `subagent_type` references, skill/command install-dest collisions, nested skills that never sync, frontmatter/path name drift, unresolvable `craftkitInject` sources, a routing hook advertising a renamed command, an orchestrator that covers RN/web but not native, an always-active rule contradicting the native skills, undocumented agents or skills, and version drift across `package.json`/README/changelog. Every check exists because that exact bug shipped unnoticed — when you fix a new class, add a check and confirm it fails before making it pass.
+
 ---
 
 ## How it works
@@ -198,7 +205,7 @@ Natural language routes to the right command automatically. No slash commands re
 "build this feature"    →  /parallel-build
 "ship this"             →  /parallel-ship
 "fix this bug"          →  /fix
-"write tests for this"  →  /fe-test
+"write tests for this"  →  /fe-test · /android-test · /ios-test  (by platform)
 "generate PR message"   →  /pr-message
 ```
 
@@ -206,7 +213,7 @@ Natural language routes to the right command automatically. No slash commands re
 
 ### Dynamic workflows (default)
 
-Build, review, and ship use **dynamic parallel execution** — a classifier reads your actual diff, selects only the agents that matter, and runs them concurrently. Test-only diffs skip deep review entirely.
+Build, review, and ship use **dynamic parallel execution** — a classifier detects the platform (RN/web, Android, iOS), reads your actual diff, selects only the agents that matter, and runs them concurrently. Test-only diffs skip deep review entirely. Every command below works on all three platforms; only the gates and the agent set change.
 
 #### /parallel-review
 
@@ -214,9 +221,10 @@ Build, review, and ship use **dynamic parallel execution** — a classifier read
 
 ```mermaid
 flowchart TD
-    A[/parallel-review/] --> B["Phase 1 — parallel fast gates\ntsc ‖ lint ‖ test"]
+    A[/parallel-review/] --> P["Step 0 — detect platform\nRN/web · Android · iOS"]
+    P --> B["Phase 1 — parallel fast gates\ntsc ‖ lint ‖ test  ·or·  gradlew lint ‖ test  ·or·  swiftlint ‖ bazel test"]
     B -->|all pass ✓| C["Classify diff\nreads actual files · skips irrelevant agents"]
-    C --> D["Phase 2 — parallel LLM agents\ncode-quality ‖ fe-review ‖ fe-a11y? ‖ adversarial?\nselected by classifier"]
+    C --> D["Phase 2 — parallel LLM agents\ncode-quality ‖ platform review ‖ platform a11y? ‖ adversarial?\nselected by classifier"]
     D --> E["Synthesize\nmerge · deduplicate · sort by severity"]
     E --> F[Merged report]
     B -->|any fail ✗| G[BLOCKED — fix gates first]
@@ -228,9 +236,10 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[/parallel-ship/] --> B["Phase 1 — parallel fast gates\ntsc ‖ lint ‖ test + coverage\n≥93% Lines · Branches · Functions · Statements"]
+    A[/parallel-ship/] --> P["Step 0 — detect platform"]
+    P --> B["Phase 1 — parallel fast gates\ntype/build ‖ lint ‖ test + coverage\nRN/web: ≥93% Lines · Branches · Functions · Statements\nnative: report actual module coverage"]
     B -->|all pass ✓| C[Classify diff]
-    C --> D["Phase 2 — parallel LLM agents\ncode-quality ‖ ponytail-review ‖ fe-review\n‖ fe-performance? ‖ fe-a11y? ‖ adversarial?\nselected by classifier"]
+    C --> D["Phase 2 — parallel LLM agents\ncode-quality ‖ ponytail-review ‖ platform review\n‖ platform performance? ‖ platform a11y? ‖ adversarial?\nselected by classifier"]
     D --> E[Synthesize]
     E --> F{Errors?}
     F -->|none| G[READY TO MERGE]
@@ -244,13 +253,14 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[/parallel-build/] --> B["fe-context\nsequential · generate docs/context.md"]
-    B --> C["fe-scaffold\nsequential · create 5-file EVPMR module"]
-    C --> D["Implement\nguided by fe-patterns + fe-performance"]
-    D --> E["Phase 3 — parallel fast gates\ntsc ‖ lint"]
+    A[/parallel-build/] --> P["Step 0 — detect platform\npicks the scaffold · patterns · gates · test skills"]
+    P --> B["Context\nsequential · docs/context.md (RN/web)\nnative: sibling screen, or *-context if multi-screen"]
+    B --> C["Scaffold\nsequential · fe-scaffold ·or· android-scaffold ·or· ios-scaffold"]
+    C --> D["Implement\nguided by the platform's patterns + performance skills"]
+    D --> E["Phase 3 — parallel fast gates\ntype/build ‖ lint"]
     E -->|all pass ✓| F["Classify what was built\nread actual file content · select agents"]
-    F --> G["Phase 5 — parallel LLM agents\nfe-review ‖ fe-patterns ‖ ponytail-review\n‖ fe-a11y? ‖ fe-performance? ‖ adversarial?\nselected by classifier"]
-    G -->|no ERROR| H["fe-test\nsequential · write tests · enforce ≥93%"]
+    F --> G["Phase 5 — parallel LLM agents\nplatform review ‖ ponytail-review ‖ fe-patterns (RN/web)\n‖ platform a11y? ‖ platform performance? ‖ adversarial?\nselected by classifier"]
+    G -->|no ERROR| H["Tests\nsequential · fe-test ≥93% ·or· android-test ·or· ios-test"]
     H --> I[DONE]
     E -->|any fail ✗| J[BLOCKED — fix gates first]
     G -->|ERROR found| J
@@ -263,15 +273,33 @@ flowchart TD
 The classifier reads your actual changed files — not just filenames — and selects only the agents that apply. Irrelevant agents are skipped entirely.
 
 ```
-git diff shows:                          agents selected:
+RN / web (EVPMR)                         agents selected:
 ──────────────────────────────────────────────────────────
 View*.tsx                           →   code-quality + fe-review + fe-a11y
 Presenter*.ts                       →   code-quality + fe-review
 Model*.ts                           →   code-quality (type/correctness focus)
 Entry*.tsx or Resource*.ts          →   fe-review
-any non-test src + build/ship       →   + ponytail-review (over-engineering)
 View or Presenter + /parallel-ship  →   + fe-performance
-3+ EVPMR layers changed             →   + adversarial (devil's advocate)
+
+Android (MVP)
+──────────────────────────────────────────────────────────
+*Activity/Fragment/Widget.kt, layout →  code-quality + android-review + android-a11y
+*Presenter.kt, *ViewModel.kt         →  code-quality + android-review
+*Repository/Interactor/UseCase.kt    →  code-quality
+Dagger *Module/*Component.kt         →  android-review
+Presenter/VM/adapter + /parallel-ship → + android-performance
+
+iOS (MVVM-C)
+──────────────────────────────────────────────────────────
+*ViewController/View/Cell.swift      →  code-quality + ios-review + ios-a11y
+*ViewModel.swift                     →  code-quality + ios-review
+*Fetcher.swift                       →  code-quality + ios-performance
+*Contract/Factory/Coordinator.swift  →  ios-review
+
+All platforms
+──────────────────────────────────────────────────────────
+any non-test src + build/ship       →   + ponytail-review (over-engineering)
+3+ architecture layers changed      →   + adversarial (devil's advocate)
 auth / payment / credential paths   →   code-quality (security emphasis)
 test files only                     →   Phase 2 SKIPPED entirely
 ```
@@ -314,6 +342,18 @@ flowchart TD
     B --> E[fe-a11y]
     B --> F["adversarial\nstrongest case against merging"]
     C & D & E & F --> G[Synthesize]
+```
+
+**Example E — Android screen (same command, native agents)**
+
+```mermaid
+flowchart TD
+    A["diff: CheckoutFragment.kt · CheckoutPresenter.kt\nplatform: Android"] --> B[Classify]
+    B --> C["code-quality\nplatform-agnostic"]
+    B --> D[android-review]
+    B --> E[android-a11y]
+    B --> F[android-performance]
+    C & D & E & F --> G["Synthesize\ngates were gradlew lint + testGeneralDebugUnitTest"]
 ```
 
 ---
@@ -396,8 +436,10 @@ Full workflow: [`commands/team-build.md`](commands/team-build.md).
 "something is broken" / "fix this bug" / "this crashes"
   /fix  →  fe-context → reproduce → isolate → fix → regression test
 
-"write tests" / "add tests" / "coverage is low"
-  /fe-test  →  write tests for all changed paths, enforce ≥93% coverage
+"write tests" / "add tests" / "coverage is low"     → resolves platform first
+  /fe-test       →  RN/web: write tests for all changed paths, enforce ≥93% coverage
+  /android-test  →  JUnit + MockK Presenter tests (no fixed coverage bar)
+  /ios-test      →  Quick + Nimble ViewModel specs (no fixed coverage bar)
 
 "generate PR message" / "draft a PR" / "what should my PR say"
   /pr-message  →  read diff → write title + summary + goal + changes + coverage → humanize (if installed) → copy to clipboard
@@ -430,11 +472,13 @@ Use when a task is narrower than a full workflow.
 | [`fe-patterns`](skills/fe-patterns/SKILL.md) | Composition patterns, hooks discipline, state location | Novel state architecture |
 | [`fe-performance`](skills/fe-performance/SKILL.md) | Waterfall elimination, bundle size, re-renders | Lighthouse regressions with non-obvious root cause |
 | [`fe-a11y`](skills/fe-a11y/SKILL.md) | Labels, roles, focus management, reduced motion — RN & Next.js | Complex focus flows spanning multiple routes |
-| [`fe-test`](skills/fe-test/SKILL.md) | Write/improve tests — enforces ≥93% coverage | Can't reach 93%, root cause unclear |
+| [`fe-test`](skills/fe-test/SKILL.md) | Write/improve tests — enforces ≥93% coverage. **RN/web only** — native goes to `/android-test` / `/ios-test` | Can't reach 93%, root cause unclear |
 
 ### Native mobile skills — on demand
 
 Sanitized, architecture-agnostic references. Native mobile does **not** use EVPMR or `docs/context.md` for single-screen work — read a real sibling screen first. For an internal codebase with concrete module names, drop a project-scoped override at `<repo>/.claude/skills/<name>/` (same skill name shadows the global one inside that repo).
+
+The `*-review`, `*-a11y`, and `*-performance` skills below double as the source for the matching cold agents — the parallel workflows spawn those, with each skill's checklist injected live via `craftkitInject`. Edit the skill; the agent follows on the next sync.
 
 **Android** — MVP + Core framework, Dagger, Gradle Dynamic Feature Modules:
 
@@ -492,16 +536,24 @@ Cold sub-agents spawned by parallel workflows. Each has a fixed system prompt (r
 
 Auto-synced to `~/.claude/agents/` on `git pull` (Claude Code only).
 
-| Agent | Role | Spawned by | Model |
-|-------|------|-----------|-------|
-| [`code-quality`](agents/code-quality.md) | 5-axis review: correctness, readability, EVPMR arch, security, performance | `parallel-review`, `parallel-ship` | sonnet |
-| [`fe-review`](agents/fe-review.md) | EVPMR layer violations, TypeScript, styling, React correctness, tracking | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
-| [`fe-a11y`](agents/fe-a11y.md) | Accessibility: labels, roles, focus, announcements, reduced motion | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
-| [`fe-patterns`](agents/fe-patterns.md) | Composition patterns, hooks discipline, state location | `parallel-build` | sonnet |
-| [`fe-performance`](agents/fe-performance.md) | Waterfalls, bundle size, re-renders, server-side, RN patterns | `parallel-build`, `parallel-ship` | sonnet |
-| [`ponytail-review`](agents/ponytail-review.md) | Over-engineering: reinvented stdlib, speculative abstraction, dead flexibility (complexity only) | `parallel-build`, `parallel-ship` | sonnet |
-| [`adversarial`](agents/adversarial.md) | Devil's advocate — strongest case against merging/shipping | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
-| [`plan-roaster`](agents/plan-roaster.md) | Stress-test a plan before implementation — weakest assumption + failure modes | On demand | sonnet |
+The parallel workflows detect the platform first, then spawn that platform's review/a11y/performance agents. `code-quality`, `ponytail-review`, and `adversarial` are platform-agnostic and run on all three.
+
+| Agent | Platform | Role | Spawned by | Model |
+|-------|----------|------|-----------|-------|
+| [`code-quality`](agents/code-quality.md) | all | 5-axis review: correctness, readability, arch, security, performance | `parallel-review`, `parallel-ship` | sonnet |
+| [`ponytail-review`](agents/ponytail-review.md) | all | Over-engineering: reinvented stdlib, speculative abstraction, dead flexibility (complexity only) | `parallel-build`, `parallel-ship` | sonnet |
+| [`adversarial`](agents/adversarial.md) | all | Devil's advocate — strongest case against merging/shipping | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
+| [`fe-review`](agents/fe-review.md) | RN / web | EVPMR layer violations, TypeScript, styling, React correctness, tracking | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
+| [`fe-a11y`](agents/fe-a11y.md) | RN / web | Accessibility: labels, roles, focus, announcements, reduced motion | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
+| [`fe-patterns`](agents/fe-patterns.md) | RN / web | Composition patterns, hooks discipline, state location | `parallel-build` | sonnet |
+| [`fe-performance`](agents/fe-performance.md) | RN / web | Waterfalls, bundle size, re-renders, server-side, RN patterns | `parallel-build`, `parallel-ship` | sonnet |
+| [`android-review`](agents/android-review.md) | Android | MVP layer violations, Dagger DI, NavigatorService nav, string resources, coroutine correctness | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
+| [`android-a11y`](agents/android-a11y.md) | Android | TalkBack labels, roles/state, touch targets, focus order, text scaling | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
+| [`android-performance`](agents/android-performance.md) | Android | Main-thread discipline, RecyclerView/DiffUtil, recomposition stability, image loading, leaks | `parallel-build`, `parallel-ship` | sonnet |
+| [`ios-review`](agents/ios-review.md) | iOS | MVVM-C layer violations, Dependency-struct DI, Coordinator-only nav, NSLocalizedString, retain cycles | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
+| [`ios-a11y`](agents/ios-a11y.md) | iOS | VoiceOver labels/traits/hints, focus & announcements, Dynamic Type, reduce motion | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
+| [`ios-performance`](agents/ios-performance.md) | iOS | Main-thread discipline, cell reuse & prefetch, image downsampling, layout cost, retain cycles | `parallel-build`, `parallel-ship` | sonnet |
+| [`plan-roaster`](agents/plan-roaster.md) | all | Stress-test a plan before implementation — weakest assumption + failure modes | On demand | sonnet |
 
 ### Skill vs agent — when to add which
 
@@ -515,7 +567,9 @@ Auto-synced to `~/.claude/agents/` on `git pull` (Claude Code only).
 
 `fe-review` is an example of both: `/fe-review` for manual use, `fe-review` agent for parallel workflows. `adversarial` is agent-only — you'd never invoke it directly.
 
-> **Agent system prompts are cold copies.** Agents don't inherit rules or session context — anything the agent needs must be baked into `agents/<name>.md`. If you update `rules/fe-rules.md`, manually update any agent that duplicates its content.
+> **Agent system prompts are cold copies.** Agents don't inherit rules, skills, or session context — anything the agent needs must be in `agents/<name>.md`.
+>
+> **`craftkitInject` avoids the hand-maintained duplicate.** Add `craftkitInject: <name>` to an agent's frontmatter and the sync splices that body in as a managed block at install time, regenerated on every pull. Each name resolves `rules/<name>.md` first, then `skills/<name>/SKILL.md` — so an agent can carry a live rule (`fe-review` ← `fe-rules`) or a live skill checklist (`android-review` ← `skills/android-review`). Prefer it over copying text into the agent; a copy silently rots when the source changes. Claude Code only.
 
 ### Add an agent
 
@@ -679,6 +733,7 @@ External tools and inspirations bundled or adopted into this repo.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| `v1.19.0` | 2026-08-05 | **The parallel workflows now run on iOS and Android, not just RN/web.** `/parallel-review`, `/parallel-ship`, and `/parallel-build` hardcoded `rtk tsc` + jest-93% gates and a `fe-*`-only agent set, and the classifier keyed on `View*.tsx`/`Presenter*.ts` — so a `.kt` or `.swift` branch landed in a command with the wrong gates and no matching reviewer, while the sequential `/build` `/fix` `/ship` had platform-routed for versions. Closed in four parts. (1) **`craftkitInject` resolves skills, not just rules** — `adapters/claude.sh` now looks up each injected name as `rules/<n>.md` first, then `skills/<n>/SKILL.md` (`_claude_inject_source_path`), so a cold agent can carry a live *skill checklist*. That is what makes native agents maintainable: no hand-copied duplicate to rot. (2) **Six native cold agents** — `android-review` `android-a11y` `android-performance` `ios-review` `ios-a11y` `ios-performance`, each a thin prompt over its injected skill, each told it cannot run Gradle/Bazel/SwiftLint/TalkBack/VoiceOver/Instruments and to name the manual check or measurement still owed instead of asserting one. `code-quality`, `ponytail-review`, and `adversarial` stay platform-agnostic and run on all three. (3) **Platform-aware classifier** — `using-agent-skills` gained Step 1.5 (detect platform; a mixed diff unions both tables) and per-platform Step 2 tables for MVP (Activity/Fragment/Widget, Presenter, ViewModel, Repository, Dagger, `strings.xml`) and MVVM-C (ViewController/View/Cell, ViewModel, Fetcher, Contract/Factory/Coordinator, `*.strings`); the adversarial trigger now counts layers in any of the three architectures, and Step 4 announces the detected platform. (4) **Step 0 in all three commands** — per-platform gate rows (`gradlew lintGeneralDebug` + `testGeneralDebugUnitTest`; `swiftlint lint` + `bazelisk test`), the 93% coverage bar scoped to RN/web with native reporting actual module coverage or stating it isn't measured, native context downgraded to sibling-screen reading for single screens, and the repeated per-agent payload blocks collapsed into one message template + an agent/platform/include-when table (which is what kept 12 agent variants from tripling these files). `parallel-build` also routes its scaffold/patterns/test phases per platform; native has no `*-patterns` agent by design — the patterns skill already ran in Phase 2 and the review agent covers the layer contract. **Two pre-existing routing bugs found by the follow-up repo audit and fixed in the same release.** (a) *Test intent was platform-blind* — the routing table sent every "write tests" / "coverage is low" phrasing, plus both ambiguous-test tiebreakers, to `/fe-test`, which is Jest + 93% + EVPMR paths; on a `.kt`/`.swift` repo that is the wrong skill while `/android-test` and `/ios-test` sat unreachable unless named. The row and tiebreakers now resolve platform first, `skills/fe-test/SKILL.md` opens with a platform gate that stops and redirects (and forbids carrying the 93% bar into native), and the hook + README rows match. (b) *`docs/context.md` was declared mandatory with no exceptions* while ten `{android,ios}-*` skills declared they don't use it — a direct contradiction inside an always-active rule. Standard context loading now states its scope up front (RN/web, plus native multi-screen only), names the sibling-screen baseline as correct for native single-screen work, generalizes project-root detection to `settings.gradle` / `*.xcodeproj`, and picks the generator per platform (`/fe-context` · `/android-context` · `/ios-context`); failure-mode #9 no longer reads as absolute. (c) *`skills/pr-message/` deleted* — a 7-line stub whose body only pointed at `commands/pr-message.md`. Because a skill with `alwaysApply: false` installs to the same dest a command does (`adapters/claude.sh:4-5`), the two passes wrote the same file every sync on all six tools; the 137-line command won only because the commands pass happens to run second. Ordering luck, not design. Removing the stub makes the sync idempotent for the first time — `commands: (up to date)` everywhere instead of a perpetual `+ installing: pr-message`. The state-file removal loop uninstalled the orphan automatically; nothing referenced the stub. (d) *Cursor re-wrote all four rules on every sync* — `install_cursor_rule` injects `alwaysApply: true` after the opening `---`, but `sync_rules_adapter` diffed the **raw source** against the **transformed dest**, so every rule compared as changed forever. Same bug class the agents pass already solved: `sync_rules_adapter` now honours an optional `effective_<adapter>_rule_source` hook (mirroring `effective_<adapter>_agent_source`, including the never-delete-the-source temp guard), and `adapters/cursor.sh` declares one over a shared `_cursor_render_rule` so install and comparison can't drift. Cursor was the only adapter transforming rules on install — the other five plain-`cp` to a staging path, so their raw diff was already honest. `sync.sh` is now idempotent end to end: a second run reports no work on any of the six tools. **Added `check.sh` — the repo's first verification step.** All four bugs above were mechanical and grep-findable, and all four survived because nothing greps: with no build, lint, or test suite, "verification" was `sync.sh` printing `Sync complete.`, which only proves files copied. `check.sh` codifies core behavior #7 (if code can answer, code answers) with ten checks, each one a regression guard for a bug that actually shipped — `subagent_type` resolution, skill/command dest collision, flat `skills/`, frontmatter/path name agreement, `craftkitInject` resolution, routing-hook targets, per-platform orchestrator coverage, absolute `docs/context.md` claims, README coverage of every agent and skill, and version agreement across `package.json`/README header/changelog. Each was verified to fail before being made to pass. Wired into `CLAUDE.md` and the README as a pre-commit gate. |
 | `v1.18.0` | 2026-08-05 | **Comment bloat is now a scored rubric tag.** `v1.17.0` gave the writing side a comment-discipline block, but the ponytail rubric had no tag for it — so neither the write-time self-pass nor `/ponytail-review` ever scored comments, and only `agents/code-quality.md` (readability axis) caught them. Added a sixth tag **`narrate:`** to the rubric in `rules/karpathy-guidelines.md` rule 2 — fails on a comment that restates the code, or on comments denser than the file around it. One row propagates to every consumer: the write-time self-pass, `/ponytail-review`, `/ponytail-audit`, `/android-review`, `/ios-review`, all three scaffolds' after-generating checklists, and the `ponytail-review` agent (live via `craftkitInject`). Tag-specific protected list added so the guard can't strip what matters: a comment carrying a non-obvious *why*, license/pragma headers, and doc comments on public APIs. The comment-discipline block now closes on the causal point — excessive comments mean the code isn't expressive enough, so fix the code — and names `narrate:` as its enforcement. Overlaps `code-quality`'s comment-noise check only on the same `file:line` (→ `[CONSENSUS]` in synthesis, same precedent as the `delete:`/dead-code overlap). |
 | `v1.17.0` | 2026-08-04 | **Ponytail moved to write time — kills the review-rewrite loop.** Ponytail lived only on the review side: writers got the abstract ladder, reviewers scored by a five-tag rubric they never saw, so `/ponytail-review` always found a pile and applying it churned files. Fixed in three places. (1) **Shared rubric** — the five tags (`delete:` `stdlib:` `native:` `yagni:` `shrink:`) and the protected list moved into `rules/karpathy-guidelines.md` rule 2 (always active); the three hand-maintained copies in `skills/ponytail-review`, `skills/ponytail-audit`, and `agents/ponytail-review` now reference it (the agent already receives it live via `craftkitInject`). One list, both sides. (2) **Write-time self-pass** — any turn that writes code scans its own diff against the rubric before reporting done, cutting each hit or marking it `ponytail:` with its ceiling, and reports `ponytail self-pass: clean` / what was cut. Wired as an explicit gate in `/build` Step 3, `/parallel-build` Phase 2 (+ report line), `/team-build` per-task definition of done, the after-generating checklists of **all three** scaffolds (`/fe-scaffold`, `/android-scaffold`, `/ios-scaffold`), and CI-gate #3 in `using-agent-skills` core behavior #6. `/android-review` and `/ios-review` gained an **Over-engineering** section with platform-specific hits (Android: forwarding UseCase, single-subclass `sealed class`, hand-rolled `map`/`associateBy`; iOS: single-conformer protocol, forwarding Fetcher wrapper, hand-rolled `compactMap`/`first(where:)`/`Result`, unread Dependency field). The `ponytail-review` agent is now the backstop, not the first pass. (3) **Apply = deletion, never rewrite** — findings act on the named `file:line` only (remove, or swap in the named stdlib/native call); no restructuring, renaming, or tidying while in there, and a rewrite-shaped finding is stated and left alone. The agent must also emit only deletion-actionable findings. |
 | `v1.16.1` | 2026-08-03 | **Detached Jumbo.** Removed the `jumbo-cli` global-install block from `sync.sh` `ensure_tools` and its Tooling-table row. Jumbo is a *per-project* memory CLI (`.jumbo/`), but CraftKit never initialized one — it rode along as a global install with zero effect inside this repo, whose memory/context is already handled by `docs/context.md` + the routing/skills system. No behavior change here; existing global `jumbo` binaries are left untouched (uninstall manually with `npm rm -g jumbo-cli` if unused elsewhere). |

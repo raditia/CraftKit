@@ -22,13 +22,28 @@ uninstall_cursor_skill() {
 
 get_cursor_rule_dest() { echo "$CURSOR_RULES_DIR/${1}.mdc"; }
 
+# Rules are always-apply; inject alwaysApply: true after the opening ---
+_cursor_render_rule() {
+    awk 'NR==1 && /^---$/{print; print "alwaysApply: true"; next} {print}' "$1" > "$2"
+}
+
 install_cursor_rule() {
     local name="$1"
     local source_file="$2"
-    local dest="$CURSOR_RULES_DIR/${name}.mdc"
     mkdir -p "$CURSOR_RULES_DIR"
-    # Rules are always-apply; inject alwaysApply: true after the opening ---
-    awk 'NR==1 && /^---$/{print; print "alwaysApply: true"; next} {print}' "$source_file" > "$dest"
+    _cursor_render_rule "$source_file" "$CURSOR_RULES_DIR/${name}.mdc"
+}
+
+# Currency hook used by sync.sh's rules loop: renders to a temp file so the diff-skip
+# check compares dest against the *rendered* output, not the raw source — otherwise the
+# injected alwaysApply line makes every rule look changed on every run. sync.sh removes
+# the returned temp file after diffing.
+effective_cursor_rule_source() {
+    local source_file="$2"
+    local tmp
+    tmp="$(mktemp)"
+    _cursor_render_rule "$source_file" "$tmp"
+    echo "$tmp"
 }
 
 uninstall_cursor_rule() { rm -f "$CURSOR_RULES_DIR/${1}.mdc"; }

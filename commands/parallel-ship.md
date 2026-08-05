@@ -1,47 +1,54 @@
 ---
 name: parallel-ship
-description: Dynamic parallel pre-merge check — Phase 1 (tsc + lint + test with coverage gate) then classifier-selected agents run concurrently. Adapts to what actually changed.
+description: Dynamic parallel pre-merge check — platform-routed Phase 1 gates (type/build + lint + test with coverage) then classifier-selected agents run concurrently. Supports RN/web, Android, and iOS.
 ---
 
-**Commands:** `rtk git diff`, `rtk tsc`, `rtk lint`, `rtk test`
+**Commands:** `rtk git diff`, plus the platform's type/lint/test tooling (see Phase 1)
 **Model:** everyday — escalate for security-sensitive changes or major arch tradeoffs
 
 > Triggered by: "parallel ship", "fast ship", "ship in parallel", "ship fast", `/parallel-ship`
 
 ---
 
-## Phase 0 — Context
+## Step 0 — Platform routing
 
 1. Detect base: `rtk git remote show origin | grep 'HEAD branch'`
 2. `rtk git diff <base>...HEAD --name-only` + `rtk git diff <base>...HEAD`
-3. Apply standard context loading (`using-agent-skills`) — freshness check (branch + commit), regenerate if stale or missing, read Summary + Key Changes
+3. Detect platform per classifier Step 1.5 (`using-agent-skills`) — RN/web, Android, or iOS. It selects the Phase 1 gates and the Phase 2 agent set.
 
 ---
 
-## Phase 1 — Fast gates (all three in parallel)
+## Phase 0 — Context
 
-Run simultaneously as parallel Bash calls:
+Load context for the detected platform:
+   - **RN / web** — apply standard context loading (`using-agent-skills`): freshness check (branch + commit), regenerate if stale or missing, read Summary + Key Changes
+   - **Android / iOS** — `docs/context.md` only for multi-screen branches (`/android-context`, `/ios-context`). Single screen: read a real sibling screen instead and pass that as the convention baseline
 
-```bash
-rtk tsc --noEmit
+---
+
+## Phase 1 — Fast gates (all in parallel)
+
+Run the detected platform's row simultaneously as parallel Bash calls:
+
+| Platform | Type/build | Lint | Test (with coverage) |
+|----------|-----------|------|----------------------|
+| RN / web | `rtk tsc --noEmit` | `rtk lint <changed-files>` | `rtk test --testPathPattern="<feature-path>" --coverage` |
+| Android | — (Gradle compiles as part of test) | `./gradlew :<module>:lintGeneralDebug` | `./gradlew :<module>:testGeneralDebugUnitTest` (+ `jacocoTestReport` if the module has it) |
+| iOS | — (Bazel compiles as part of test) | `swiftlint lint` | `bazelisk test //Modules/<M>:<M>TestsBundle` |
+
+**Coverage gate:**
+- **RN / web** — Lines, Branches, Functions, Statements all ≥ 93%. Below threshold → BLOCKED.
+- **Android / iOS** — no fixed bar unless the team set one. Report the module's actual coverage; if it isn't measurable, say so rather than implying a pass.
+
+**Gate:** All gates for the platform must pass, and the platform's coverage rule must be satisfied. If any fail → report immediately, skip Phase 2.
+
 ```
-```bash
-rtk lint <changed-files>
-```
-```bash
-rtk test --testPathPattern="<feature-path>" --coverage
-```
-
-Coverage gate: Lines, Branches, Functions, Statements all ≥ 93%.
-
-**Gate:** All three must pass and coverage must meet threshold. If any fail → report immediately, skip Phase 2.
-
-```
-PHASE 1
-tsc:      PASS / FAIL
-lint:     PASS / FAIL
-test:     PASS / FAIL (N tests)
-coverage: Lines N% / Branches N% / Functions N% / Statements N% — PASS / FAIL
+PHASE 1  (platform: <RN/web | Android | iOS>)
+type/build: PASS / FAIL / n-a
+lint:       PASS / FAIL
+test:       PASS / FAIL (N tests)
+coverage:   Lines N% / Branches N% / Functions N% / Statements N% — PASS / FAIL
+            (native: actual module coverage, or "not measured")
 → Proceeding to classification / BLOCKED — fix above first
 ```
 
@@ -59,75 +66,38 @@ Spawn **all** selected agents in **one** message — N `Agent` tool-use blocks i
 
 **Do not wait by polling.** Never `grep`/`sleep`-loop over task output files (`tasks/*.output`) to detect completion — the harness wakes the main thread automatically when every spawned agent comes to rest, and re-invokes you with their results. Spin-loops keep running for minutes after the agents already finished. On wake, read the returned results and go straight to Phase 3.
 
-**Agent: code-quality** (`subagent_type: "code-quality"`)
+Every agent gets the same user message, prefixed `This is a pre-merge check — be thorough.`:
 
-Pass as user message:
 ```
 This is a pre-merge check — be thorough.
-[if auth/payment/credential paths changed, prepend: "Security-sensitive code present — emphasize security axis."]
-[if package.json changed, prepend: "package.json changed — audit new dependencies for bundle impact, maintenance status, and known vulnerabilities."]
 
 DIFF:
 <full diff>
 
 CONTEXT:
-<docs/context.md Summary + Key Changes>
+<docs/context.md Summary + Key Changes — or, for a single native screen, the sibling screen read in Phase 0>
 ```
 
-**Agent: ponytail-review** (`subagent_type: "ponytail-review"`) — _include whenever non-test, non-resource source changed_
+Spawn the set the classifier selected:
 
-Pass as user message:
-```
-DIFF:
-<full diff>
+| Agent (`subagent_type`) | Platform | Include when |
+|-------------------------|----------|--------------|
+| `code-quality` | all | any non-test, non-resource code changed |
+| `ponytail-review` | all | any non-test, non-resource source changed |
+| `fe-review` | RN / web | any EVPMR layer changed |
+| `fe-performance` | RN / web | `View*.tsx` or `Presenter*.ts` changed |
+| `fe-a11y` | RN / web | `View*.tsx` changed |
+| `android-review` | Android | any MVP layer, Dagger, or `strings.xml` changed |
+| `android-performance` | Android | Presenter/ViewModel/adapter/Composable changed |
+| `android-a11y` | Android | Activity/Fragment/Widget/Composable or layout XML changed |
+| `ios-review` | iOS | any MVVM-C layer or `*.strings` changed |
+| `ios-performance` | iOS | ViewModel/ViewController/Fetcher/Cell changed |
+| `ios-a11y` | iOS | ViewController/View/Cell changed |
+| `adversarial` | all | 3+ architecture layers changed |
 
-CONTEXT:
-<docs/context.md Summary + Key Changes>
-```
-
-**Agent: fe-review** (`subagent_type: "fe-review"`)
-
-Pass as user message:
-```
-DIFF:
-<full diff>
-
-CONTEXT:
-<docs/context.md Summary + Key Changes>
-```
-
-**Agent: fe-performance** (`subagent_type: "fe-performance"`) — _only if View*.tsx or Presenter*.ts changed_
-
-Pass as user message:
-```
-DIFF:
-<full diff>
-
-CONTEXT:
-<docs/context.md Summary + Key Changes>
-```
-
-**Agent: fe-a11y** (`subagent_type: "fe-a11y"`) — _only if View*.tsx changed_
-
-Pass as user message:
-```
-DIFF:
-<full diff>
-
-CONTEXT:
-<docs/context.md Summary + Key Changes>
-```
-
-**Agent: adversarial** (`subagent_type: "adversarial"`) — _only if 3+ EVPMR layers changed_
-
-Pass as user message:
-```
-DIFF:
-<full diff>
-
-CONTEXT:
-<docs/context.md Summary + Key Changes>
-```
+**`code-quality` prompt additions** — prepend when applicable:
+- security-sensitive paths (`auth/*`, `payment/*`, `*credential*`, `*token*`): `"Security-sensitive code present — emphasize security axis."`
+- manifest changed (`package.json`, `*.gradle`, `Podfile`/`Package.swift`): `"<file> changed — audit new dependencies for bundle/binary impact, maintenance status, and known vulnerabilities."`
 
 ---
 
@@ -150,8 +120,9 @@ Sort within each tier: `[CONSENSUS]` first, then standard, then `[UNIQUE]`.
 ```
 PARALLEL SHIP COMPLETE
 ────────────────────────────────────────
-Phase 1:   tsc PASS | lint PASS | test PASS (N tests)
-           Coverage: Lines N% / Branches N% / Functions N% / Statements N%
+Platform:  <RN/web | Android | iOS>
+Phase 1:   type/build PASS | lint PASS | test PASS (N tests)
+           Coverage: Lines N% / Branches N% / Functions N% / Statements N%  (native: actual, or "not measured")
 Agents:    ran [list] | skipped [agent — reason, if any]
 
 FINDINGS

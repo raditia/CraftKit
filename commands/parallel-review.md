@@ -1,44 +1,48 @@
 ---
 name: parallel-review
-description: Dynamic parallel code review — classifier reads the diff, selects only relevant agents, spawns them concurrently. Adapts to what actually changed.
+description: Dynamic parallel code review — classifier reads the diff, detects the platform (RN/web, Android, iOS), selects only relevant agents, spawns them concurrently. Adapts to what actually changed.
 ---
 
-**Commands:** `rtk git diff`, `rtk tsc`, `rtk lint`, `rtk test`
+**Commands:** `rtk git diff`, plus the platform's type/lint/test tooling (see Phase 1)
 **Model:** everyday — escalate for security-sensitive changes or major arch tradeoffs
 
 > Triggered by: "parallel review", "fast review", "review in parallel", "review fast", `/parallel-review`
 
 ---
 
-## Phase 0 — Context
+## Step 0 — Platform routing
 
 1. Detect base: `rtk git remote show origin | grep 'HEAD branch'`
 2. `rtk git diff <base>...HEAD --name-only` + `rtk git diff <base>...HEAD`
-3. Apply standard context loading (`using-agent-skills`) — freshness check (branch + commit), regenerate if stale or missing, read Summary + Key Changes
+3. Detect platform per classifier Step 1.5 (`using-agent-skills`) — RN/web, Android, or iOS. It selects the Phase 1 gates and the Phase 2 agent set.
 
 ---
 
-## Phase 1 — Fast gates (all three in parallel)
+## Phase 0 — Context
 
-Run simultaneously as parallel Bash calls:
+Load context for the detected platform:
+   - **RN / web** — apply standard context loading (`using-agent-skills`): freshness check (branch + commit), regenerate if stale or missing, read Summary + Key Changes
+   - **Android / iOS** — `docs/context.md` only for multi-screen branches (`/android-context`, `/ios-context`). Single screen: read a real sibling screen instead and pass that as the convention baseline
 
-```bash
-rtk tsc --noEmit
-```
-```bash
-rtk lint <changed-files>
-```
-```bash
-rtk test --testPathPattern="<feature-path>" --no-coverage
-```
+---
 
-**Gate:** All three must pass. If any fail → report immediately, skip Phase 2.
+## Phase 1 — Fast gates (all in parallel)
+
+Run the detected platform's row simultaneously as parallel Bash calls:
+
+| Platform | Type/build | Lint | Test |
+|----------|-----------|------|------|
+| RN / web | `rtk tsc --noEmit` | `rtk lint <changed-files>` | `rtk test --testPathPattern="<feature-path>" --no-coverage` |
+| Android | — (Gradle compiles as part of test) | `./gradlew :<module>:lintGeneralDebug` | `./gradlew :<module>:testGeneralDebugUnitTest` |
+| iOS | — (Bazel compiles as part of test) | `swiftlint lint` | `bazelisk test //Modules/<M>:<M>TestsBundle` |
+
+**Gate:** All gates for the platform must pass. If any fail → report immediately, skip Phase 2.
 
 ```
-PHASE 1
-tsc:   PASS / FAIL
-lint:  PASS / FAIL
-test:  PASS / FAIL (N tests)
+PHASE 1  (platform: <RN/web | Android | iOS>)
+type/build: PASS / FAIL / n-a
+lint:       PASS / FAIL
+test:       PASS / FAIL (N tests)
 → Proceeding to classification / BLOCKED — fix above first
 ```
 
@@ -56,52 +60,32 @@ Spawn **all** selected agents in **one** message — N `Agent` tool-use blocks i
 
 **Do not wait by polling.** Never `grep`/`sleep`-loop over task output files (`tasks/*.output`) to detect completion — the harness wakes the main thread automatically when every spawned agent comes to rest, and re-invokes you with their results. Spin-loops keep running for minutes after the agents already finished (observed: agents done in <2 min, poll loop burned 12 min more). On wake, read the returned results and go straight to Phase 3.
 
-**Agent: code-quality** (`subagent_type: "code-quality"`)
+Every agent gets the same user message:
 
-Pass as user message:
-```
-[if auth/payment/credential paths changed, prepend: "Security-sensitive code present — emphasize security axis."]
-[if package.json changed, prepend: "package.json changed — audit new dependencies for bundle impact, maintenance status, and known vulnerabilities."]
-
-DIFF:
-<full diff>
-
-CONTEXT:
-<docs/context.md Summary + Key Changes>
-```
-
-**Agent: fe-review** (`subagent_type: "fe-review"`)
-
-Pass as user message:
 ```
 DIFF:
 <full diff>
 
 CONTEXT:
-<docs/context.md Summary + Key Changes>
+<docs/context.md Summary + Key Changes — or, for a single native screen, the sibling screen read in Phase 0>
 ```
 
-**Agent: fe-a11y** (`subagent_type: "fe-a11y"`) — _only if View*.tsx changed_
+Spawn the set the classifier selected:
 
-Pass as user message:
-```
-DIFF:
-<full diff>
+| Agent (`subagent_type`) | Platform | Include when |
+|-------------------------|----------|--------------|
+| `code-quality` | all | any non-test, non-resource code changed |
+| `fe-review` | RN / web | any EVPMR layer changed |
+| `fe-a11y` | RN / web | `View*.tsx` changed |
+| `android-review` | Android | any MVP layer, Dagger, or `strings.xml` changed |
+| `android-a11y` | Android | Activity/Fragment/Widget/Composable or layout XML changed |
+| `ios-review` | iOS | any MVVM-C layer or `*.strings` changed |
+| `ios-a11y` | iOS | ViewController/View/Cell changed |
+| `adversarial` | all | 3+ architecture layers changed |
 
-CONTEXT:
-<docs/context.md Summary + Key Changes>
-```
-
-**Agent: adversarial** (`subagent_type: "adversarial"`) — _only if 3+ EVPMR layers changed_
-
-Pass as user message:
-```
-DIFF:
-<full diff>
-
-CONTEXT:
-<docs/context.md Summary + Key Changes>
-```
+**`code-quality` prompt additions** — prepend to its message when applicable:
+- security-sensitive paths (`auth/*`, `payment/*`, `*credential*`, `*token*`): `"Security-sensitive code present — emphasize security axis."`
+- manifest changed (`package.json`, `*.gradle`, `Podfile`/`Package.swift`): `"<file> changed — audit new dependencies for bundle/binary impact, maintenance status, and known vulnerabilities."`
 
 ---
 
@@ -124,7 +108,8 @@ Sort within each tier: `[CONSENSUS]` first, then standard, then `[UNIQUE]`.
 ```
 PARALLEL REVIEW COMPLETE
 ────────────────────────────────────────
-Phase 1:   tsc PASS | lint PASS | test PASS (N tests)
+Platform:  <RN/web | Android | iOS>
+Phase 1:   type/build PASS | lint PASS | test PASS (N tests)
 Agents:    ran [list] | skipped [agent — reason, if any]
 
 FINDINGS

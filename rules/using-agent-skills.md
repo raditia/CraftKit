@@ -46,7 +46,7 @@ Match natural language to the right command. **Dynamic parallel is the default**
 | "help me review", "review the changes", "code review", "LGTM check", "can you check my changes?" — **feedback intent, no merge signal** | `/parallel-review` | dynamic |
 | "get this ready to merge", "ship this", "prepare for PR", "is this ready?", "can I merge this?" — **merge intent present** | `/parallel-ship` | dynamic |
 | "something is broken", "fix this bug", "this crashes", "why is X not working", "coverage is failing in CI" — **clear breakage signal**; vague complaints without error/crash/fail → `/parallel-review` instead | `/fix` | sequential (linear by nature) |
-| Any test work: "write tests", "add tests", "update tests", "fix tests", "test this", "do tests need updating", "any tests to update", "coverage is low", "improve coverage", "I need tests for X", "create a test for X", "create tests for X", "should I update tests", "are there tests to update" — **test authoring/updating, not broken coverage**. When in doubt about test intent → default here | `/fe-test` | — |
+| Any test work: "write tests", "add tests", "update tests", "fix tests", "test this", "do tests need updating", "any tests to update", "coverage is low", "improve coverage", "I need tests for X", "create a test for X", "create tests for X", "should I update tests", "are there tests to update" — **test authoring/updating, not broken coverage**. When in doubt about test intent → default here | platform's test skill: `/fe-test` (RN/web) · `/android-test` · `/ios-test` | — |
 | "generate PR message", "write PR description", "draft a PR", "what should my PR say", "PR message for this branch" | `/pr-message` | — |
 
 **Tiebreakers:**
@@ -54,8 +54,9 @@ Match natural language to the right command. **Dynamic parallel is the default**
 - "scaffold" verb alone → `/build` not `/parallel-build`
 - "plan"/"spec"/"define"/"scope" intent (before code exists) → `/define`; "build"/"implement" intent → `/parallel-build`. Planning verb wins only when no build-now signal.
 - Merge intent ("ready to merge", "can I merge", "ship") → `/parallel-ship` over `/parallel-review`
-- Coverage mentioned + failing/CI context → `/fix`; coverage mentioned + authoring/update context → `/fe-test`
-- Any ambiguous test query ("any tests?", "tests needed?", "should tests change?") → `/fe-test`
+- Coverage mentioned + failing/CI context → `/fix`; coverage mentioned + authoring/update context → the platform's test skill
+- Any ambiguous test query ("any tests?", "tests needed?", "should tests change?") → the platform's test skill
+- **Test intent resolves platform first.** `/fe-test` is RN/web only (jest, 93% bar, EVPMR paths) — on `*.kt`/`*.java` run `/android-test`, on `*.swift`/`*.m` run `/ios-test`. Detect from the changed files, or from the project root when nothing is changed yet. Announcing `/fe-test` on a native repo is a routing error, not a near-miss.
 
 **Sequential fallback** — use explicit slash command when you want a lightweight, single-pass run:
 
@@ -112,7 +113,7 @@ Native Android (MVP + Core framework)          Native iOS (MVVM-C)
   └── Branch context (multi-screen)? ──→ /android-context    /ios-context
 ```
 
-Native build / fix / ship / PR-message reuse the shared `/build` `/fix` `/ship` `/pr-message` — these detect the platform and dispatch to the matching `{android,ios}-*` skills (no parallel-agent variants for native).
+All orchestrators are platform-routed — `/build` `/fix` `/ship` `/pr-message` and the three `/parallel-*` commands detect the platform at Step 0 and dispatch to the matching `{fe,android,ios}-*` skills and agents. Same command names on every platform; only the gates and agent set change.
 
 ---
 
@@ -129,7 +130,21 @@ rtk git diff <base>...HEAD               # full diff
 
 For each changed file, read enough of its actual content to confirm what layer it belongs to — don't rely on filename alone.
 
+### Step 1.5 — Detect platform
+
+Pick the table in Step 2 from the changed files (a mixed diff runs both tables and unions the sets):
+
+| Signal | Platform | Architecture |
+|--------|----------|--------------|
+| `*.tsx`/`*.ts` + `package.json` | React Native / web | EVPMR |
+| `*.kt`/`*.java` + Gradle | Android | MVP + Core framework |
+| `*.swift`/`*.m` + `Modules/` | iOS | MVVM-C |
+
+`code-quality`, `ponytail-review`, and `adversarial` are platform-agnostic — they apply on all three. Only the review/a11y/performance agents are platform-specific.
+
 ### Step 2 — Classify and select agents
+
+**React Native / web (EVPMR)**
 
 | Changed file pattern | Agent(s) to add |
 |---------------------|-----------------|
@@ -138,15 +153,45 @@ For each changed file, read enough of its actual content to confirm what layer i
 | `Model*.ts` | `code-quality` |
 | `Entry*.tsx` | `fe-review` |
 | `Resource*.ts` | `fe-review` |
-| `auth/*`, `payment/*`, `*credential*`, `*token*` | `code-quality` (security emphasis — note in prompt) |
 | `package.json` changed | `code-quality` (dependency audit — note in prompt) |
-| Test files only (all changed files match `__tests__/*` or `*.test.*`) | **Skip Phase 2** — fast gates only |
+| Test files only (all match `__tests__/*` or `*.test.*`) | **Skip Phase 2** — fast gates only |
+
+**Android (MVP + Core framework)**
+
+| Changed file pattern | Agent(s) to add |
+|---------------------|-----------------|
+| `*Activity.kt`, `*Fragment.kt`, `*Widget.kt`, `res/layout/*.xml`, `@Composable` | `android-review`, `android-a11y` |
+| `*Presenter.kt` | `android-review`, `code-quality` |
+| `*ViewModel.kt`, `*NavigationModel.kt` | `android-review`, `code-quality` |
+| `*Repository.kt`, `*Interactor.kt`, `*UseCase.kt` | `code-quality` |
+| `*Module.kt`, `*Component.kt`, `*ComponentBuilder.kt` (Dagger) | `android-review` |
+| `res/values*/strings.xml` | `android-review` |
+| `*.gradle` / `*.gradle.kts` changed | `code-quality` (dependency audit — note in prompt) |
+| Test files only (all match `src/test/**` or `*Test.kt`) | **Skip Phase 2** — fast gates only |
+
+**iOS (MVVM-C)**
+
+| Changed file pattern | Agent(s) to add |
+|---------------------|-----------------|
+| `*ViewController.swift`, `*View.swift`, `*Cell.swift` | `ios-review`, `ios-a11y` |
+| `*ViewModel.swift` | `ios-review`, `code-quality` |
+| `*Fetcher.swift` | `code-quality`, `ios-performance` |
+| `*Contract.swift`, `*Factory.swift`, `*Coordinator.swift` | `ios-review` |
+| `*.strings`, `Localizable*` | `ios-review` |
+| `Podfile`, `Package.swift`, `BUILD`/`*.bzl` changed | `code-quality` (dependency audit — note in prompt) |
+| Test files only (all match `*Test.swift` or `*Spec.swift`) | **Skip Phase 2** — fast gates only |
+
+**All platforms**
+
+| Changed file pattern | Agent(s) to add |
+|---------------------|-----------------|
+| `auth/*`, `payment/*`, `*credential*`, `*token*` | `code-quality` (security emphasis — note in prompt) |
 
 Dedup the set. Always include `code-quality` if any non-test, non-resource code changed.
 
 > `parallel-build` and `parallel-ship` additionally include `ponytail-review` (over-engineering axis) for any non-test, non-resource change — defined in those command files, not this base table (see extensions note below). It overlaps `code-quality` only on `delete:`/dead-code; a same-`file:line` hit becomes `[CONSENSUS]` in synthesis, which is the dedup, not waste.
 
-> **Command-specific extensions:** `parallel-build` and `parallel-ship` add agents beyond this base table (e.g. `fe-patterns`, `fe-performance`). Those additions are defined in the command file itself, not here — this table is the shared base.
+> **Command-specific extensions:** `parallel-build` and `parallel-ship` add agents beyond these base tables (e.g. `fe-patterns`, `fe-performance`, `android-performance`, `ios-performance`). Those additions are defined in the command file itself, not here — these tables are the shared base.
 
 ### Step 3 — Flag conditions
 
@@ -155,14 +200,15 @@ Evaluate before spawning:
 | Condition | Action |
 |-----------|--------|
 | Diff > 300 lines | Add `[WARNING] Change size: N lines — consider splitting` to synthesis |
-| 3+ EVPMR layers changed | Add `adversarial` agent (definition in `agents/adversarial.md`) |
+| 3+ architecture layers changed — EVPMR (Entry/View/Presenter/Model/Resource), Android MVP (View/Presenter/ViewModel/Repository/DI), or iOS MVVM-C (ViewController/View/ViewModel/Fetcher/Coordinator) | Add `adversarial` agent (definition in `agents/adversarial.md`) |
 | Security-sensitive paths | Pass "Security-sensitive code present — emphasize security axis." in user message to `code-quality` agent |
 
 ### Step 4 — Announce selection
 
-Before spawning agents, tell the user:
+Before spawning agents, tell the user — name the detected platform, since it picked the agent set:
 ```
-Classifier selected: [agent-a, agent-b, agent-c] based on: View*.tsx + Presenter*.ts changed
+Platform: Android (MVP)
+Classifier selected: [android-review, android-a11y, code-quality] based on: *Fragment.kt + *Presenter.kt changed
 Spawning N agents in parallel...
 ```
 
@@ -182,18 +228,20 @@ Do not retry a dead model spawn inline — the model key won't change mid-turn. 
 
 ## Standard context loading
 
-Every skill follows this on start — not repeated per skill:
-1. Find project root — nearest `package.json` going up from CWD
+**Scope: RN/web skills, and native skills only on multi-screen branches.** A native single-screen task has no `docs/context.md` by design — the ten `{android,ios}-*` skills say so in their own **Context:** line, and that wins. There, the baseline is a real sibling screen read from the same module; skip this procedure entirely rather than generating a doc to satisfy it.
+
+Where it does apply, every skill follows this on start — not repeated per skill:
+1. Find project root — nearest `package.json` (RN/web), `settings.gradle` (Android), or `*.xcodeproj`/`Package.swift` (iOS) going up from CWD
 2. Freshness check — run both in parallel:
    ```bash
    rtk git branch --show-current
    rtk git rev-parse HEAD
    ```
-   Then read the `**Branch:**` and `**Commit:**` fields from the `docs/context.md` header (first 5 lines).
-   - If `docs/context.md` missing → run `/fe-context`, then continue
-   - If branch mismatch OR commit mismatch → regenerate with `/fe-context`, then continue
+   Then read the `**Branch:**` and `**Commit:**` fields from the `docs/context.md` header (first 5 lines). The generator is the platform's context skill — `/fe-context`, `/android-context`, or `/ios-context`.
+   - If `docs/context.md` missing → run that skill, then continue
+   - If branch mismatch OR commit mismatch → regenerate with that skill, then continue
    - If both match → context is fresh, proceed
-3. **Always read `docs/context.md`** — mandatory, not optional. Read only the sections the skill specifies (see each skill's **Context:** line); at minimum: Summary + Key Changes
+3. **Read `docs/context.md`** — required wherever this procedure applies. Read only the sections the skill specifies (see each skill's **Context:** line); at minimum: Summary + Key Changes
 4. If context conflicts with code → `CONFUSION: docs/context.md says X but code shows Y. Options: A) ... B) ... → Which?`
 
 ---
@@ -337,7 +385,7 @@ Authoring/updating craftkit content (rules, skills, commands, agents) is **repo-
 6. Modifying code orthogonal to the task
 7. Removing things you don't fully understand
 8. Skipping verification because "it looks right"
-9. Skipping `docs/context.md` read — mandatory at skill start, no exceptions
+9. Skipping the `docs/context.md` read where standard context loading applies — or, on a native single-screen task, generating one instead of reading a sibling screen
 10. Context flooding — loading entire files not relevant to the current task
 11. **Skipping skill classification before responding** — always check skills first; always announce match or no-match; never silently bypass this gate
 

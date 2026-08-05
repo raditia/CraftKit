@@ -1,8 +1,10 @@
 ---
 name: fe-test
-description: Write or improve tests covering all changed code paths. Enforces 93% coverage minimum.
+description: Write or improve Jest tests for React Native / web (EVPMR) covering all changed code paths. Enforces 93% coverage minimum. Native repos use /android-test or /ios-test instead.
 alwaysApply: false
 ---
+
+> **Platform gate — check first.** This skill is RN/web only (Jest, 93% bar, EVPMR paths). If the code under test is `*.kt`/`*.java` → stop, run `/android-test`. If `*.swift`/`*.m` → stop, run `/ios-test`. Neither has a fixed coverage bar; do not carry the 93% gate into them.
 
 **Commands:** `rtk tsc`, `rtk lint`, `rtk grep "pattern" .`
 **Tests:** `rtk test --testPathPattern=<path> --no-coverage` (run from workspace root)

@@ -1,61 +1,71 @@
 ---
 name: parallel-build
-description: Dynamic parallel build workflow — sequential context + scaffold + implement, then classifier-selected validation agents run concurrently. Adapts to what was built.
+description: Dynamic parallel build workflow — platform-routed context + scaffold + implement, then classifier-selected validation agents run concurrently. Supports RN/web (EVPMR), Android (MVP), and iOS (MVVM-C).
 ---
 
-**Commands:** `rtk git diff`, `rtk tsc`, `rtk lint`, `rtk test`
+**Commands:** `rtk git diff`, plus the platform's type/lint/test tooling (see Step 0)
 **Model:** everyday — escalate for architectural decisions with non-obvious tradeoffs
 
 > Triggered by: "parallel build", "build in parallel", "build fast", `/parallel-build`
 
 ---
 
+## Step 0 — Platform routing
+
+Detect the platform from the project root + target files, then use its column for every phase below:
+
+| | RN / web (EVPMR) | Android (MVP) | iOS (MVVM-C) |
+|---|---|---|---|
+| **Signal** | `package.json` + `*.tsx` | `*.gradle`, `*.kt`/`*.java` | `*.xcodeproj`/`Podfile`/`Package.swift`, `Modules/` + `*.swift` |
+| **Phase 0 context** | `/fe-context` → `docs/context.md` (required) | `/android-context` only if multi-screen | `/ios-context` only if multi-screen |
+| **Phase 1 scaffold** | `/fe-scaffold` (5-file EVPMR) | `/android-scaffold` | `/ios-scaffold` |
+| **Phase 2 patterns** | `/fe-patterns` + `/fe-performance` | `/android-patterns` + `/android-performance` | `/ios-patterns` + `/ios-performance` |
+| **Phase 3 gates** | `rtk tsc --noEmit`, `rtk lint` | `./gradlew :<module>:lintGeneralDebug` | `swiftlint lint` |
+| **Phase 6 tests** | `/fe-test` — coverage ≥ 93% | `/android-test` — no fixed bar | `/ios-test` — no fixed bar |
+
+For native, skip the EVPMR-specific steps. When Phase 0 context is skipped (single screen), read a real sibling screen first and use it as the convention baseline everywhere `docs/context.md` is referenced below.
+
+---
+
 ## Phase 0 — Context (sequential)
 
-Run the `/fe-context` workflow:
+Run the platform's context step from Step 0. For RN / web that is `/fe-context`:
 1. Detect base: `rtk git remote show origin | grep 'HEAD branch'`
 2. `rtk git log --oneline <base>...HEAD` + `rtk git diff <base>...HEAD`
 3. Write `docs/context.md` (≤ 600 lines): Summary, Architecture Patterns in Use, Key Changes, Test Coverage Needed
 
-**Gate:** `docs/context.md` exists and covers the feature scope.
+**Gate:** `docs/context.md` exists and covers the feature scope — or, for a single native screen, the sibling screen has been read.
 
-If the architecture/approach is genuinely open (not a routine EVPMR feature) → offer `/ideate` before scaffold; feed the chosen shortlist in as the design decision. Opt-in — cost gate applies.
+If the architecture/approach is genuinely open (not a routine feature on the platform's pattern) → offer `/ideate` before scaffold; feed the chosen shortlist in as the design decision. Opt-in — cost gate applies.
 
 ---
 
 ## Phase 1 — Scaffold (sequential)
 
-Follow the `/fe-scaffold` workflow — surface assumptions first, create the 5-file EVPMR module.
+Follow the platform's scaffold skill from Step 0 — surface assumptions first, create the module's full file set.
 
-**Gate:** All 5 files created, `rtk tsc --noEmit` passes.
+**Gate:** All files created, the platform's type/build gate passes.
 
 ---
 
 ## Phase 2 — Implement (sequential)
 
-Build the feature. Apply `/fe-patterns` and `/fe-performance` continuously as you build — not as a post-pass. `fe-rules` (always active) enforces layer constraints throughout.
+Build the feature. Apply the platform's patterns + performance skills continuously as you build — not as a post-pass. On RN / web, `fe-rules` (always active) enforces layer constraints throughout; on native, the layer contract comes from the platform's patterns skill.
 
-**Gate:** `rtk tsc --noEmit` passes after every logical chunk, and the ponytail self-pass (`karpathy-guidelines` rule 2) runs on the built files before Phase 3 — cut or mark `ponytail:` now, while the code is still yours. The `ponytail-review` agent in Phase 5 is the backstop, not the first pass; findings there mean this gate was skipped.
+**Gate:** The platform's type/build gate passes after every logical chunk, and the ponytail self-pass (`karpathy-guidelines` rule 2) runs on the built files before Phase 3 — cut or mark `ponytail:` now, while the code is still yours. The `ponytail-review` agent in Phase 5 is the backstop, not the first pass; findings there mean this gate was skipped.
 
 ---
 
 ## Phase 3 — Fast gates (parallel)
 
-Run simultaneously as parallel Bash calls:
+Run the platform's Phase 3 gates from Step 0 simultaneously as parallel Bash calls.
 
-```bash
-rtk tsc --noEmit
-```
-```bash
-rtk lint <changed-files>
-```
-
-**Gate:** Both must pass. If any fail → fix before Phase 4.
+**Gate:** All must pass. If any fail → fix before Phase 4.
 
 ```
-PHASE 3
-tsc:   PASS / FAIL
-lint:  PASS / FAIL
+PHASE 3  (platform: <RN/web | Android | iOS>)
+type/build: PASS / FAIL / n-a
+lint:       PASS / FAIL
 → Proceeding to classification / BLOCKED — fix above first
 ```
 
@@ -65,17 +75,18 @@ lint:  PASS / FAIL
 
 Apply the parallel workflow classifier from `using-agent-skills`, but scan the **newly created/modified files** (not just the diff) — read their actual content to determine which layers exist and what they do.
 
-Additional build-specific rules:
+Additional build-specific rules — the a11y/performance rows resolve to the detected platform's agent (`fe-*`, `android-*`, or `ios-*`):
 
 | What was built | Add to agent set |
 |----------------|-----------------|
 | Any non-test, non-resource source | `ponytail-review` (over-engineering — fresh builds accrete speculative abstraction) |
-| View with form inputs or interactive elements | `fe-a11y` |
-| Presenter with data fetching or complex state | `fe-performance` |
-| New component used in navigation | `fe-a11y` |
-| Large module (> 5 files or > 300 lines total) | adversarial agent |
+| Screen/view with form inputs or interactive elements | platform a11y agent |
+| Screen/view reachable from navigation | platform a11y agent |
+| Presenter / ViewModel with data fetching or complex state | platform performance agent |
+| List or collection rendering (FlatList, RecyclerView, UITableView/UICollectionView) | platform performance agent |
+| Large module (> 5 files or > 300 lines total) | `adversarial` |
 
-Announce selected agents before proceeding.
+Announce the detected platform and the selected agents before proceeding.
 
 ---
 
@@ -85,73 +96,36 @@ Spawn **all** selected agents in **one** message — N `Agent` tool-use blocks i
 
 **Do not wait by polling.** Never `grep`/`sleep`-loop over task output files (`tasks/*.output`) to detect completion — the harness wakes the main thread automatically when every spawned agent comes to rest, and re-invokes you with their results. Spin-loops keep running for minutes after the agents already finished. On wake, read the returned results and go straight to synthesis.
 
-**Agent: fe-review** (`subagent_type: "fe-review"`)
+Every agent gets the same user message:
 
-Pass as user message:
 ```
 FILES:
 <content of all newly created/modified files>
 
 CONTEXT:
-<docs/context.md full content>
+<docs/context.md full content — or, for a single native screen, the sibling screen read in Phase 0>
 ```
 
-**Agent: fe-patterns** (`subagent_type: "fe-patterns"`)
+`adversarial` gets one extra prefix line: `This is a newly built feature — argue the strongest case against shipping it as-is.`
 
-Pass as user message:
-```
-FILES:
-<content of all newly created/modified files>
+Spawn the set Phase 4 selected:
 
-CONTEXT:
-<docs/context.md full content>
-```
+| Agent (`subagent_type`) | Platform | Include when |
+|-------------------------|----------|--------------|
+| `ponytail-review` | all | any non-test, non-resource source built |
+| `fe-review` | RN / web | always |
+| `fe-patterns` | RN / web | always |
+| `fe-a11y` | RN / web | interactive or navigable View built |
+| `fe-performance` | RN / web | Presenter with data fetching, complex state, or list rendering |
+| `android-review` | Android | always |
+| `android-a11y` | Android | interactive or navigable Activity/Fragment/Widget/Composable built |
+| `android-performance` | Android | Presenter/ViewModel with data fetching, complex state, or RecyclerView |
+| `ios-review` | iOS | always |
+| `ios-a11y` | iOS | interactive or navigable ViewController/View built |
+| `ios-performance` | iOS | ViewModel/Fetcher with data fetching, complex state, or table/collection view |
+| `adversarial` | all | large module built (> 5 files or > 300 lines total) |
 
-**Agent: ponytail-review** (`subagent_type: "ponytail-review"`) — _include whenever non-test, non-resource source built_
-
-Pass as user message:
-```
-FILES:
-<content of all newly created/modified files>
-
-CONTEXT:
-<docs/context.md full content>
-```
-
-**Agent: fe-a11y** (`subagent_type: "fe-a11y"`) — _only if interactive View components built_
-
-Pass as user message:
-```
-FILES:
-<content of all newly created/modified files>
-
-CONTEXT:
-<docs/context.md full content>
-```
-
-**Agent: fe-performance** (`subagent_type: "fe-performance"`) — _only if Presenter with data fetching or complex state_
-
-Pass as user message:
-```
-FILES:
-<content of all newly created/modified files>
-
-CONTEXT:
-<docs/context.md full content>
-```
-
-**Agent: adversarial** (`subagent_type: "adversarial"`) — _only if large module built (> 5 files or > 300 lines total)_
-
-Pass as user message:
-```
-This is a newly built feature — argue the strongest case against shipping it as-is.
-
-FILES:
-<content of all newly created/modified files>
-
-CONTEXT:
-<docs/context.md full content>
-```
+Native has no `*-patterns` cold agent — the platform's patterns skill already ran continuously in Phase 2, and its review agent covers the layer contract. That is a deliberate gap, not an omission to fill.
 
 **Synthesize Phase 5 findings** — first apply **Step 5 — Handle agent failures** (`using-agent-skills`): any selected agent that returned no findings is a coverage gap, not a clean axis — surface it, mark it skipped, gate verdict to `INCOMPLETE`. Then apply **Track B** (structured synthesis):
 - `[CONSENSUS]` — flagged by 2+ agents independently → fix before proceeding
@@ -165,9 +139,9 @@ CONTEXT:
 
 ## Phase 6 — Tests (sequential)
 
-Run the `/fe-test` workflow — write tests covering all new code paths. Coverage ≥ 93% on Lines, Branches, Functions, Statements.
+Run the platform's test skill from Step 0 — write tests covering all new code paths.
 
-**Gate:** All tests pass. Coverage ≥ 93% on all four metrics.
+**Gate:** All tests pass. RN / web: coverage ≥ 93% on Lines, Branches, Functions, Statements. Android / iOS: no fixed bar unless the team set one — report the module's actual coverage, or state that it isn't measured.
 
 ---
 
@@ -176,9 +150,10 @@ Run the `/fe-test` workflow — write tests covering all new code paths. Coverag
 ```
 PARALLEL BUILD COMPLETE
 ────────────────────────────────────────
-Files created:   [list all 5 EVPMR files]
+Platform:        <RN/web | Android | iOS>
+Files created:   [list all files in the module]
 Ponytail:        self-pass clean / cut <what>, marked <what>
-Phase 3:         tsc PASS | lint PASS
+Phase 3:         type/build PASS | lint PASS
 Agents (Phase 5): ran [list] | skipped [agent — reason, if any]
 
 FINDINGS (from validation)
@@ -191,6 +166,6 @@ FINDINGS (from validation)
   1. concern — scenario → consequence
 
 Tests:     PASS (N tests, N new)
-Coverage:  Lines N% / Branches N% / Functions N% / Statements N%
+Coverage:  Lines N% / Branches N% / Functions N% / Statements N%  (native: actual, or "not measured")
 Verdict:   DONE / BLOCKED — <list blockers> / INCOMPLETE — <axes unverified due to skipped agents>
 ```

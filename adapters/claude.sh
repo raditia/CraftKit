@@ -13,7 +13,7 @@ CLAUDE_MD="$HOME/.claude/CLAUDE.md"
 _CRAFTKIT_HOOK_SCRIPT="craftkit-routing.js"
 _CLAUDE_SECTION_START="<!-- BEGIN AGENTIC-SKILLS (managed — do not edit manually) -->"
 _CLAUDE_SECTION_END="<!-- END AGENTIC-SKILLS -->"
-_CLAUDE_AGENT_RULES_START="<!-- BEGIN CRAFTKIT-INJECTED-RULES (managed — regenerated on sync from rules/) -->"
+_CLAUDE_AGENT_RULES_START="<!-- BEGIN CRAFTKIT-INJECTED-RULES (managed — regenerated on sync from rules/ or skills/) -->"
 _CLAUDE_AGENT_RULES_END="<!-- END CRAFTKIT-INJECTED-RULES -->"
 
 # Returns 0 if the skill's SKILL.md has alwaysApply: true
@@ -283,7 +283,7 @@ get_claude_agent_dest() {
     echo "$CLAUDE_AGENTS_DIR/${1}.md"
 }
 
-# Reads the comma-separated rule names from an agent's `craftkitInject:` frontmatter
+# Reads the comma-separated source names from an agent's `craftkitInject:` frontmatter
 # line (only inside the leading --- block). Empty output = no injection requested.
 _claude_agent_inject_list() {
     awk '
@@ -303,9 +303,10 @@ _claude_strip_frontmatter() {
 }
 
 # Renders an agent source file into $out. If the agent opts in via
-# `craftkitInject: ruleA, ruleB`, the bodies of rules/<ruleA>.md ... are spliced
-# in as a managed block right after the agent's frontmatter — so cold agents
-# carry the live rule text instead of a hand-maintained copy. No opt-in → plain copy.
+# `craftkitInject: ruleA, skillB`, the bodies of rules/<ruleA>.md /
+# skills/<skillB>/SKILL.md ... are spliced in as a managed block right after the
+# agent's frontmatter — so cold agents carry the live text instead of a
+# hand-maintained copy. No opt-in → plain copy.
 _claude_render_agent() {
     local src="$1" out="$2"
     local list
@@ -322,12 +323,15 @@ _claude_render_agent() {
         echo "$list" | tr ',' '\n' | while IFS= read -r r; do
             r="$(echo "$r" | tr -d '[:space:]')"
             [[ -z "$r" ]] && continue
-            local rf="$RULES_DIR/${r}.md"
-            if [[ -f "$rf" ]]; then
+            # rules/ wins over skills/ when a name exists in both
+            if [[ -f "$RULES_DIR/${r}.md" ]]; then
                 echo ""
-                _claude_strip_frontmatter "$rf"
+                _claude_strip_frontmatter "$RULES_DIR/${r}.md"
+            elif [[ -f "$SKILLS_DIR/${r}/SKILL.md" ]]; then
+                echo ""
+                _claude_strip_frontmatter "$SKILLS_DIR/${r}/SKILL.md"
             else
-                echo "    ! craftkitInject: rule '$r' not found in rules/ — skipped" >&2
+                echo "    ! craftkitInject: '$r' not found in rules/ or skills/ — skipped" >&2
             fi
         done
         echo ""
