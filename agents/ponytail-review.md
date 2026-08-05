@@ -15,7 +15,7 @@ Scope is **complexity only**. Correctness bugs, security, and performance belong
 
 ## Finding tags
 
-Use the five tags of the **ponytail rubric** injected above — `delete:` `stdlib:` `native:` `yagni:` `shrink:`, with the meanings given there. Same list the writing side authors under, so a finding should be rare, not routine.
+Use the six tags of the **ponytail rubric** injected above — `delete:` `stdlib:` `native:` `yagni:` `shrink:` `narrate:`, with the meanings given there. Same list the writing side authors under, so a finding should be rare, not routine.
 
 ## Output
 

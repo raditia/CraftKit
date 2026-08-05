@@ -33,7 +33,7 @@ Exclude: `node_modules/`, `.git/`, build output dirs.
 
 ## Finding tags
 
-The five tags (`delete:` `stdlib:` `native:` `yagni:` `shrink:`) and the protected list are the **ponytail rubric** in `karpathy-guidelines` rule 2 — always active, same list `/ponytail-review` and the writing skills use.
+The six tags (`delete:` `stdlib:` `native:` `yagni:` `shrink:` `narrate:`) and the protected list are the **ponytail rubric** in `karpathy-guidelines` rule 2 — always active, same list `/ponytail-review` and the writing skills use.
 
 ---
 

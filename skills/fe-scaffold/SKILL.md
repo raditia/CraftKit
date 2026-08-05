@@ -120,7 +120,7 @@ track('FEATURE_NAME', 'ACTION', { ...payload });
 
 ## After generating
 
-- [ ] Ponytail self-pass — scan every generated file against the five tags in `karpathy-guidelines` rule 2; cut each hit or mark it `ponytail:`. Report `ponytail self-pass: clean` or what was cut/marked
+- [ ] Ponytail self-pass — scan every generated file against the six tags in `karpathy-guidelines` rule 2; cut each hit or mark it `ponytail:`. Report `ponytail self-pass: clean` or what was cut/marked
 - [ ] `rtk lint path/to/file.tsx` on every file created or modified — zero errors
 - [ ] `rtk tsc --noEmit` — no TypeScript errors
 - [ ] No `// eslint-disable` without a documented reason

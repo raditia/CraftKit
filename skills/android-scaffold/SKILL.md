@@ -124,7 +124,7 @@ Add to the module's `res/values/strings.xml`; reference `R.string.<key>`. Never 
 
 ## After generating
 
-- [ ] Ponytail self-pass — scan every generated file against the five tags in `karpathy-guidelines` rule 2; cut each hit or mark it `ponytail:`. Report `ponytail self-pass: clean` or what was cut/marked
+- [ ] Ponytail self-pass — scan every generated file against the six tags in `karpathy-guidelines` rule 2; cut each hit or mark it `ponytail:`. Report `ponytail self-pass: clean` or what was cut/marked
 - [ ] `./gradlew :<feature>:lintGeneralDebug` — zero new violations
 - [ ] `./gradlew :<feature>:testGeneralDebugUnitTest` compiles (add a Presenter test — see `/android-test`)
 - [ ] Dagger graph compiles (the View is in the `@Component`'s `inject(...)` list)
