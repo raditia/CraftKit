@@ -48,6 +48,21 @@ Hard constraints for the Entry/View/Presenter/Model/Resource architecture. These
 
 ---
 
+## Imports
+
+- **Import the module, never the folder barrel.** A barrel `index.ts` re-exports hooks, providers and contexts next to pure utils, so reaching one helper through it pulls that whole graph — react-query, feature-control and provider code — into the importer:
+  ```ts
+  // WRONG — drags the barrel's hooks/providers in for one function
+  import { getPassengerName } from '@scope/pkg/booking-seat-map';
+  // CORRECT
+  import { getPassengerName } from '@scope/pkg/booking-seat-map/utils/getPassengerName';
+  ```
+- **Don't add a new shared helper to the barrel.** Export it from its own file only — an available barrel path invites the expensive import next time.
+- Already importing other symbols from that barrel? There's no graph win, but deep-import anyway for consistency.
+- Bonus in tests: a `jest.mock` of the barrel leaves a deep-imported helper real, so it needs no `jest.requireActual` threading.
+
+---
+
 ## Styling
 
 - NEVER inline styles: `style={{ margin: 8 }}` → forbidden

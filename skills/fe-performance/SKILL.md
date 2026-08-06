@@ -84,15 +84,7 @@ const HeavyChart = dynamic(() => import('./HeavyChart'), {
 const HeavyChart = lazy(() => import('./HeavyChart'));
 ```
 
-**Direct imports, not barrels** — barrel `index.ts` files force bundlers to load the entire graph:
-```ts
-// WRONG
-import { Button, Card } from '@/components';
-
-// CORRECT
-import { Button } from '@/components/Button';
-import { Card } from '@/components/Card';
-```
+**Direct imports, not barrels** — barrel `index.ts` files force bundlers to load the entire graph. Rule and examples: `fe-rules` → Imports. Audit existing barrel imports on any bundle-size investigation.
 
 **Statically analyzable import paths** — dynamic template literals defeat tree-shaking:
 ```ts
