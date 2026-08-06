@@ -213,6 +213,35 @@ else
     fail "package.json=$_pkg  README header=$_hdr  changelog=$_log — must match"
 fi
 
+# ---------------------------------------------------------------------------
+# 11. Routing hook resolves each platform from cwd, and survives bad stdin.
+#     Platform used to be the model's job to infer from filenames, which is how
+#     a /fe-* skill got announced on a .kt task. It is now injected per prompt —
+#     but a marker typo or a crash on malformed stdin removes the whole gate
+#     silently, since a dead UserPromptSubmit hook just yields no context.
+#     Behavioral on purpose: a grep would pass on detection that never fires.
+# ---------------------------------------------------------------------------
+check "routing hook detects platform from cwd"
+if ! command -v node >/dev/null 2>&1; then
+    echo "    skipped (node not on PATH)"
+else
+    _fx="$(mktemp -d)"
+    mkdir -p "$_fx/a" "$_fx/i" "$_fx/w"
+    touch "$_fx/a/settings.gradle" "$_fx/i/Podfile" "$_fx/w/package.json"
+    _probe() { echo "{\"cwd\":\"$1\"}" | node "$HOOK" 2>/dev/null; }
+    _pd=0
+    _probe "$_fx/a" | grep -q "Platform (detected from cwd, authoritative): Android (MVP)" \
+        || { fail "settings.gradle did not resolve to Android"; _pd=1; }
+    _probe "$_fx/i" | grep -q "Platform (detected from cwd, authoritative): iOS (MVVM-C)" \
+        || { fail "Podfile did not resolve to iOS"; _pd=1; }
+    _probe "$_fx/w" | grep -q "Platform (detected from cwd, authoritative): React Native / web (EVPMR)" \
+        || { fail "package.json did not resolve to React Native / web"; _pd=1; }
+    echo 'not json' | node "$HOOK" >/dev/null 2>&1 \
+        || { fail "hook exits non-zero on malformed stdin — gate disappears every prompt"; _pd=1; }
+    rm -rf "$_fx"
+    [[ $_pd -eq 0 ]] && pass
+fi
+
 echo
 if [[ $FAILURES -eq 0 ]]; then
     echo "All checks passed."

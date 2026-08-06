@@ -29,15 +29,53 @@ function detectModelTier() {
   }
 }
 
+// Platform detection — deterministic, so the model never infers RN/web vs Android vs iOS
+// from filenames. Nearest ancestor holding a marker wins: from an RN root only package.json
+// matches; from inside its android/ subdir build.gradle matches first, which is the right
+// answer for native work there. Several markers at one level = mixed, report all.
+const PLATFORM_MARKERS = [
+  { label: 'Android (MVP)', match: n => /^(settings|build)\.gradle(\.kts)?$/.test(n) },
+  { label: 'iOS (MVVM-C)', match: n => n === 'Package.swift' || n === 'Podfile' || /\.xc(odeproj|workspace)$/.test(n) },
+  { label: 'React Native / web (EVPMR)', match: n => n === 'package.json' },
+];
+
+function detectPlatform(startDir) {
+  let dir = startDir;
+  for (let depth = 0; depth < 12; depth++) {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir);
+    } catch (e) {
+      return null;
+    }
+    const hits = PLATFORM_MARKERS.filter(p => entries.some(n => p.match(n))).map(p => p.label);
+    if (hits.length) return hits.join(' + ');
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+  return null;
+}
+
 let input = '';
 process.stdin.on('data', chunk => { input += chunk; });
 process.stdin.on('end', () => {
   const tier = detectModelTier();
+  let cwd = process.cwd();
+  try {
+    const payload = JSON.parse(input);
+    if (payload && typeof payload.cwd === 'string') cwd = payload.cwd;
+  } catch (e) { /* no cwd in payload — process.cwd() stands */ }
+  const platform = detectPlatform(cwd);
+  const platformLine = platform
+    ? `Platform (detected from cwd, authoritative): ${platform}. Route to this platform's skills, agents, and gates.\n\n`
+    : '';
   process.stdout.write(JSON.stringify({
     hookSpecificOutput: {
       hookEventName: "UserPromptSubmit",
       additionalContext:
         "CraftKit skill-first gate. Classify every prompt against skills BEFORE responding; on match output 'Running /skill [tier] — reason.' then invoke, else output exactly 'No skill matched for this request. Responding directly.' Do NOT respond before invoking. Silent bypass = violation. Full routing table + tiebreakers: rules/using-agent-skills.md.\n\n" +
+        platformLine +
         "Orchestrators: build/implement feature→/parallel-build · review/check changes→/parallel-review · ship/merge→/parallel-ship · broken/bug/crash→/fix · tests/coverage→platform test skill (/fe-test RN-web · /android-test · /ios-test) · PR message→/pr-message · scaffold only→/build\n" +
         "Skills (RN/web EVPMR): /fe-context /fe-scaffold /fe-review /fe-patterns /fe-a11y /fe-performance /fe-test /code-quality /debug /ideate /think /ponytail-review /ponytail-audit /ponytail-debt\n" +
         "Planning (opt-in): /define chains interview→spec→plan (checkpoint-gated) — use for 'plan this feature' / 'spec before building'. Or invoke a phase alone: /interview (de-fuzz) · /spec (PRD) · /plan (tasks) · /adr (decision record) · /docs (dual-audience humanized docs). adr+docs also offered as tail of /parallel-ship. Never auto-run from /parallel-build.\n" +

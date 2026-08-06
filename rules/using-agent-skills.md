@@ -132,7 +132,7 @@ For each changed file, read enough of its actual content to confirm what layer i
 
 ### Step 1.5 — Detect platform
 
-Pick the table in Step 2 from the changed files (a mixed diff runs both tables and unions the sets):
+The routing hook already injects `Platform (detected from cwd)` each turn — take it and skip this step. The table below is for when it is absent (non-Claude tool, no marker found) or when the diff is genuinely mixed, in which case run both tables and union the sets:
 
 | Signal | Platform | Architecture |
 |--------|----------|--------------|
