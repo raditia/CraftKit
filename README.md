@@ -1,4 +1,4 @@
-# craftkit `v1.21.0`
+# craftkit `v1.22.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **GitHub Copilot**, **Gemini CLI**, **Codex CLI**, and **Crush**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
@@ -17,6 +17,7 @@ One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**,
   - [Planning pipeline: /define](#planning-pipeline-define--before-you-build) — `/interview` → `/spec` → `/plan`
   - [Experimental: /team-build](#experimental-team-build--agent-teams) — agent-teams build
   - [Fix, tests, and PR message](#fix-tests-and-pr-message)
+  - [Grill, research, and handoff](#grill-research-and-handoff) — stress-test plans, delegate reading, hand off sessions
 - [Skills reference](#skills-reference)
 - [Agents reference](#agents-reference)
 - [Architecture (EVPMR)](#architecture-evpmr)
@@ -60,7 +61,7 @@ M src/checkout/PresenterCheckout.ts
 
 ### Caveman — compresses what you read (AI output)
 
-The `caveman` rule strips filler, hedging, and pleasantries from every response. Same findings, fewer words.
+The caveman plugin strips filler, hedging, and pleasantries from every response. Same findings, fewer words.
 
 ```
 ── WITHOUT CAVEMAN (~65 tokens) ─────────────────────────────────────
@@ -162,7 +163,7 @@ Every `git pull` triggers a sync that installs rules, skills, commands, and agen
 flowchart TD
     A[git pull] --> B[post-merge hook]
     B --> C[sync.sh]
-    C --> T["RTK + Caveman\ntoken-compression tools"]
+    C --> T["RTK\ntoken-filter proxy (ensure_tools)\ncaveman = plugin, not synced"]
     C --> R["rules/*.md\nalways-on · every session"]
     C --> S["skills/*/SKILL.md\non-demand slash commands"]
     C --> M["commands/*.md\nworkflow orchestrators"]
@@ -207,6 +208,9 @@ Natural language routes to the right command automatically. No slash commands re
 "fix this bug"          →  /fix
 "write tests for this"  →  /fe-test · /android-test · /ios-test  (by platform)
 "generate PR message"   →  /pr-message
+"poke holes in my plan" →  /grill     (also: "grill this", "stress-test my design")
+"research X for me"     →  /research  (background agent, primary sources)
+"hand this session off" →  /handoff   (also: "summarize for the next agent")
 ```
 
 Platform is not inferred. On every prompt `hooks/craftkit-routing.js` walks up from `cwd` for `settings.gradle` (Android), `Podfile` / `Package.swift` / `*.xcodeproj` (iOS), or `package.json` (RN/web) — nearest ancestor wins, several markers at one level report as mixed — and injects the answer. So `"write tests for this"` in an Android repo resolves to `/android-test`, never `/fe-test`.
@@ -245,6 +249,7 @@ flowchart TD
     D --> E[Synthesize]
     E --> F{Errors?}
     F -->|none| G[READY TO MERGE]
+    G -.->|opt-in tail| T["offers /adr (decision record)\n+ /docs (dual-audience pages)"]
     F -->|yes| H[BLOCKED — list blockers]
     B -->|any fail ✗| H
 ```
@@ -303,6 +308,7 @@ All platforms
 any non-test src + build/ship       →   + ponytail-review (over-engineering)
 3+ architecture layers changed      →   + adversarial (devil's advocate)
 auth / payment / credential paths   →   code-quality (security emphasis)
+docs/context.md has PLANNING block  →   code-quality (spec conformance — diff vs planned acceptance criteria)
 test files only                     →   Phase 2 SKIPPED entirely
 ```
 
@@ -383,6 +389,8 @@ When you want a lightweight, single-pass run — use the explicit slash command.
 
 Pre-build only — it stops at a reviewed plan and hands off. The post-build docs (`/adr` for the *why*, `/docs` for dual-audience engineer + stakeholder pages) are offered as an opt-in tail of `/parallel-ship`, when the code is final. Every planning skill is also invocable alone (`/spec`, `/plan`, …) when you only want one phase.
 
+Already have a plan and want it challenged before building? `/grill` runs an interactive frontier-round interview over it (see [Grill, research, and handoff](#grill-research-and-handoff)); `plan-roaster` is the cold one-shot alternative.
+
 ---
 
 ### Experimental: /team-build — agent teams
@@ -449,6 +457,35 @@ Full workflow: [`commands/team-build.md`](commands/team-build.md).
 
 ---
 
+### Grill, research, and handoff
+
+Three general-purpose skills adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). All natural-language routed; none auto-run.
+
+```
+"poke holes in my plan" / "grill this" / "stress-test my design"   → needs an EXISTING plan
+  /grill  →  map plan as design tree → ask whole frontier per round (each ❓ with ➡️ recommended
+             answer) → sub-agents fetch facts, you only decide → done when frontier empty.
+             Side effects: resolved terms → docs/glossary.md · hard-to-reverse decisions → offers /adr
+
+"research X for me" / "find out how the Y API works" / "dig into the docs"
+  /research  →  background agent reads PRIMARY sources only (official docs, source code, specs)
+                → cited Markdown note in the repo → you keep working meanwhile
+
+"hand this off" / "summarize this session for the next agent" / "wrapping up for today"
+  /handoff  →  handoff doc in OS temp dir: goal, verified state, decisions + why, ordered next
+               steps, suggested skills. Links existing artifacts by path, never duplicates. Secrets redacted.
+```
+
+Picking the right interrogator:
+
+| You have | You want | Use |
+|----------|----------|-----|
+| A fuzzy new ask, no plan | Requirements extracted | `/interview` (one question at a time) |
+| An existing plan/decision | It challenged, interactively | `/grill` (frontier rounds) |
+| A finished plan doc | A cold second opinion, one shot | `plan-roaster` agent |
+
+---
+
 ## Skills reference
 
 ### Always-active rules
@@ -457,7 +494,6 @@ Loaded automatically on every session. Never invoke these — they're always pre
 
 | Rule | Enforces |
 |------|---------|
-| [`caveman`](rules/caveman.md) | Terse responses — no filler, no hedging. lite / full / ultra modes |
 | [`fe-rules`](rules/fe-rules.md) | EVPMR layer constraints, TypeScript strict, module-over-barrel imports, styling tokens, React correctness, tracking |
 | [`karpathy-guidelines`](rules/karpathy-guidelines.md) | Think before coding, simplicity, surgical changes, goal-driven, read before write, tests verify intent, checkpoint after steps |
 | [`using-agent-skills`](rules/using-agent-skills.md) | Skill routing (mandatory gate — classify before every response, announce match or "No skill matched."), model selection, severity labels, parallel classifier, model for judgment only, surface conflicts |
@@ -514,6 +550,8 @@ The `*-review`, `*-a11y`, and `*-performance` skills below double as the source 
 | [`debug`](skills/debug/SKILL.md) | Structured reproduce → isolate → fix | No hypothesis after 2 isolation attempts |
 | [`ideate`](skills/ideate/SKILL.md) | Divergent ideation — N framed generators → critic scores/clusters. Open-ended design, naming, fuzzy debug | High-stakes — escalate the critic/deepen pass to opus |
 | [`think`](skills/think/SKILL.md) | Systems/strategy reasoning router — cynefin, systems, feedback loops, constraints, leverage, second-order. Architecture + complex-system decisions | Architecture call with non-obvious tradeoffs — escalate analysis to opus |
+| [`research`](skills/research/SKILL.md) | Background agent researches a question against primary sources only, writes a cited note into the repo | — |
+| [`handoff`](skills/handoff/SKILL.md) | Compact the session into a handoff doc for a fresh agent — state, decisions, next steps, suggested skills | — |
 | [`ponytail-review`](skills/ponytail-review/SKILL.md) | Over-engineering audit on a diff or file — what to delete/shrink | Correctness or security concerns → use `code-quality` |
 | [`ponytail-audit`](skills/ponytail-audit/SKILL.md) | Whole-repo bloat scan — ranked list of removals | — |
 | [`ponytail-debt`](skills/ponytail-debt/SKILL.md) | Ledger of all `ponytail:` shortcuts — surfaces deferred simplifications | — |
@@ -528,6 +566,7 @@ The **Define → Plan → Document** layer. All opt-in — never auto-run from `
 | [`spec`](skills/spec/SKILL.md) | Write a PRD before coding — objective, scope, boundaries, acceptance criteria | Hard-to-reverse (schema, public API, payment/auth) — escalate to opus |
 | [`plan`](skills/plan/SKILL.md) | Break a spec into ordered, verifiable tasks + deps + executing skill; offers `plan-roaster` | Large dependency graph or > 5 interdependent files |
 | [`adr`](skills/adr/SKILL.md) | Record one architectural decision — context, options, decision, consequences (the *why*) | — |
+| [`grill`](skills/grill/SKILL.md) | Stress-test an existing plan/decision — frontier-round interview until nothing is silently assumed; captures `docs/glossary.md` terms + offers `/adr` | — |
 | [`docs`](skills/docs/SKILL.md) | Dual-audience docs — technical (engineers) + non-technical (stakeholders), Confluence-paste-ready markdown, run through `/humanizer` | Accuracy depends on subtle system behavior — escalate to everyday |
 
 ---
@@ -725,7 +764,7 @@ External tools and inspirations bundled or adopted into this repo.
 | Tool | Source | Purpose | How it's used |
 |------|--------|---------|---------------|
 | **RTK** | [github.com/rtk-ai/rtk](https://github.com/rtk-ai/rtk) | Filters shell output before it reaches the AI — 60–90% input token savings | Auto-installed on `bash install.sh`. All commands prefixed with `rtk` |
-| **Caveman** | [github.com/JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) | Strips AI output verbosity — 40–60% response token savings | Always-active via `rules/caveman.md`. lite / full / ultra modes |
+| **Caveman** | [github.com/JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) | Strips AI output verbosity — 40–60% response token savings | Delivered by the caveman plugin's hooks (level tracking, stats). lite / full / ultra modes |
 | **Ponytail** | [github.com/DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) | YAGNI-first decision ladder + over-engineering audit — 80–94% code reduction | Decision ladder in `karpathy-guidelines`, `ponytail:` comment convention, 3 skills: `/ponytail-review`, `/ponytail-audit`, `/ponytail-debt` |
 | **Karpathy Guidelines** | [karpathy.ai](https://karpathy.ai) — adapted | Behavioral rules to prevent LLM coding pitfalls: think before coding, surgical changes, goal-driven execution | Always-active via `rules/karpathy-guidelines.md` |
 
@@ -735,6 +774,7 @@ External tools and inspirations bundled or adopted into this repo.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| `v1.22.0` | 2026-08-09 | Adopted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT) after a duplicate/conflict audit against the existing catalog. **`/grill`** — interactive stress-test of an existing plan/decision via frontier-round interview (design tree; whole frontier asked per round, each question with a recommended answer; sub-agents fetch facts so the user only makes decisions); captures resolved terms into a standalone `docs/glossary.md` (deliberately not `docs/context.md`, which `/fe-context` regenerates) and offers `/adr` on the three-condition test — positioned against `/interview` (de-fuzz a new ask, one question at a time) and `plan-roaster` (cold single-pass), so all three keep distinct niches. **`/research`** — background agent investigates primary sources only (official docs, source code, specs) and writes a cited note into the repo. **`/handoff`** — compacts the session into a handoff doc (goal, verified state, decisions with their why, ordered next steps, suggested skills) in the OS temp dir, referencing existing artifacts by path instead of duplicating them, secrets redacted. `/interview` upgraded with two grilling ideas: mark the recommended answer among candidates, and "facts are your job, decisions are the user's" (look up what the environment can answer before spending a question). Parallel classifier gains a **spec-conformance flag condition**: when `docs/context.md` has a PLANNING block, `code-quality` is instructed to verify the diff against the planned spec/acceptance criteria — closing the `/define` → build → review loop. `CLAUDE.md` authoring checklist gains **"Writing levers for agent-consumed docs"** (no-op test, leading words, state-the-positive, pointer wording as invocation lever, completion-criteria demand) mined from `writing-for-agents`. Considered and skipped as duplicates/conflicts: `diagnosing-bugs` (`/debug`), `tdd` (test-skill routing), `code-review` (`/parallel-review`; its Spec axis adopted as the flag condition above), `to-spec`/`to-tickets`/`triage`/`wayfinder` (tracker-centric; `/spec` + `/plan` cover the need), `ask-matt` (routing hook), `improve-codebase-architecture`/`codebase-design` (deepening philosophy clashes with ponytail's deletion bias). Routing wired: hook `General:` line, discovery-tree entries (grill under Planning & docs, new General-utilities group), grill tiebreaker. **Caveman dedup** — a token audit of the live install found the caveman instructions loaded ~4×: `rules/caveman.md` synced into the managed block, a second copy in an orphaned `AGENTIC-GENERAL` block left by an old installer, a stray third copy, plus the caveman plugin injecting the same text per-turn via its SessionStart/UserPromptSubmit hooks. One channel wins: the plugin (level tracking, stats, persistence). `rules/caveman.md` deleted — the sync state-file removal loop uninstalls it from all six tools automatically — and `using-agent-skills` / README now name the plugin as the sole delivery. ~1.2k tokens/session + ~150 tokens/turn reclaimed. |
 | `v1.21.0` | 2026-08-06 | **Platform detection moved from inference to `cwd`.** The routing hook told the model to detect RN/web vs Android vs iOS itself, and `using-agent-skills` warned that announcing a `/fe-*` skill on a `.kt` or `.swift` task is a routing error — a rule against a mistake the setup invited, since the model only had filenames to go on and a native repo with no staged changes gives it nothing. That is deterministic work handed to a probabilistic step, against core behavior #7 (if code can answer, code answers). `hooks/craftkit-routing.js` now walks up from the hook payload's `cwd` (falling back to `process.cwd()`, capped at 12 levels) checking each level for `settings.gradle{,.kts}` / `build.gradle{,.kts}` → Android (MVP), `Podfile` / `Package.swift` / `*.xcodeproj` / `*.xcworkspace` → iOS (MVVM-C), `package.json` → React Native / web (EVPMR). Nearest ancestor wins, so an RN root reports RN while its `android/` subdir reports Android — the right answer in both places; several markers at one level report as mixed; no marker anywhere emits no line rather than a guess. The result is injected as an authoritative `Platform (detected from cwd)` line, so `"write tests for this"` in an Android repo can no longer land on `/fe-test`. **New `check.sh` check #11, behavioral not grep** — it builds three fixture dirs, runs the real hook against each, and asserts the label, plus asserts the hook exits 0 on malformed stdin. Both matter because a `UserPromptSubmit` hook that dies just yields no context: a marker typo or a parse crash removes the entire skill-first gate silently, and a grep-based check would pass on detection that never fires. Skips with a notice when `node` is off `PATH`. Verified to fail before being made to pass, for both classes. |
 | `v1.20.0` | 2026-08-06 | **Barrel-import discipline moved to write time.** The guidance existed — `skills/fe-performance/SKILL.md` had a "Direct imports, not barrels" block — but it lived in an on-demand *performance* skill, so it was absent from context during ordinary feature and bugfix work. That is exactly when the mistake gets made: a shared helper was added to a package barrel and imported through it from three call sites, and the cost only surfaced in PR review. The barrel re-exported hooks, a query provider and a context alongside pure utils, so two of those importers pulled react-query, feature-control and provider code into their module graph for one string function. New **`## Imports`** section in `rules/fe-rules.md` (always active), covering the module-over-barrel rule with a monorepo example, the corollary that a new shared helper must **not** be added to the barrel (an available path invites the costly import next time), consistency when the file already imports from that barrel, and the test bonus — a deep-imported helper survives a `jest.mock` of the barrel with no `jest.requireActual` threading. Per the token audit, the `fe-performance` block collapses to a one-line pointer plus its own distinct job (audit existing barrel imports during a bundle-size investigation), so the concept has one home. Reaches the `fe-review` cold agent live via its existing `craftkitInject: fe-rules` — no hand-copied duplicate. |
 | `v1.19.0` | 2026-08-05 | **The parallel workflows now run on iOS and Android, not just RN/web.** `/parallel-review`, `/parallel-ship`, and `/parallel-build` hardcoded `rtk tsc` + jest-93% gates and a `fe-*`-only agent set, and the classifier keyed on `View*.tsx`/`Presenter*.ts` — so a `.kt` or `.swift` branch landed in a command with the wrong gates and no matching reviewer, while the sequential `/build` `/fix` `/ship` had platform-routed for versions. Closed in four parts. (1) **`craftkitInject` resolves skills, not just rules** — `adapters/claude.sh` now looks up each injected name as `rules/<n>.md` first, then `skills/<n>/SKILL.md` (`_claude_inject_source_path`), so a cold agent can carry a live *skill checklist*. That is what makes native agents maintainable: no hand-copied duplicate to rot. (2) **Six native cold agents** — `android-review` `android-a11y` `android-performance` `ios-review` `ios-a11y` `ios-performance`, each a thin prompt over its injected skill, each told it cannot run Gradle/Bazel/SwiftLint/TalkBack/VoiceOver/Instruments and to name the manual check or measurement still owed instead of asserting one. `code-quality`, `ponytail-review`, and `adversarial` stay platform-agnostic and run on all three. (3) **Platform-aware classifier** — `using-agent-skills` gained Step 1.5 (detect platform; a mixed diff unions both tables) and per-platform Step 2 tables for MVP (Activity/Fragment/Widget, Presenter, ViewModel, Repository, Dagger, `strings.xml`) and MVVM-C (ViewController/View/Cell, ViewModel, Fetcher, Contract/Factory/Coordinator, `*.strings`); the adversarial trigger now counts layers in any of the three architectures, and Step 4 announces the detected platform. (4) **Step 0 in all three commands** — per-platform gate rows (`gradlew lintGeneralDebug` + `testGeneralDebugUnitTest`; `swiftlint lint` + `bazelisk test`), the 93% coverage bar scoped to RN/web with native reporting actual module coverage or stating it isn't measured, native context downgraded to sibling-screen reading for single screens, and the repeated per-agent payload blocks collapsed into one message template + an agent/platform/include-when table (which is what kept 12 agent variants from tripling these files). `parallel-build` also routes its scaffold/patterns/test phases per platform; native has no `*-patterns` agent by design — the patterns skill already ran in Phase 2 and the review agent covers the layer contract. **Two pre-existing routing bugs found by the follow-up repo audit and fixed in the same release.** (a) *Test intent was platform-blind* — the routing table sent every "write tests" / "coverage is low" phrasing, plus both ambiguous-test tiebreakers, to `/fe-test`, which is Jest + 93% + EVPMR paths; on a `.kt`/`.swift` repo that is the wrong skill while `/android-test` and `/ios-test` sat unreachable unless named. The row and tiebreakers now resolve platform first, `skills/fe-test/SKILL.md` opens with a platform gate that stops and redirects (and forbids carrying the 93% bar into native), and the hook + README rows match. (b) *`docs/context.md` was declared mandatory with no exceptions* while ten `{android,ios}-*` skills declared they don't use it — a direct contradiction inside an always-active rule. Standard context loading now states its scope up front (RN/web, plus native multi-screen only), names the sibling-screen baseline as correct for native single-screen work, generalizes project-root detection to `settings.gradle` / `*.xcodeproj`, and picks the generator per platform (`/fe-context` · `/android-context` · `/ios-context`); failure-mode #9 no longer reads as absolute. (c) *`skills/pr-message/` deleted* — a 7-line stub whose body only pointed at `commands/pr-message.md`. Because a skill with `alwaysApply: false` installs to the same dest a command does (`adapters/claude.sh:4-5`), the two passes wrote the same file every sync on all six tools; the 137-line command won only because the commands pass happens to run second. Ordering luck, not design. Removing the stub makes the sync idempotent for the first time — `commands: (up to date)` everywhere instead of a perpetual `+ installing: pr-message`. The state-file removal loop uninstalled the orphan automatically; nothing referenced the stub. (d) *Cursor re-wrote all four rules on every sync* — `install_cursor_rule` injects `alwaysApply: true` after the opening `---`, but `sync_rules_adapter` diffed the **raw source** against the **transformed dest**, so every rule compared as changed forever. Same bug class the agents pass already solved: `sync_rules_adapter` now honours an optional `effective_<adapter>_rule_source` hook (mirroring `effective_<adapter>_agent_source`, including the never-delete-the-source temp guard), and `adapters/cursor.sh` declares one over a shared `_cursor_render_rule` so install and comparison can't drift. Cursor was the only adapter transforming rules on install — the other five plain-`cp` to a staging path, so their raw diff was already honest. `sync.sh` is now idempotent end to end: a second run reports no work on any of the six tools. **Added `check.sh` — the repo's first verification step.** All four bugs above were mechanical and grep-findable, and all four survived because nothing greps: with no build, lint, or test suite, "verification" was `sync.sh` printing `Sync complete.`, which only proves files copied. `check.sh` codifies core behavior #7 (if code can answer, code answers) with ten checks, each one a regression guard for a bug that actually shipped — `subagent_type` resolution, skill/command dest collision, flat `skills/`, frontmatter/path name agreement, `craftkitInject` resolution, routing-hook targets, per-platform orchestrator coverage, absolute `docs/context.md` claims, README coverage of every agent and skill, and version agreement across `package.json`/README header/changelog. Each was verified to fail before being made to pass. Wired into `CLAUDE.md` and the README as a pre-commit gate. |

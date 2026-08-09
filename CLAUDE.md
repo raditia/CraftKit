@@ -120,6 +120,16 @@ Resolution: A) extend existing  B) replace  C) both are needed — why? → Whic
 
 Target: every line teaches something unique or is a reference a reader couldn't infer elsewhere. If removing a line loses no information, remove it.
 
+### Writing levers for agent-consumed docs
+
+Adapted from [mattpocock/skills](https://github.com/mattpocock/skills) `writing-for-agents` (MIT). Apply when authoring any rule/skill/command/agent body:
+
+- **No-op test** — an instruction the model already obeys by default pays tokens to say nothing ("be thorough"). Test: does the sentence change behavior vs the default? Fail → delete the whole sentence, don't trim words.
+- **Leading words** — one pretrained concept-word beats a spelled-out triad: "fast, deterministic, low-overhead" → *tight*. A word too weak to beat the default is a no-op; fix with a stronger word (*relentless*), not more words.
+- **State the positive** — prohibition drags the forbidden behavior into context and makes it *more* available. Phrase the target behavior ("write one-line comments"), not the ban. A prohibition survives only as a hard guardrail that can't be phrased positively, paired with the positive target.
+- **Pointer wording decides invocation** — a skill's `description` is a context pointer: its wording, not its target, determines when the agent reaches it. Front-load the trigger word, one trigger per genuinely distinct branch, cut identity the body already carries. A must-have skill behind a weak description is a variance bug — sharpen wording before inlining content.
+- **Completion criteria carry demand** — end steps on a checkable, exhaustive bound. "Every modified file accounted for" forces legwork; "produce a change list" doesn't. Vague bounds ("understanding reached") invite premature completion.
+
 ### README sync matrix — after every add/update/remove
 
 | Change | README update required |

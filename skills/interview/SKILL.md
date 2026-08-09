@@ -23,9 +23,10 @@ Do **not** use for: known bugs (`/debug`), option generation (`/ideate`), or loo
 
 1. **Track confidence.** Estimate 0–100% how well you could write the spec right now. Start low for a vague ask.
 2. **Ask ONE question** — the single highest-information-gain question that most reduces uncertainty. Never batch. Batching lets the user skim and answer shallowly; one question forces a real answer.
-3. **Prefer concrete over open.** Offer 2–4 candidate answers when you can (use `AskUserQuestion`) — recognition beats recall. Fall back to open text only when the space is genuinely unbounded.
-4. **Update confidence**, restate the delta in one line (`Now know: X. Still fuzzy: Y.`), repeat.
-5. **Stop at ~95%** or when the user says "enough" — do not over-interview. Diminishing returns is a real cost.
+3. **Prefer concrete over open.** Offer 2–4 candidate answers when you can (use `AskUserQuestion`) and mark which one you recommend — recognition beats recall, and a recommendation gives the user something to push against. Fall back to open text only when the space is genuinely unbounded.
+4. **Facts are your job, decisions are the user's.** Anything the environment can answer (code, configs, docs, filesystem) — look it up yourself before asking. Spend questions only on decisions and unknowns no lookup can settle.
+5. **Update confidence**, restate the delta in one line (`Now know: X. Still fuzzy: Y.`), repeat.
+6. **Stop at ~95%** or when the user says "enough" — do not over-interview. Diminishing returns is a real cost.
 
 ### Question priority — ask in this order of leverage
 

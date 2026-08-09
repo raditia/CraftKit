@@ -15,8 +15,9 @@ description: Skill routing, model selection, core operating behaviors, and failu
 Loaded from `rules/` automatically on every session:
 - `karpathy-guidelines` — think before coding, simplicity, surgical changes, goal-driven
 - `fe-rules` — EVPMR layer constraints, TypeScript, styling, React correctness, tracking
-- `caveman` — output compression: terse, accurate, no filler (full mode by default)
 - `using-agent-skills` — this file: routing, behaviors, severity labels
+
+Output compression (caveman) is delivered by the caveman plugin's hooks, not a synced rule — one channel, no duplicate.
 
 ---
 
@@ -57,6 +58,7 @@ Match natural language to the right command. **Dynamic parallel is the default**
 - Coverage mentioned + failing/CI context → `/fix`; coverage mentioned + authoring/update context → the platform's test skill
 - Any ambiguous test query ("any tests?", "tests needed?", "should tests change?") → the platform's test skill
 - **Test intent resolves platform first.** `/fe-test` is RN/web only (jest, 93% bar, EVPMR paths) — on `*.kt`/`*.java` run `/android-test`, on `*.swift`/`*.m` run `/ios-test`. Detect from the changed files, or from the project root when nothing is changed yet. Announcing `/fe-test` on a native repo is a routing error, not a near-miss.
+- "grill"/"stress-test"/"poke holes"/"challenge" an **existing** plan or decision → `/grill` (interactive rounds); no plan exists yet → `/interview`; "roast this plan doc" single-pass → `plan-roaster` agent
 
 **Sequential fallback** — use explicit slash command when you want a lightweight, single-pass run:
 
@@ -99,9 +101,14 @@ Planning & docs (general, opt-in — never auto-run; feed docs/context.md before
   ├── Write a PRD / spec before coding? ────────────→ /spec
   ├── Break a spec into ordered verifiable tasks? ──→ /plan  (then plan-roaster agent to stress-test)
   ├── Record WHY a decision was made? ──────────────→ /adr
+  ├── Stress-test an EXISTING plan/decision — interactive? → /grill  (frontier rounds; cold single-pass doc roast → plan-roaster agent)
   └── Document a feature for engineers + stakeholders? → /docs  (dual-audience, humanized)
   Chain them: /define runs interview → spec → plan checkpoint-gated (one invoke). adr + docs offered as tail of /parallel-ship.
   Full arc: /define (interview→spec→plan) → /parallel-build → /parallel-ship (→ offers /adr + /docs)
+
+General utilities (any platform)
+  ├── Research a question against primary sources? ──→ /research  (background agent, cited note in repo)
+  └── Hand this session off to a fresh agent? ───────→ /handoff  (compact state + decisions + next steps)
 
 Native Android (MVP + Core framework)          Native iOS (MVVM-C)
   ├── Architecture / how a screen works? → /android-patterns    /ios-patterns
@@ -202,6 +209,7 @@ Evaluate before spawning:
 | Diff > 300 lines | Add `[WARNING] Change size: N lines — consider splitting` to synthesis |
 | 3+ architecture layers changed — EVPMR (Entry/View/Presenter/Model/Resource), Android MVP (View/Presenter/ViewModel/Repository/DI), or iOS MVVM-C (ViewController/View/ViewModel/Fetcher/Coordinator) | Add `adversarial` agent (definition in `agents/adversarial.md`) |
 | Security-sensitive paths | Pass "Security-sensitive code present — emphasize security axis." in user message to `code-quality` agent |
+| `docs/context.md` has a PLANNING block | Pass "Spec conformance: verify the diff implements the PLANNING block's spec and acceptance criteria — flag drift between what was planned and what was built." in user message to `code-quality` agent |
 
 ### Step 4 — Announce selection
 
