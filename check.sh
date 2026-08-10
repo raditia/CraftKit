@@ -242,6 +242,23 @@ else
     [[ $_pd -eq 0 ]] && pass
 fi
 
+# ---------------------------------------------------------------------------
+# 12. Every hook command ensure_tools registers resolves under a stripped PATH.
+#     Hooks spawn with /usr/gnu/bin:/usr/local/bin:/bin:/usr/bin:. — no homebrew,
+#     no fnm — so a bare `rtk hook claude` died with "rtk: command not found".
+#     Non-blocking, so it degraded silently: every Bash call ran unrewritten and
+#     the whole token filter was off with nothing but a dim hook error to show it.
+#     `rtk init` rewrites the entry to bare on each run, hence the re-absolutize.
+# ---------------------------------------------------------------------------
+check "rtk hook is absolutized after rtk init"
+if ! grep -q '_rtk_hook_absolutize$' sync.sh; then
+    fail "ensure_tools does not call _rtk_hook_absolutize — bare 'rtk hook claude' fails under the hooks' stripped PATH"
+elif ! grep -q '_rtk_hook_absolutize()' sync.sh; then
+    fail "_rtk_hook_absolutize is called but never defined"
+else
+    pass
+fi
+
 echo
 if [[ $FAILURES -eq 0 ]]; then
     echo "All checks passed."

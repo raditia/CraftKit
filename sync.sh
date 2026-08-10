@@ -290,6 +290,35 @@ sync_commands_adapter() {
     printf '%s\n' "${current_commands[@]+"${current_commands[@]}"}" > "$state_file"
 }
 
+# `rtk init -g --auto-patch` registers the PreToolUse hook as bare `rtk hook claude`.
+# Claude Code spawns hooks under a stripped PATH (/usr/gnu/bin:/usr/local/bin:/bin:/usr/bin:.)
+# with no /opt/homebrew/bin, so a bare name dies with "rtk: command not found" — non-blocking,
+# so every Bash call then runs unrewritten and unfiltered. Rewrite to an absolute path after
+# each rtk init, the same way _resolve_node_bin pins node for the routing hook.
+_rtk_hook_absolutize() {
+    local rtk_bin
+    rtk_bin="$(command -v rtk 2>/dev/null)" || return 0
+    [[ -f "$CLAUDE_SETTINGS" ]] || return 0
+    python3 - "$CLAUDE_SETTINGS" "$rtk_bin" << 'PYEOF'
+import json, sys
+settings_path, rtk_bin = sys.argv[1], sys.argv[2]
+with open(settings_path) as f:
+    settings = json.load(f)
+changed = False
+for entry in settings.get('hooks', {}).get('PreToolUse', []):
+    for h in entry.get('hooks', []):
+        cmd = h.get('command', '')
+        if 'rtk hook' in cmd and not cmd.startswith('/'):
+            h['command'] = cmd.replace('rtk hook', rtk_bin + ' hook', 1)
+            changed = True
+if changed:
+    with open(settings_path, 'w') as f:
+        json.dump(settings, f, indent=2)
+        f.write('\n')
+    print('    rtk hook path (absolute)')
+PYEOF
+}
+
 ensure_tools() {
     echo ""
     echo "[tools]"
@@ -309,6 +338,7 @@ ensure_tools() {
     # RTK — wire up the Claude Code auto-rewrite hook (idempotent)
     if command -v rtk &>/dev/null; then
         rtk init -g --auto-patch 2>/dev/null && echo "    rtk hook (ok)" || true
+        _rtk_hook_absolutize
     fi
 
     # Humanizer — de-AI-writing skill (used by /pr-message). Clone SKILL.md from
