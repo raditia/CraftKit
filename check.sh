@@ -302,6 +302,29 @@ else
     esac
 fi
 
+# ---------------------------------------------------------------------------
+# 15. Every parallel-* orchestrator has a sequential twin, named in both channels.
+#     A parallel-* command exists to spawn agents, so a context that cannot spawn
+#     them cannot run one — a subagent, or a session that disables spawning. With
+#     no sanctioned substitute the routing gate forces a choice between violating
+#     itself and narrating the conflict on every single turn, which is what it did.
+#     Checked in the rule AND the hook because they duplicate this table by design.
+# ---------------------------------------------------------------------------
+check "parallel orchestrators have sequential twins"
+_tw=0
+for _p in "$COMMANDS_DIR"/parallel-*.md; do
+    [[ -f "$_p" ]] || continue
+    _pn="$(basename "$_p" .md)"
+    _twin="${_pn#parallel-}"
+    [[ -f "$COMMANDS_DIR/${_twin}.md" ]] \
+        || { fail "/$_pn has no sequential twin commands/${_twin}.md to fall back to"; _tw=1; }
+    grep -qE "/${_pn}[^A-Za-z0-9-].*/${_twin}([^A-Za-z0-9-]|\$)" "$RULES_DIR/using-agent-skills.md" \
+        || { fail "using-agent-skills.md does not map /$_pn -> /$_twin for no-spawn contexts"; _tw=1; }
+    grep -q "/${_pn}→/${_twin}" "$HOOK" \
+        || { fail "routing hook does not map /${_pn} -> /${_twin} for no-spawn contexts"; _tw=1; }
+done
+[[ $_tw -eq 0 ]] && pass
+
 echo
 if [[ $FAILURES -eq 0 ]]; then
     echo "All checks passed."

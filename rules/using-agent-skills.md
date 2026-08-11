@@ -37,7 +37,7 @@ Announce the matched skill before invoking it (see core behavior #11). If genuin
 
 ### Orchestrator commands (multi-skill workflows — use these first)
 
-Match natural language to the right command. **Dynamic parallel is the default** — static sequential available via explicit slash command when a lightweight run is needed.
+Match natural language to the right command. **Dynamic parallel is the default where you can spawn subagents** — if you can't, swap in the sequential twin per the no-spawn table below and carry on. Static sequential is also available by explicit slash command for a lightweight run.
 
 | User says | Run | Mode |
 |-----------|-----|------|
@@ -60,7 +60,18 @@ Match natural language to the right command. **Dynamic parallel is the default**
 - **Test intent resolves platform first.** `/fe-test` is RN/web only (jest, 93% bar, EVPMR paths) — on `*.kt`/`*.java` run `/android-test`, on `*.swift`/`*.m` run `/ios-test`. Detect from the changed files, or from the project root when nothing is changed yet. Announcing `/fe-test` on a native repo is a routing error, not a near-miss.
 - "grill"/"stress-test"/"poke holes"/"challenge" an **existing** plan or decision → `/grill` (interactive rounds); no plan exists yet → `/interview`; "roast this plan doc" single-pass → `plan-roaster` agent
 
-**Sequential fallback** — use explicit slash command when you want a lightweight, single-pass run:
+**No-spawn contexts — take the sequential twin, silently.** A `parallel-*` command's whole job is spawning agents, so a context that cannot spawn them cannot run one. You are in such a context when you are yourself a subagent (subagents get no Agent tool) or when a session instruction disables agent spawning. Substitute and proceed:
+
+| Intent routes to | You cannot spawn → run |
+|------------------|------------------------|
+| `/parallel-build` | `/build` |
+| `/parallel-review` | `/review` |
+| `/parallel-ship` | `/ship` |
+| `/team-build` | `/build` |
+
+Announce the command you actually ran (`Running /build …`), not the one you couldn't. State the substitution **once** if it changes what the user gets — a skipped validation axis is a coverage gap and belongs in the output per Step 5. Re-explaining the constraint every turn is noise the user pays for; the routing table already sanctions the swap, so there is no conflict left to surface. This is not the `[WARNING] agent skipped` case, which is an agent that was spawned and died.
+
+**Sequential fallback by choice** — same three commands, when spawning is available but not worth it:
 
 | Explicit command | When to prefer |
 |-----------------|----------------|
