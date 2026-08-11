@@ -17,16 +17,10 @@ mkdir -p "$STATE_DIR"
 
 source "$REPO_DIR/adapters/claude.sh"
 source "$REPO_DIR/adapters/cursor.sh"
-source "$REPO_DIR/adapters/copilot.sh"
 source "$REPO_DIR/adapters/gemini.sh"
 source "$REPO_DIR/adapters/codex.sh"
-source "$REPO_DIR/adapters/crush.sh"
 
 ADAPTERS=("claude" "cursor" "gemini" "codex")
-
-# Tools craftkit no longer targets. Their adapters stay sourced above only so an existing
-# install can uninstall itself — see retire_adapter.
-RETIRED_ADAPTERS=("copilot" "crush")
 
 # Routing drift guard: every skill in skills/ must be named in the routing hook,
 # else the skill-first gate silently can't route it. Fail loud before syncing.
@@ -294,68 +288,6 @@ sync_commands_adapter() {
     printf '%s\n' "${current_commands[@]+"${current_commands[@]}"}" > "$state_file"
 }
 
-# Feeds every name a retired adapter recorded back through that adapter's own uninstall_*
-# function, then deletes its state files so this is a permanent no-op afterwards. Reusing the
-# adapter's own teardown is the point: Copilot's removal edits the user's VS Code settings.json
-# and Crush's strips a managed block out of CRUSH.md — neither is worth re-deriving by path.
-#
-# ponytail: two unreachable adapters kept alive for one release solely to remove themselves.
-# ceiling: ~280 dead lines. upgrade: delete adapters/{copilot,crush}.sh, their source lines,
-# RETIRED_ADAPTERS, retire_adapter, and retire_copilot_projects in the release after v1.24.0.
-retire_adapter() {
-    local adapter="$1"
-    local announced=0 kind state_file fn name n
-
-    for kind in skill rule command agent; do
-        case "$kind" in
-            skill) state_file="$STATE_DIR/$adapter" ;;
-            *)     state_file="$STATE_DIR/${adapter}-${kind}s" ;;
-        esac
-        [[ -f "$state_file" ]] || continue
-
-        if [[ $announced -eq 0 ]]; then
-            echo ""
-            echo "[$adapter] retired — uninstalling from this machine"
-            announced=1
-        fi
-
-        fn="uninstall_${adapter}_${kind}"
-        n=0
-        if declare -f "$fn" &>/dev/null; then
-            while IFS= read -r name; do
-                [[ -n "$name" ]] || continue
-                "$fn" "$name"
-                n=$((n + 1))
-            done < "$state_file"
-        fi
-        rm -f "$state_file"
-        echo "    - ${kind}s: $n removed"
-    done
-
-    [[ $announced -eq 1 ]] || return 0
-    # Collapses whatever the per-name uninstalls left behind — Crush drops its now-ruleless
-    # managed section out of CRUSH.md here.
-    if declare -f "finalize_${adapter}" &>/dev/null; then
-        "finalize_${adapter}"
-    fi
-}
-
-# Per-project Copilot @-agents wrote files into other repos, which may well be committed
-# there. Unregister them from craftkit and name the paths — deleting files inside someone
-# else's git repo is not sync.sh's call to make.
-retire_copilot_projects() {
-    local projects_file="$STATE_DIR/copilot-projects"
-    [[ -f "$projects_file" ]] || return 0
-
-    echo ""
-    echo "[copilot] retired — per-project agents no longer synced:"
-    while IFS= read -r project_dir; do
-        [[ -n "$project_dir" ]] || continue
-        echo "    $project_dir/.github/agents  (left in place — delete manually if unwanted)"
-    done < "$projects_file"
-    rm -f "$projects_file"
-}
-
 # `rtk init -g --auto-patch` registers the PreToolUse hook as bare `rtk hook claude`.
 # Claude Code spawns hooks under a stripped PATH (/usr/gnu/bin:/usr/local/bin:/bin:/usr/bin:.)
 # with no /opt/homebrew/bin, so a bare name dies with "rtk: command not found" — non-blocking,
@@ -438,11 +370,6 @@ echo "==> Syncing craftkit..."
 if [[ "${AGENTIC_SETUP:-0}" == "1" ]]; then
     ensure_tools
 fi
-
-for adapter in "${RETIRED_ADAPTERS[@]}"; do
-    retire_adapter "$adapter"
-done
-retire_copilot_projects
 
 for adapter in "${ADAPTERS[@]}"; do
     echo ""

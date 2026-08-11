@@ -260,25 +260,23 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 13. Adapter arrays agree with adapters/ and with each other.
-#     sync.sh calls adapter functions by string interpolation, so a name with no
-#     sourced file dies at the first call — mid-sync, after some tools are written.
-#     Retiring a tool is the live case: RETIRED_ADAPTERS still needs its adapter
-#     sourced (retire_adapter replays that adapter's own uninstall_*), and a name
-#     left in both arrays would install then immediately uninstall every run.
+# 13. Every name in ADAPTERS has a sourced adapter file, and every adapter file is
+#     listed. sync.sh calls adapter functions by string interpolation, so a name with
+#     no sourced file dies at the first call — mid-sync, after some tools are already
+#     written. The reverse direction catches the other half: an adapter left on disk
+#     but absent from ADAPTERS is dead weight that reads as a supported tool.
 # ---------------------------------------------------------------------------
 check "adapter arrays resolve"
-_array_of() { grep "^${1}=" "$REPO_DIR/sync.sh" | sed 's/[^(]*(//;s/).*//;s/"//g'; }
-_live="$(_array_of ADAPTERS)"
-_retired="$(_array_of RETIRED_ADAPTERS)"
+_live="$(grep '^ADAPTERS=' "$REPO_DIR/sync.sh" | sed 's/[^(]*(//;s/).*//;s/"//g')"
 _ad=0
 [[ -n "$_live" ]] || { fail "ADAPTERS not found in sync.sh"; _ad=1; }
-for a in $_live $_retired; do
+for a in $_live; do
     [[ -f "$REPO_DIR/adapters/${a}.sh" ]] || { fail "adapter '$a' listed but adapters/${a}.sh missing"; _ad=1; }
     grep -q "adapters/${a}.sh" "$REPO_DIR/sync.sh" || { fail "adapter '$a' listed but never sourced in sync.sh"; _ad=1; }
 done
-for a in $_retired; do
-    case " $_live " in *" $a "*) fail "adapter '$a' is in both ADAPTERS and RETIRED_ADAPTERS"; _ad=1 ;; esac
+for _f in "$REPO_DIR"/adapters/*.sh; do
+    _an="$(basename "$_f" .sh)"
+    case " $_live " in *" $_an "*) ;; *) fail "adapters/${_an}.sh exists but is not in ADAPTERS — delete it or list it"; _ad=1 ;; esac
 done
 [[ $_ad -eq 0 ]] && pass
 
