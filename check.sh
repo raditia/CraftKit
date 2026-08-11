@@ -17,6 +17,7 @@ COMMANDS_DIR="$REPO_DIR/commands"
 AGENTS_DIR="$REPO_DIR/agents"
 HOOK="$REPO_DIR/hooks/craftkit-routing.js"
 README="$REPO_DIR/README.md"
+CHANGELOG="$REPO_DIR/CHANGELOG.md"
 
 FAILURES=0
 CURRENT=""
@@ -200,17 +201,19 @@ done
 [[ $_doc -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
-# 10. Version agreement: package.json, README header, changelog top row.
-#     A release ships from package.json; a stale README header misreports it.
+# 10. Version agreement: package.json, README header, newest CHANGELOG.md section.
+#     The release workflow reads the version from the README header and the release
+#     notes from the matching CHANGELOG.md section, so a mismatch either ships the
+#     wrong number or aborts the release. Both files, one number.
 # ---------------------------------------------------------------------------
 check "version is consistent"
 _pkg="$(awk -F'"' '/"version":/{print $4;exit}' "$REPO_DIR/package.json")"
 _hdr="$(awk '/^# craftkit/{gsub(/[`v]/,"");print $3;exit}' "$README")"
-_log="$(awk -F'`' '/^\| `v[0-9]/{print $2;exit}' "$README" | tr -d 'v')"
+_log="$(awk '/^## v[0-9]/{print $2;exit}' "$CHANGELOG" | tr -d 'v')"
 if [[ "$_pkg" == "$_hdr" && "$_pkg" == "$_log" ]]; then
     pass
 else
-    fail "package.json=$_pkg  README header=$_hdr  changelog=$_log — must match"
+    fail "package.json=$_pkg  README header=$_hdr  CHANGELOG.md newest=$_log — must match"
 fi
 
 # ---------------------------------------------------------------------------

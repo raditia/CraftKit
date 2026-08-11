@@ -42,10 +42,17 @@ jobs:
         if: steps.tag_check.outputs.exists == 'false'
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          # Match the changelog table row: | `v1.3.0` | date | description |
-          ENTRY=$(grep "| \`${VERSION}\`" README.md | sed 's/^| `[^`]*` | [^|]* | //' | sed 's/ |$//')
+          # CHANGELOG.md holds one section per release: "## v1.3.0 — 2026-01-01".
+          # Print between this version's heading and the next one. The trailing space in
+          # the match is load-bearing: without it v1.2.1 also matches v1.2.10.
+          ENTRY=$(awk -v v="$VERSION" '
+            $0 ~ "^## " v " " { flag = 1; next }
+            /^## v[0-9]/      { if (flag) exit }
+            flag              { print }
+          ' CHANGELOG.md | sed -e '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}')
           if [ -z "$ENTRY" ]; then
-            ENTRY="See README for full changelog."
+            echo "::error::No CHANGELOG.md section for ${VERSION} — add one before releasing."
+            exit 1
           fi
           # Use delimiter-safe output for multiline safety
           echo "notes<<EOF" >> "$GITHUB_OUTPUT"
