@@ -14,7 +14,7 @@ description: Experimental agent-teams build — this session acts as team lead (
 
 ## Phase −1 — Preflight (hard gates)
 
-0. **Harness.** Agent teams are a **Claude Code runtime feature** (teammate spawn, shared task list, mailbox) — not a model capability. Running under any other synced tool (Cursor, Copilot, Gemini CLI, Codex CLI, Crush) → stop and fall back: `/parallel-build` where the tool has subagents (Cursor background agents, Gemini shell-parallel headless calls per the fusion-panel table in `using-agent-skills`), else sequential `/build`.
+0. **Harness.** Agent teams are a **Claude Code runtime feature** (teammate spawn, shared task list, mailbox) — not a model capability. Running under any other synced tool (Cursor, Gemini CLI, Codex CLI) → stop and fall back: `/parallel-build` where the tool has subagents (Cursor background agents, Gemini and Codex shell-parallel headless calls per the fusion-panel table in `using-agent-skills`), else sequential `/build`.
 1. **Feature flag.** Check `echo "$CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"`. If not `1` → stop and instruct:
    ```json
    // settings.json

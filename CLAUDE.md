@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-CraftKit (`@raditia/craftkit`) is the **source of truth** for AI coding skills, rules, commands, and agents that get synced into six AI tools: Claude Code, Cursor, GitHub Copilot, Gemini CLI, Codex CLI, and Crush. It contains no application code and no test suite — the "product" is the content in `rules/`, `skills/`, `commands/`, `agents/` plus the bash machinery that distributes it.
+CraftKit (`@raditia/craftkit`) is the **source of truth** for AI coding skills, rules, commands, and agents that get synced into four AI tools: Claude Code, Cursor, Gemini CLI, and Codex CLI. It contains no application code and no test suite — the "product" is the content in `rules/`, `skills/`, `commands/`, `agents/` plus the bash machinery that distributes it.
 
 You will be running here under the very rules this repo defines (they are installed into `~/.claude/CLAUDE.md`). Editing source files here changes future behavior for every synced tool.
 
@@ -38,7 +38,7 @@ A `skills/<name>/SKILL.md` with `alwaysApply: true` is treated as a **rule** by 
 
 ### sync.sh — the engine
 
-`sync.sh` sources all six `adapters/*.sh`, then for each adapter runs four sync passes: `sync_rules_adapter`, `sync_adapter` (skills), `sync_commands_adapter`, and `sync_agents_adapter` (only if the adapter defines `install_<adapter>_agent`). Each pass:
+`sync.sh` sources every `adapters/*.sh`, then for each adapter in `ADAPTERS` runs four sync passes: `sync_rules_adapter`, `sync_adapter` (skills), `sync_commands_adapter`, and `sync_agents_adapter` (only if the adapter defines `install_<adapter>_agent`). Each pass:
 
 1. Reads prior state from `~/.craftkit-state/<adapter>[-rules|-agents|-commands]` (one name per line).
 2. **Removes** anything in state but no longer in the repo (handles deletions/renames).
@@ -47,17 +47,21 @@ A `skills/<name>/SKILL.md` with `alwaysApply: true` is treated as a **rule** by 
 
 This state-file diff is why deleting a source file auto-uninstalls it everywhere on next sync — the removal loop catches the orphan. If you rename a file, the old name is removed and the new one installed.
 
-After all adapters, `finalize_<adapter>` runs if defined (Claude uses it to rebuild a missing managed block and wire the routing hook), then `sync_copilot_projects` re-runs per-project Copilot agent setup for any registered project.
+After all adapters, `finalize_<adapter>` runs if defined (Claude uses it to rebuild a missing managed block and wire the routing hook).
+
+**Retiring a tool — `RETIRED_ADAPTERS`.** Dropping an adapter from `ADAPTERS` alone orphans whatever it already wrote: the tool keeps loading a frozen copy of the rules forever, because the removal loop that would clean it up no longer runs. So a retired adapter stays *sourced* and moves to `RETIRED_ADAPTERS`, where `retire_adapter` replays that adapter's own `uninstall_<a>_{skill,rule,command,agent}` over every name in its state files, calls `finalize_<a>` to collapse the leftovers, then deletes the state files so the pass is a permanent no-op. Reusing the adapter's teardown rather than re-deriving paths is the whole point — Copilot's removal edits the user's VS Code `settings.json` through `jq`. The adapter files are then deletable one release later; `check.sh` verifies every name in either array still has a sourced file behind it and that no name sits in both. Current occupants: `copilot`, `crush` (retired v1.24.0, delete next release).
+
+Files a retired adapter wrote into *other* repos are left alone — `retire_copilot_projects` prints the registered `.github/agents` paths instead of deleting them, since they may be committed there.
 
 ### Adapters — the contract
 
 Each `adapters/<tool>.sh` implements a fixed set of function names that `sync.sh` calls by string interpolation (`"install_${adapter}_skill"`). To add a tool, implement: `get_<a>_dest`, `install_<a>_skill`, `uninstall_<a>_skill`, and the `_rule` / `_command` / `_agent` variants, plus an optional `finalize_<a>`. Add the tool name to the `ADAPTERS` array.
 
-**Agents are Claude-only.** Only `adapters/claude.sh` defines `install_<a>_agent` — the other five tools have no cold sub-agent concept, so `sync.sh` skips the agent pass for them (guarded on `declare -f install_${adapter}_agent`). Agent-related contract functions are therefore Claude-specific in practice.
+**Agents are Claude-only.** Only `adapters/claude.sh` defines `install_<a>_agent` — the other three tools have no cold sub-agent concept, so `sync.sh` skips the agent pass for them (guarded on `declare -f install_${adapter}_agent`). Agent-related contract functions are therefore Claude-specific in practice.
 
 **Optional `effective_<a>_agent_source` hook.** An adapter that *transforms* an agent on install (rather than plain-copying) can define `effective_<a>_agent_source <name> <source>` returning a path to the rendered output. `sync_agents_adapter` diffs the dest against that rendered file (and removes it after) instead of the raw source — so the skip-unchanged check stays honest and a transformed agent doesn't re-sync every run. Only Claude defines it today (for `craftkitInject`).
 
-**Managed-block pattern (Claude, Gemini, Codex, Crush):** rules are concatenated into a delimited block (`<!-- BEGIN AGENTIC-SKILLS ... END -->`) inside a shared file like `~/.claude/CLAUDE.md`, edited in place with a Python regex sub. Everything outside the markers is the user's own content and must be preserved. `claude.sh:_rebuild_claude_md` / `_remove_claude_md_section` are the reference implementation.
+**Managed-block pattern (Claude, Gemini, Codex):** rules are concatenated into a delimited block (`<!-- BEGIN AGENTIC-SKILLS ... END -->`) inside a shared file like `~/.claude/CLAUDE.md`, edited in place with a Python regex sub. Everything outside the markers is the user's own content and must be preserved. `claude.sh:_rebuild_claude_md` / `_remove_claude_md_section` are the reference implementation.
 
 **Claude specifics (`adapters/claude.sh`):**
 - Rules → managed block in `~/.claude/CLAUDE.md`. Commands → `~/.claude/commands/<name>.md`. Agents → `~/.claude/agents/<name>.md`.

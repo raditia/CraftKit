@@ -411,7 +411,7 @@ Use the everyday model by default. Escalate inline when you detect genuine uncer
 | Claude Code | enterprise | `claude-sonnet-5` | `claude-opus-4-8` | `claude-fable-5` | 2× `claude-fable-5` → fable judge |
 | Gemini CLI | — | `gemini-2.5-flash` | `gemini-2.5-flash` | `gemini-2.5-pro` | 2× `gemini-2.5-pro` → pro judge |
 | Cursor | — | `gpt-4o-mini` | claude-sonnet / gpt-4o | claude-opus / o1 | 2× claude-opus → opus judge |
-| Copilot | — | `gpt-4o-mini` | `claude-sonnet-5` | `claude-opus-4-8` | 2× `claude-opus-4-8` → opus judge |
+| Codex CLI | — | `codex-mini-latest` | `codex-mini-latest` | `o3` | 2× `o3` → `o3` judge |
 
 Cheapest = the floor for pure pattern-matching/extraction skills (scaffold, context, a11y, ponytail-*, debug's first pass). On enterprise the floor is `claude-sonnet-5`, not haiku — cold review **agents** (`agents/*.md`) also pin to `sonnet` for this reason (static frontmatter can't branch on plan, so sonnet is the value valid on both plans).
 
@@ -441,7 +441,7 @@ Independence-then-synthesis: same prompt → 2 independent runs → judge synthe
    - **Claude Code** — Agent tool, both in one message (concurrent), `model:` = tier's Escalate column (`claude-opus-4-8` personal / `claude-fable-5` enterprise)
    - **Gemini CLI** — shell `&`-parallelism into temp files, judge call reads both
    - **Cursor** — two background agent tabs at once, same model (`claude-opus`/`o1`)
-   - **Copilot** — two parallel chat windows, paste both into a third judge window
+   - **Codex CLI** — two `codex exec` calls backgrounded into temp files, judge call reads both
 4. Classify the deliverable, then synthesize:
    - **Artifact (code/config/script)** → run both candidates, merge by what demonstrably works, verify — the graft seam is where merges silently break, so run the merged result and fix until it passes.
    - **Research/analysis** → five sections: **Consensus** (agreement = highest confidence) · **Contradictions** (state both, adjudicate — never bury) · **Partial coverage** (depth only some engaged) · **Unique insights** (one panelist's non-obvious point — highest leverage) · **Blind spots** (what the whole panel missed; add one they didn't name).

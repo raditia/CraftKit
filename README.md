@@ -1,6 +1,6 @@
-# craftkit `v1.23.0`
+# craftkit `v1.24.0`
 
-One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **GitHub Copilot**, **Gemini CLI**, **Codex CLI**, and **Crush**. Pull once — every AI tool gets the same workflows, rules, and commands.
+One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
 ---
 
@@ -137,21 +137,16 @@ bash install.sh
 
 `install.sh` wires up the post-merge hook and runs the first sync. After that, `git pull` keeps every AI tool up to date automatically.
 
-**Requirements:** bash 3.2+, curl. macOS ships bash 3.2 by default.  
-**Optional:** `jq` for Copilot VS Code settings integration.
+**Requirements:** bash 3.2+, curl. macOS ships bash 3.2 by default.
 
-**Per-project Copilot `@` agents** (run inside any project repo):
-```bash
-bash ~/craftkit/scripts/init-copilot-agents.sh
-# commit .github/ to share with your team
-```
+**Upgrading from ≤ v1.23.0** — GitHub Copilot and Crush were retired in v1.24.0. The next sync uninstalls them from your machine automatically: Copilot's entries come out of VS Code `settings.json` and Crush's managed block out of `~/.config/crush/CRUSH.md`, then the state files are dropped so it never runs again. One thing it deliberately leaves alone: per-project Copilot `@` agents wrote real files into your other repos, possibly committed there, so sync prints those paths and lets you decide.
 
 **Contributing to craftkit itself** — there is no build or test suite (the product is markdown), so `check.sh` is the gate:
 ```bash
 bash check.sh   # content integrity — exit 0 required before commit
 bash sync.sh    # distribute; a second consecutive run must report no work
 ```
-It catches what a reader can't hold in their head: dangling `subagent_type` references, skill/command install-dest collisions, nested skills that never sync, frontmatter/path name drift, unresolvable `craftkitInject` sources, a routing hook advertising a renamed command or no longer resolving a platform from `cwd`, an orchestrator that covers RN/web but not native, an always-active rule contradicting the native skills, undocumented agents or skills, and version drift across `package.json`/README/changelog. Every check exists because that exact bug shipped unnoticed — when you fix a new class, add a check and confirm it fails before making it pass.
+It catches what a reader can't hold in their head: dangling `subagent_type` references, skill/command install-dest collisions, nested skills that never sync, frontmatter/path name drift, unresolvable `craftkitInject` sources, a routing hook advertising a renamed command or no longer resolving a platform from `cwd`, an orchestrator that covers RN/web but not native, an always-active rule contradicting the native skills, undocumented agents or skills, an adapter name listed in `sync.sh` with no sourced file behind it, and version drift across `package.json`/README/changelog. Every check exists because that exact bug shipped unnoticed — when you fix a new class, add a check and confirm it fails before making it pass.
 
 ---
 
@@ -185,12 +180,12 @@ Four namespaces, one source of truth:
 |------|----------------------|--------------------------------------|--------------------|
 | Claude Code | `~/.claude/CLAUDE.md` (managed block) | `~/.claude/commands/<name>.md` → `/<name>` | `~/.claude/agents/<name>.md` |
 | Cursor | `~/.cursor/rules/*.mdc` (alwaysApply) | `~/.cursor/rules/*.mdc` (alwaysApply:false) | — |
-| Copilot | `codeGeneration.instructions` | `codeGeneration.instructions` | — |
 | Gemini CLI | `~/GEMINI.md` (managed block) | `~/GEMINI.md` (managed block) | — |
 | Codex CLI | `~/.codex/AGENTS.md` (managed block) | `~/.codex/AGENTS.md` (managed block) | — |
-| Crush | `~/.config/crush/CRUSH.md` (managed block) | `~/.config/crush/skills/<name>.md` → command | — |
 
-Agents are Claude-only — the other five tools have no cold sub-agent concept, so `sync.sh` skips the agent pass for them.
+Agents are Claude-only — the other three tools have no cold sub-agent concept, so `sync.sh` skips the agent pass for them.
+
+**Retired:** GitHub Copilot and Crush were supported through v1.23.0. Every kept tool exposes a headless entry point (`claude -p`, `cursor-agent`, `gemini -p`, `codex exec`), which is what lets one of them spawn work in another; Copilot is IDE-bound and Crush is TUI-only, so neither can participate in cross-tool agent fan-out.
 
 ---
 
@@ -432,7 +427,7 @@ Works on all three platforms — React Native/web (EVPMR), Android (MVP), iOS (M
 
 **Know before you run it:**
 
-- **Claude Code only.** Teams are a harness runtime feature, not a model capability — on Cursor, Copilot, Gemini CLI, Codex CLI, or Crush the command's preflight falls back to `/parallel-build` or `/build`.
+- **Claude Code only.** Teams are a harness runtime feature, not a model capability — on Cursor, Gemini CLI, or Codex CLI the command's preflight falls back to `/parallel-build` or `/build`.
 - **~5× the tokens** of a solo build — reserve it for features big enough to justify the overhead.
 - **Teammates don't survive `/resume`** — an interrupted build restarts coordination from the task board, not the conversation.
 
@@ -695,9 +690,7 @@ Each skill runs on the everyday model. Escalation is inline — the AI consults 
 | Claude Code | enterprise | `claude-opus-4-8` | `claude-fable-5` | 2× fable → fable judge |
 | Gemini CLI | — | `gemini-2.5-flash` | `gemini-2.5-pro` | — |
 | Cursor | — | claude-sonnet / gpt-4o | claude-opus / o1 | — |
-| Copilot | — | `claude-sonnet-5` | `claude-opus-4-8` | — |
 | Codex CLI | — | `codex-mini-latest` | `o3` | — |
-| Crush | — | provider-dependent | provider-dependent | — |
 
 Escalation triggers: architecture decisions with non-obvious tradeoffs, security-sensitive code, debugging with no hypothesis after 2 attempts.
 
@@ -707,7 +700,7 @@ Fusion panel triggers: irreversible production changes, security architecture wi
 
 ## Managing skills
 
-**Never edit installed files directly** in `~/.claude/`, `~/.cursor/`, or VS Code settings — `sync.sh` owns them and will overwrite on next pull. Always edit source files in this repo.
+**Never edit installed files directly** in `~/.claude/`, `~/.cursor/`, `~/GEMINI.md`, or `~/.codex/` — `sync.sh` owns them and will overwrite on next pull. Always edit source files in this repo.
 
 ### Add a rule (always-on)
 
@@ -774,6 +767,7 @@ External tools and inspirations bundled or adopted into this repo.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| `v1.24.0` | 2026-08-11 | **Narrowed the fan-out from six tools to four — GitHub Copilot and Crush retired.** The kept set (Claude Code, Cursor, Gemini CLI, Codex CLI) is the set where every member has a headless entry point (`claude -p`, `cursor-agent`, `gemini -p`, `codex exec`), which is the prerequisite for one tool spawning work in another; Copilot is IDE-bound and Crush is TUI-only, so neither could ever participate in cross-tool agent fan-out. **Retirement is a teardown pass, not a deletion.** Dropping an adapter from `ADAPTERS` alone is the harmful move: the removal loop that would uninstall it stops running, so the tool keeps loading a frozen copy of the rules indefinitely with nothing to signal why. `sync.sh` gained `RETIRED_ADAPTERS` plus `retire_adapter`, which keeps the adapter *sourced* and replays its own `uninstall_<a>_{skill,rule,command,agent}` over every name in its state files, calls `finalize_<a>` to collapse the leftovers, then deletes the state files so the pass is a permanent no-op afterwards. Reusing each adapter's own teardown instead of re-deriving paths is the point — Copilot's removal edits the user's VS Code `settings.json` through `jq`, and Crush's strips a managed block out of `CRUSH.md`; both are places a hand-written `rm` gets expensive. The two adapter files are now unreachable except through that pass and are marked `ponytail:` for deletion one release out. **One thing deliberately not cleaned up:** per-project Copilot `@` agents wrote real files into *other* repos, quite possibly committed there, so `retire_copilot_projects` prints the registered `.github/agents` paths and unregisters them rather than deleting inside someone else's git repo. `scripts/init-copilot-agents.sh` deleted — teardown never calls it. **`check.sh` check 13 — adapter arrays resolve.** The retirement mechanism has a failure mode worth a guard: `sync.sh` calls adapter functions by string interpolation, so a name listed with no sourced file behind it dies at the first call, *mid-sync*, after some tools have already been written. The check asserts every name in either array has both an `adapters/<a>.sh` and a source line, and that no name sits in both arrays (which would install then immediately uninstall on every run). Verified to fail before being made to pass, per the existing convention. **Codex CLI promoted to a first-class row.** Narrowing exposed that Codex was a sync target with no entry in the model-routing table in `rules/using-agent-skills.md` — it inherited nothing and had no fusion-panel spawn mechanism, while the retired Copilot had both. Added its tier row and its `codex exec` shell fan-out; `/ideate`'s portability table moves Codex from "degraded — no programmatic fan-out" to full parallel spawn for the same reason. Tool lists reconciled across `README.md`, `CLAUDE.md`, `package.json`, `commands/{pr-message,team-build}.md`, and `skills/{docs,ideate}/SKILL.md`; historical changelog rows left as written, since they record what was true at the time. |
 | `v1.23.0` | 2026-08-10 | **RTK's `PreToolUse` hook was silently dead, and with it the whole token filter.** `ensure_tools` calls `rtk init -g --auto-patch`, which registers the hook as bare `rtk hook claude`. Claude Code spawns hooks under a stripped `PATH` — `/usr/gnu/bin:/usr/local/bin:/bin:/usr/bin:.`, no `/opt/homebrew/bin`, no fnm — so the bare name died with `/bin/sh: rtk: command not found`. The failure is *non-blocking*, which is what made it expensive rather than obvious: the tool call proceeded unrewritten, so `git status` never became `rtk git status` and every Bash call ran unfiltered, with nothing but a dim hook error to show for it. Against the 72.8% / 35.0M tokens `rtk gain` reports saved, that is the entire point of the proxy silently switched off. New `_rtk_hook_absolutize()` in `sync.sh` rewrites any bare `rtk hook` `PreToolUse` command to the absolute path from `command -v rtk`, called right after each `rtk init` — necessary because `rtk init` re-registers the bare form on every run, so a one-time hand fix would not survive the next `AGENTIC_SETUP=1` sync. Resolved dynamically rather than hardcoded, so Intel Macs (`/usr/local/bin`) and Linux work too. This is the same class the Claude adapter already solved for node via `_resolve_node_bin` (which pins a stable fnm install path over the session-scoped multishell symlink) — the rtk hook was the unpatched sibling. **New `check.sh` check #12** asserts `ensure_tools` both defines and calls `_rtk_hook_absolutize`, guarding the fix from deletion; verified to fail before being made to pass. Verified end-to-end under `env -i`, the exact environment that broke it: the hook now returns its `RTK auto-rewrite` payload. Not fixed and not ours — the companion `node: command not found` comes from the caveman plugin's own `plugin.json` declaring bare `node "${CLAUDE_PLUGIN_ROOT}/..."`; the plugin cache is overwritten on update, so that needs an upstream PR. It is harmless meanwhile because the installer left absolute-path duplicates of both caveman hooks in `settings.json`, which is why caveman works while the error prints. |
 | `v1.22.0` | 2026-08-09 | Adopted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT) after a duplicate/conflict audit against the existing catalog. **`/grill`** — interactive stress-test of an existing plan/decision via frontier-round interview (design tree; whole frontier asked per round, each question with a recommended answer; sub-agents fetch facts so the user only makes decisions); captures resolved terms into a standalone `docs/glossary.md` (deliberately not `docs/context.md`, which `/fe-context` regenerates) and offers `/adr` on the three-condition test — positioned against `/interview` (de-fuzz a new ask, one question at a time) and `plan-roaster` (cold single-pass), so all three keep distinct niches. **`/research`** — background agent investigates primary sources only (official docs, source code, specs) and writes a cited note into the repo. **`/handoff`** — compacts the session into a handoff doc (goal, verified state, decisions with their why, ordered next steps, suggested skills) in the OS temp dir, referencing existing artifacts by path instead of duplicating them, secrets redacted. `/interview` upgraded with two grilling ideas: mark the recommended answer among candidates, and "facts are your job, decisions are the user's" (look up what the environment can answer before spending a question). Parallel classifier gains a **spec-conformance flag condition**: when `docs/context.md` has a PLANNING block, `code-quality` is instructed to verify the diff against the planned spec/acceptance criteria — closing the `/define` → build → review loop. `CLAUDE.md` authoring checklist gains **"Writing levers for agent-consumed docs"** (no-op test, leading words, state-the-positive, pointer wording as invocation lever, completion-criteria demand) mined from `writing-for-agents`. Considered and skipped as duplicates/conflicts: `diagnosing-bugs` (`/debug`), `tdd` (test-skill routing), `code-review` (`/parallel-review`; its Spec axis adopted as the flag condition above), `to-spec`/`to-tickets`/`triage`/`wayfinder` (tracker-centric; `/spec` + `/plan` cover the need), `ask-matt` (routing hook), `improve-codebase-architecture`/`codebase-design` (deepening philosophy clashes with ponytail's deletion bias). Routing wired: hook `General:` line, discovery-tree entries (grill under Planning & docs, new General-utilities group), grill tiebreaker. **Caveman dedup** — a token audit of the live install found the caveman instructions loaded ~4×: `rules/caveman.md` synced into the managed block, a second copy in an orphaned `AGENTIC-GENERAL` block left by an old installer, a stray third copy, plus the caveman plugin injecting the same text per-turn via its SessionStart/UserPromptSubmit hooks. One channel wins: the plugin (level tracking, stats, persistence). `rules/caveman.md` deleted — the sync state-file removal loop uninstalls it from all six tools automatically — and `using-agent-skills` / README now name the plugin as the sole delivery. ~1.2k tokens/session + ~150 tokens/turn reclaimed. |
 | `v1.21.0` | 2026-08-06 | **Platform detection moved from inference to `cwd`.** The routing hook told the model to detect RN/web vs Android vs iOS itself, and `using-agent-skills` warned that announcing a `/fe-*` skill on a `.kt` or `.swift` task is a routing error — a rule against a mistake the setup invited, since the model only had filenames to go on and a native repo with no staged changes gives it nothing. That is deterministic work handed to a probabilistic step, against core behavior #7 (if code can answer, code answers). `hooks/craftkit-routing.js` now walks up from the hook payload's `cwd` (falling back to `process.cwd()`, capped at 12 levels) checking each level for `settings.gradle{,.kts}` / `build.gradle{,.kts}` → Android (MVP), `Podfile` / `Package.swift` / `*.xcodeproj` / `*.xcworkspace` → iOS (MVVM-C), `package.json` → React Native / web (EVPMR). Nearest ancestor wins, so an RN root reports RN while its `android/` subdir reports Android — the right answer in both places; several markers at one level report as mixed; no marker anywhere emits no line rather than a guess. The result is injected as an authoritative `Platform (detected from cwd)` line, so `"write tests for this"` in an Android repo can no longer land on `/fe-test`. **New `check.sh` check #11, behavioral not grep** — it builds three fixture dirs, runs the real hook against each, and asserts the label, plus asserts the hook exits 0 on malformed stdin. Both matter because a `UserPromptSubmit` hook that dies just yields no context: a marker typo or a parse crash removes the entire skill-first gate silently, and a grep-based check would pass on detection that never fires. Skips with a notice when `node` is off `PATH`. Verified to fail before being made to pass, for both classes. |

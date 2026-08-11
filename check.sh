@@ -259,6 +259,29 @@ else
     pass
 fi
 
+# ---------------------------------------------------------------------------
+# 13. Adapter arrays agree with adapters/ and with each other.
+#     sync.sh calls adapter functions by string interpolation, so a name with no
+#     sourced file dies at the first call — mid-sync, after some tools are written.
+#     Retiring a tool is the live case: RETIRED_ADAPTERS still needs its adapter
+#     sourced (retire_adapter replays that adapter's own uninstall_*), and a name
+#     left in both arrays would install then immediately uninstall every run.
+# ---------------------------------------------------------------------------
+check "adapter arrays resolve"
+_array_of() { grep "^${1}=" "$REPO_DIR/sync.sh" | sed 's/[^(]*(//;s/).*//;s/"//g'; }
+_live="$(_array_of ADAPTERS)"
+_retired="$(_array_of RETIRED_ADAPTERS)"
+_ad=0
+[[ -n "$_live" ]] || { fail "ADAPTERS not found in sync.sh"; _ad=1; }
+for a in $_live $_retired; do
+    [[ -f "$REPO_DIR/adapters/${a}.sh" ]] || { fail "adapter '$a' listed but adapters/${a}.sh missing"; _ad=1; }
+    grep -q "adapters/${a}.sh" "$REPO_DIR/sync.sh" || { fail "adapter '$a' listed but never sourced in sync.sh"; _ad=1; }
+done
+for a in $_retired; do
+    case " $_live " in *" $a "*) fail "adapter '$a' is in both ADAPTERS and RETIRED_ADAPTERS"; _ad=1 ;; esac
+done
+[[ $_ad -eq 0 ]] && pass
+
 echo
 if [[ $FAILURES -eq 0 ]]; then
     echo "All checks passed."

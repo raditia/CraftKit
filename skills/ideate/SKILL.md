@@ -58,10 +58,10 @@ Frame choice is judgment — match frames to the problem. Adversary + Radical-si
 |------|------------------------|---------|
 | Claude Code | `Agent` tool — 5 blocks in one message, `subagent_type: general-purpose` | ✅ full |
 | Gemini CLI | shell `&` fan-out + `wait` (5× `gemini -p "<frame prompt>"`), then read outputs | ✅ full |
+| Codex CLI | shell `&` fan-out + `wait` (5× `codex exec "<frame prompt>"`), then read outputs | ✅ full |
 | Cursor | background agent tabs opened together | ⚠️ manual |
-| Copilot / Codex / Crush | no programmatic fan-out — run frames one-by-one in separate chats, paste outputs to the critic | ⚠️ degraded — sequential, not truly isolated; state the limitation to the user |
 
-On degraded tools, still run distinct frames — you lose isolation, not divergence.
+On a manual tool, still run distinct frames — you lose isolation, not divergence.
 
 ---
 
