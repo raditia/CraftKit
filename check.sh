@@ -326,6 +326,31 @@ for _p in "$COMMANDS_DIR"/parallel-*.md; do
 done
 [[ $_tw -eq 0 ]] && pass
 
+# ---------------------------------------------------------------------------
+# 16. A declared license has license text behind it.
+#     `package.json` said "license": "MIT" for 26 releases with no LICENSE file in
+#     the repo — so npm advertised MIT while the grant existed nowhere, GitHub could
+#     not detect it, and four MIT-licensed upstreams were adapted without the notice
+#     their license requires. A license claim nobody can read is not a license.
+# ---------------------------------------------------------------------------
+check "declared license has license text"
+_lic="$(awk -F'"' '/"license":/{print $4;exit}' "$REPO_DIR/package.json")"
+_licfile=""
+for _c in LICENSE LICENSE.md LICENCE; do
+    [[ -f "$REPO_DIR/$_c" ]] && { _licfile="$REPO_DIR/$_c"; break; }
+done
+if [[ -z "$_lic" ]]; then
+    pass   # no claim made, nothing to back up
+elif [[ -z "$_licfile" ]]; then
+    fail "package.json declares \"license\": \"$_lic\" but no LICENSE file exists"
+elif ! head -5 "$_licfile" | grep -qi -- "$_lic"; then
+    # Header only, not the whole file: a third-party attribution block naming other
+    # projects' licenses would otherwise satisfy this and hide a mismatched grant.
+    fail "package.json declares '$_lic' but $(basename "$_licfile") does not name it in its header"
+else
+    pass
+fi
+
 echo
 if [[ $FAILURES -eq 0 ]]; then
     echo "All checks passed."

@@ -7,6 +7,18 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.27.0 — 2026-08-11
+
+Added the `LICENSE` that `package.json` had been promising for 26 releases, plus `CONTRIBUTING.md`.
+
+Started as a question about why GitHub shows only one tab on the repo page. It shows tabs for a fixed allowlist of community health files (`README`, `CODE_OF_CONDUCT`, `CONTRIBUTING`, `LICENSE`, `SECURITY`, `CITATION`) — `CHANGELOG.md` is not on it and never gets a tab, so `v1.26.0`'s split was fine as-is. But checking which of those files existed surfaced a real problem.
+
+- **`package.json` declared `"license": "MIT"` with no `LICENSE` file anywhere in the repo.** npm advertised MIT while the grant existed nowhere, GitHub could not detect or display it, and four MIT-licensed upstreams had been adapted without the notice their license requires. A license claim nobody can read is not a license.
+- **`LICENSE` added** — MIT text, `Copyright (c) 2026 Gusti Raditia Madya`, plus a third-party section naming each adapted upstream and what it became. The four attributions were verified against the files themselves rather than from memory: `mattpocock/skills` → `skills/{grill,research,handoff}` + CLAUDE.md's writing levers; `addyosmani/agent-skills` → `skills/{adr,docs,interview,spec,plan}`; `UditAkhourii/adhd` → `skills/ideate`; `tjboudreaux/cc-thinking-skills` → `skills/think`. Exact upstream copyright lines are not reproduced because they were not available to copy verbatim — the section invites those authors to open an issue if they want their notice included as written.
+- **`CONTRIBUTING.md` added**, carrying the gate (`check.sh` exit 0, second `sync.sh` reporting no work), the full list of what `check.sh` catches, the release procedure, and the conventions that bite. The README keeps a three-line pointer instead of the buried section it had. Authoring rules stay in `CLAUDE.md` deliberately — that file is loaded into every session working in this repo, so it is the copy that actually gets followed.
+- **`check.sh` check 16** — a declared license must have license text behind it, and the file must name that license **in its header**. The header restriction is the point: an initial version grepped the whole file and passed a deliberately mismatched `Apache License` header, because "MIT-licensed" in the third-party attribution block satisfied it. Caught by testing the branch rather than trusting it; all three branches (no claim, no file, header mismatch) verified failing before passing.
+- Skipped `CODE_OF_CONDUCT.md` and `SECURITY.md`: for a single-maintainer skills repo they are boilerplate nobody reads, which is what the ponytail rubric exists to catch.
+
 ## v1.26.0 — 2026-08-11
 
 Split the changelog out of the README and gave it a readable shape.

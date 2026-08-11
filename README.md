@@ -1,4 +1,4 @@
-# craftkit `v1.26.0`
+# craftkit `v1.27.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
@@ -139,12 +139,13 @@ bash install.sh
 
 **Upgrading from ≤ v1.23.0** — GitHub Copilot and Crush were retired in v1.24.0. The next sync uninstalls them from your machine automatically: Copilot's entries come out of VS Code `settings.json` and Crush's managed block out of `~/.config/crush/CRUSH.md`, then the state files are dropped so it never runs again. One thing it deliberately leaves alone: per-project Copilot `@` agents wrote real files into your other repos, possibly committed there, so sync prints those paths and lets you decide.
 
-**Contributing to craftkit itself** — there is no build or test suite (the product is markdown), so `check.sh` is the gate:
+**Contributing to craftkit itself** — see **[CONTRIBUTING.md](CONTRIBUTING.md)**. Short version:
+there is no build or test suite (the product is markdown), so `check.sh` is the gate and a second
+consecutive `sync.sh` must report no work.
 ```bash
 bash check.sh   # content integrity — exit 0 required before commit
 bash sync.sh    # distribute; a second consecutive run must report no work
 ```
-It catches what a reader can't hold in their head: dangling `subagent_type` references, skill/command install-dest collisions, nested skills that never sync, frontmatter/path name drift, unresolvable `craftkitInject` sources, a routing hook advertising a renamed command or no longer resolving a platform from `cwd`, an orchestrator that covers RN/web but not native, an always-active rule contradicting the native skills, undocumented agents or skills, an adapter name listed in `sync.sh` with no sourced file behind it, a `parallel-*` orchestrator with no sequential twin mapped in both the rule and the hook, a routing hook pinned to a node version fnm can prune, and version drift across `package.json` + README header + newest `CHANGELOG.md` section. Every check exists because that exact bug shipped unnoticed — when you fix a new class, add a check and confirm it fails before making it pass.
 
 ---
 
