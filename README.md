@@ -79,8 +79,6 @@ want to move that state logic into the Presenter layer instead.
 
 **~72% reduction** per response. Full review sessions with reasoning and multi-step output: **40–60% output savings**.
 
-### Combined impact
-
 ### Ponytail — compresses what the AI generates (code output)
 
 The `ponytail` decision ladder enforces YAGNI before any code is written. Before generating code, the AI stops at the first rung that holds: does this need to exist? is it in stdlib? is it a native feature? is an installed dep enough? can it be one line? Only then: minimal code. Deliberate shortcuts are marked with `ponytail:` comments naming their ceiling and upgrade path.
