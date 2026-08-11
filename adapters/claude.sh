@@ -163,11 +163,20 @@ install_claude_skill() {
     fi
 }
 
+# Hooks spawn under a stripped PATH with no shell profile, so the registered command must
+# carry an absolute interpreter. Which absolute path matters: prefer one a package manager
+# repoints on upgrade over a version-pinned one, because fnm prunes old versions and a
+# UserPromptSubmit hook that dies takes the whole routing gate with it, silently.
 _resolve_node_bin() {
-    # Prefer fnm's stable installation path over session-scoped multishell symlink
+    local p
+    for p in /opt/homebrew/bin/node /usr/local/bin/node; do
+        [[ -x "$p" ]] && { echo "$p"; return; }
+    done
+
     local fnm_dir="$HOME/.local/share/fnm/node-versions"
     if [[ -d "$fnm_dir" ]]; then
-        # Pick highest version available
+        # Highest version available — pinned, so _craftkit_hook_wire_settings migrates off
+        # this the moment a managed path appears.
         local stable
         stable="$(ls -1 "$fnm_dir" | sort -V | tail -1)"
         local candidate="$fnm_dir/$stable/installation/bin/node"
@@ -197,16 +206,41 @@ print(json.dumps({'hooks':{'UserPromptSubmit':[{'hooks':[hook]}]}},indent=2))
     fi
 
     python3 - "$CLAUDE_SETTINGS" "$hook_cmd" << 'PYEOF'
-import json, sys
+import json, os, re, sys
 settings_path, hook_cmd = sys.argv[1], sys.argv[2]
 with open(settings_path) as f:
     settings = json.load(f)
 hook = {'type': 'command', 'command': hook_cmd, 'timeout': 5, 'statusMessage': 'CraftKit routing...'}
 ups = settings.setdefault('hooks', {}).setdefault('UserPromptSubmit', [])
+
+
+def interpreter(cmd):
+    m = re.match(r'"([^"]+)"', cmd)
+    return m.group(1) if m else (cmd.split() or [''])[0]
+
+
+# Registration used to be write-once, which meant the interpreter path was frozen at
+# whatever existed on install day. Two ways that goes wrong, both re-pointed here:
+# the path stopped existing (dead hook, no routing gate, no error the user would notice),
+# or it is a version-pinned fnm path that is one `fnm uninstall` away from becoming the
+# first case. A working non-pinned command is left alone — it may be deliberate.
 for entry in ups:
     for h in entry.get('hooks', []):
-        if 'craftkit-routing' in h.get('command', ''):
-            sys.exit(0)  # already registered
+        cmd = h.get('command', '')
+        if 'craftkit-routing' not in cmd:
+            continue
+        current = interpreter(cmd)
+        alive = os.path.isfile(current) and os.access(current, os.X_OK)
+        pinned = 'fnm/node-versions' in current or 'fnm_multishells' in current
+        if alive and not pinned:
+            sys.exit(0)
+        h['command'] = hook_cmd
+        with open(settings_path, 'w') as f:
+            json.dump(settings, f, indent=2)
+            f.write('\n')
+        print('    routing hook interpreter re-pointed: %s -> %s'
+              % (current, interpreter(hook_cmd)))
+        sys.exit(0)
 if ups:
     ups[0].setdefault('hooks', []).append(hook)
 else:
@@ -242,9 +276,13 @@ install_claude_craftkit_hook() {
     if [[ ! -f "$dest" ]] || ! diff -q "$src" "$dest" &>/dev/null; then
         cp "$src" "$dest"
         chmod +x "$dest"
-        _craftkit_hook_wire_settings "$dest"
         echo "    + hook: craftkit-routing"
     fi
+    # Wired on every sync, not only when the script content changed. Registration is
+    # idempotent and now repairs a stale interpreter, so gating it on the copy meant the
+    # repair could never reach a machine whose hook script was already up to date —
+    # which is every machine that had synced once.
+    _craftkit_hook_wire_settings "$dest"
 }
 
 uninstall_claude_craftkit_hook() {

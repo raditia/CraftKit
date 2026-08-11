@@ -282,6 +282,26 @@ for a in $_retired; do
 done
 [[ $_ad -eq 0 ]] && pass
 
+# ---------------------------------------------------------------------------
+# 14. The routing hook's node path is absolute and not version-pinned.
+#     Hooks spawn under a stripped PATH with no profile, so the command must carry an
+#     absolute interpreter — and it must be one that survives, because a dead
+#     UserPromptSubmit hook silently removes the whole routing gate. A pinned
+#     fnm/node-versions/<v> path is one `fnm uninstall` away from exactly that.
+# ---------------------------------------------------------------------------
+check "routing hook interpreter is durable"
+if [[ ! -x /opt/homebrew/bin/node && ! -x /usr/local/bin/node ]]; then
+    echo "    skipped (no package-manager node to prefer on this machine)"
+else
+    _nb="$(. "$REPO_DIR/adapters/claude.sh" >/dev/null 2>&1; _resolve_node_bin)"
+    case "$_nb" in
+        *fnm/node-versions*|*fnm_multishells*)
+            fail "_resolve_node_bin returned version-pinned '$_nb' while a managed node exists" ;;
+        /*) pass ;;
+        *)  fail "_resolve_node_bin returned non-absolute '$_nb' — hooks get a stripped PATH" ;;
+    esac
+fi
+
 echo
 if [[ $FAILURES -eq 0 ]]; then
     echo "All checks passed."
