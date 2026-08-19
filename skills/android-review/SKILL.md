@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `git diff <base>...HEAD`, `./gradlew :<module>:lintGeneralDebug`, `grep -rn "pattern" <feature>/src`
-**Model:** everyday — escalate to `claude-opus-4-8` if the review surfaces an architectural conflict with non-obvious resolution
+**Model:** everyday — escalate if the review surfaces an architectural conflict with non-obvious resolution
 
 ---
 

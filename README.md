@@ -1,4 +1,4 @@
-# craftkit `v1.27.0`
+# craftkit `v1.28.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
@@ -683,15 +683,18 @@ flowchart TD
 
 Each skill runs on the everyday model. Escalation is inline — the AI consults the higher model for a specific question and continues without interrupting you.
 
-**Claude Code is plan-aware.** `hooks/craftkit-routing.js` reads the logged-in account from `~/.claude.json` on every prompt and injects the detected tier as context: Gmail-domain login → personal, `organizationType` containing "enterprise" → enterprise, anything unreadable → personal (safe default).
+**On Claude Code the tiers are resolved per prompt, not written down.** `hooks/craftkit-routing.js` reads `~/.claude.json` — `modelAccessCache` ∪ `additionalModelOptionsCache`, the entitlement list Claude Code keeps there — takes the newest entitled version of each model family, ranks them `haiku < sonnet < opus < fable`, and injects the top three as cheapest / everyday / escalate. So an account without fable resolves haiku/sonnet/opus and one with it resolves sonnet/opus/fable, and **a new model release needs no edit in this repo**: `opus-5` displaces `opus-4-8` the moment the account is entitled to it. Only a brand-new *family* name touches the rank list — a name alone can't say where it sits. Entitlements unreadable → family aliases only, said out loud in the injected line.
 
-| AI | Plan | Everyday | Escalate | Fusion panel |
-|----|------|----------|----------|-------------|
-| Claude Code | personal (Pro, Gmail login) | `claude-sonnet-5` | `claude-opus-4-8` | 2× opus → opus judge |
-| Claude Code | enterprise | `claude-opus-4-8` | `claude-fable-5` | 2× fable → fable judge |
-| Gemini CLI | — | `gemini-2.5-flash` | `gemini-2.5-pro` | — |
-| Cursor | — | claude-sonnet / gpt-4o | claude-opus / o1 | — |
-| Codex CLI | — | `codex-mini-latest` | `o3` | — |
+The other three tools reach the same property by their own means: Gemini CLI's `pro`/`flash`/`flash-lite` aliases resolve against CLI constants plus account entitlement; Codex CLI gets no `model` key at all, so its server-refreshed catalog picks and the tier rides `model_reasoning_effort`; Cursor has no committable model selector, so that row is a note rather than a setting. Working sources in `docs/research/self-updating-model-ids.md` — written after `codex-mini-latest` was found retired since **2026-02-12** while still sitting in this table.
+
+Skills therefore name a tier, never a model id, and agents spawn on the family alias (`haiku`/`sonnet`/`opus`/`fable`), which self-updates to the newest model in that family. `check.sh` fails the build if a versioned id reappears in `rules/`, `skills/`, `commands/`, or `agents/`.
+
+| AI | Everyday | Escalate | Fusion panel |
+|----|----------|----------|-------------|
+| Claude Code | injected per prompt | injected per prompt | 2× escalate → same-tier judge |
+| Gemini CLI | `flash` | `pro` | — |
+| Cursor | `auto` (picker/account-level — not repo-configurable) | `cursor-agent --model` | — |
+| Codex CLI | omit `model`, effort `medium` | omit `model`, effort `high` | — |
 
 Escalation triggers: architecture decisions with non-obvious tradeoffs, security-sensitive code, debugging with no hypothesis after 2 attempts.
 

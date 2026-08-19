@@ -4,7 +4,7 @@ description: Router for systems/strategy reasoning frameworks — classify the p
 alwaysApply: false
 ---
 
-**Model:** everyday — escalate the analysis (`claude-opus-4-8`) for architecture calls with non-obvious tradeoffs.
+**Model:** everyday — escalate the analysis for architecture calls with non-obvious tradeoffs.
 
 > **Core behaviors:** Surface assumptions. STOP and ask when confused. See `/using-agent-skills`.
 > **Reasoning aid, not an action skill.** `/think` structures *how you reason*, then hands off. It does not edit code, review, or scaffold — route to the real skill after.

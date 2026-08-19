@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `git diff <base>...HEAD`, `bazelisk test //Modules/<Module>:<Module>TestsBundle`, `swiftlint lint --path <file>`
-**Model:** everyday — escalate to `claude-opus-4-8` if a ViewModel path can't be reached without refactoring the production code
+**Model:** everyday — escalate if a ViewModel path can't be reached without refactoring the production code
 
 > Triggered by: "write iOS tests", "test this view model", "add tests for this screen", "improve iOS coverage"
 

@@ -4,7 +4,7 @@ description: Experimental agent-teams build — this session acts as team lead (
 ---
 
 **Commands:** platform gates — see Phase 5
-**Model:** lead = escalated (`claude-opus-4-8`), teammates = everyday (`claude-sonnet-5`)
+**Model:** lead = escalated, teammates = everyday
 
 > Triggered by: `/team-build` **only** — never auto-routed. "build feature X" in natural language still routes to `/parallel-build`. This command is an explicit opt-in: it requires the experimental agent-teams feature and costs roughly (1 + teammate count) × a solo build in tokens.
 
@@ -21,7 +21,7 @@ description: Experimental agent-teams build — this session acts as team lead (
    { "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" } }
    ```
    Restart the session after enabling. Do not proceed degraded — fall back to `/parallel-build` if the user declines.
-2. **Lead model.** The team lead is *this* session — a command cannot switch it. If the session runs the everyday tier, warn: lead work is judgment-heavy (task DAG design, contradiction adjudication, synthesis) and merits `claude-opus-4-8` (`/model`). Proceed on everyday only with explicit user OK. *(Deliberate exception to the model-routing "never ask the user to switch" rule — inline escalation spawns cover targeted questions, not a session-long lead role.)*
+2. **Lead model.** The team lead is *this* session — a command cannot switch it. If the session runs the everyday tier, warn: lead work is judgment-heavy (task DAG design, contradiction adjudication, synthesis) and merits the escalated tier (`/model`). Proceed on everyday only with explicit user OK. *(Deliberate exception to the model-routing "never ask the user to switch" rule — inline escalation spawns cover targeted questions, not a session-long lead role.)*
 3. **Session caveats — tell the user before spawning:**
    - `/resume` and `/rewind` do not restore in-process teammates — a long build interrupted mid-team restarts its coordination from the task list, not the conversation.
    - One team per session; teammates cannot spawn background subagents.

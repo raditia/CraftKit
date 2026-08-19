@@ -3,7 +3,7 @@ name: define
 description: Checkpoint-gated pre-build planning pipeline — chains /interview → /spec → /plan (offering /ideate and plan-roaster where useful) so an underspecified feature ask becomes a reviewed spec + task plan in one invocation. Pauses for your approval between phases. Writes the forward-planning block into docs/context.md. Use before building a feature whose scope, approach, or tasks aren't yet clear.
 ---
 
-**Model:** everyday — escalate the spec phase (`claude-opus-4-8`) for hard-to-reverse features (schema, public API, payment/auth).
+**Model:** everyday — escalate the spec phase for hard-to-reverse features (schema, public API, payment/auth).
 
 > Triggered by: "plan this feature", "define feature X", "help me spec and plan X", "let's plan before building", `/define`
 > **Pre-build only.** `/define` stops at a reviewed plan and hands to `/parallel-build`. It does **not** build, and it does **not** write adr/docs — those are post-build (offered by `/parallel-ship`).

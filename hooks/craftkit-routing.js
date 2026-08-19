@@ -9,23 +9,62 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-// Model tier detection — reads the logged-in account from ~/.claude.json.
-// Domain check first (gmail.com = personal), organizationType as fallback for
-// non-Gmail personal accounts, personal as the safe default on any read/parse failure.
-// See rules/using-agent-skills.md → "Model routing" for the full tier table.
-function detectModelTier() {
-  const PERSONAL = { label: 'personal', cheapest: 'claude-haiku-4-5', everyday: 'claude-sonnet-5', escalate: 'claude-opus-4-8' };
-  const ENTERPRISE = { label: 'enterprise', cheapest: 'claude-sonnet-5', everyday: 'claude-opus-4-8', escalate: 'claude-fable-5' };
+// Model tier resolution — derived from what the account is actually entitled to,
+// so a new model release needs no edit here. Claude Code caches the entitlement
+// list in ~/.claude.json: `modelAccessCache` (every model, with an `entitled`
+// flag) plus `additionalModelOptionsCache` (extra picker entries, which can be
+// selectable while the base id still reads entitled:false — hence the union).
+// Tiers are the top three available families, newest version of each. That
+// reproduces both historical plan rows without asking which plan this is:
+// no fable  -> haiku / sonnet / opus   (was "personal")
+// has fable -> sonnet / opus  / fable  (was "enterprise")
+// FAMILY_RANK is the one line a genuinely NEW family name needs — a name alone
+// cannot say where it sits. Version bumps inside a known family are automatic.
+const FAMILY_RANK = ['haiku', 'sonnet', 'opus', 'fable'];
+
+// Aliases are what the Agent tool's `model:` accepts, and they self-update to the
+// newest model in the family — so a spawn should carry the alias and the concrete
+// id is only ever shown to the user.
+const FALLBACK = { cheapest: 'haiku', everyday: 'sonnet', escalate: 'opus', resolved: false };
+
+// claude-opus-4-8 -> [4,8] · claude-haiku-4-5-20251001 -> [4,5] (date segment ends it)
+// claude-fable-5[1m] -> [5] · claude-3-opus-20240229 -> null (pre-family-first naming)
+function parseModelId(raw) {
+  const id = String(raw || '').replace(/\[.*$/, '');
+  const m = id.match(new RegExp('^claude-(' + FAMILY_RANK.join('|') + ')-([\\d-]+)'));
+  if (!m) return null;
+  const version = [];
+  for (const seg of m[2].split('-')) {
+    if (!seg || seg.length >= 8) break;
+    version.push(Number(seg));
+  }
+  return version.length ? { id, family: m[1], version } : null;
+}
+
+function newerVersion(a, b) {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] || 0) - (b[i] || 0);
+    if (d) return d > 0;
+  }
+  return false;
+}
+
+function resolveModelTiers() {
   try {
     const cfg = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude.json'), 'utf8'));
-    const oa = cfg.oauthAccount || {};
-    const domain = String(oa.emailAddress || '').toLowerCase().split('@')[1] || '';
-    if (domain === 'gmail.com' || domain === 'googlemail.com') return PERSONAL;
-    const orgType = String(oa.organizationType || '').toLowerCase();
-    if (orgType.includes('enterprise')) return ENTERPRISE;
-    return PERSONAL;
+    const ids = (cfg.modelAccessCache || []).filter(m => m && m.entitled).map(m => m.apiName)
+      .concat((cfg.additionalModelOptionsCache || []).map(m => m && m.value));
+    const best = {};
+    for (const raw of ids) {
+      const p = parseModelId(raw);
+      if (p && (!best[p.family] || newerVersion(p.version, best[p.family].version))) best[p.family] = p;
+    }
+    const ladder = FAMILY_RANK.filter(f => best[f]).map(f => best[f]);
+    if (!ladder.length) return FALLBACK;
+    const at = i => ladder[Math.max(0, ladder.length - i)];
+    return { cheapest: at(3).id, everyday: at(2).id, escalate: at(1).id, resolved: true };
   } catch (e) {
-    return PERSONAL;
+    return FALLBACK;
   }
 }
 
@@ -60,7 +99,7 @@ function detectPlatform(startDir) {
 let input = '';
 process.stdin.on('data', chunk => { input += chunk; });
 process.stdin.on('end', () => {
-  const tier = detectModelTier();
+  const tier = resolveModelTiers();
   let cwd = process.cwd();
   try {
     const payload = JSON.parse(input);
@@ -84,7 +123,7 @@ process.stdin.on('end', () => {
         "Android (*.kt/*.java, MVP): /android-patterns /android-scaffold /android-review /android-test /android-a11y /android-performance /android-context\n" +
         "iOS (*.swift/*.m, MVVM-C): /ios-patterns /ios-scaffold /ios-review /ios-test /ios-a11y /ios-performance /ios-context\n" +
         "Every orchestrator is platform-routed — /parallel-build /parallel-review /parallel-ship /build /fix /ship /pr-message detect RN-web vs Android vs iOS at Step 0 and swap in that platform's gates, skills, and agents. Native single-screen work uses no EVPMR and no docs/context.md — read a real sibling screen instead; standard context loading does not apply there. Announcing a /fe-* skill on a .kt or .swift task is a routing error.\n\n" +
-        `Model tier (detected from ~/.claude.json): ${tier.label} — cheapest=${tier.cheapest}, everyday=${tier.everyday}, escalate=${tier.escalate}. Use these for Claude Code rows in the Model routing table in rules/using-agent-skills.md.`
+        `Model tiers (resolved from ~/.claude.json entitlements): cheapest=${tier.cheapest}, everyday=${tier.everyday}, escalate=${tier.escalate}${tier.resolved ? '' : ' (entitlements unreadable — family aliases only)'}. These are authoritative — use them wherever a skill names a tier, and spawn agents with the family alias (haiku/sonnet/opus/fable), which tracks the newest model in that family on its own.`
     }
   }));
 });

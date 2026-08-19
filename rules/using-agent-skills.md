@@ -380,11 +380,11 @@ Ambiguous between two skills → name both, ask user which applies.
 ### 11. Announce skill invocation
 Before invoking any skill or command, tell the user which one you're using and what model will run it:
 ```
-Running /fe-test [everyday: claude-sonnet-5] — write and verify tests for changed code paths.
-Running /pr-message [cheapest: claude-haiku-4-5] — generate PR message from branch diff.
-Running /fe-context [cheapest: claude-haiku-4-5] — generate context doc from staged changes.
+Running /fe-test [everyday] — write and verify tests for changed code paths.
+Running /pr-message [cheapest] — generate PR message from branch diff.
+Running /fe-context [cheapest] — generate context doc from staged changes.
 ```
-One line, before the skill executes. Lets the user redirect before work begins. Read the skill's `**Model:**` line to get the right label — use `cheapest`, `everyday`, or `escalated` as the tier label.
+One line, before the skill executes. Lets the user redirect before work begins. Read the skill's `**Model:**` line to get the right label — use `cheapest`, `everyday`, or `escalated` as the tier label. Name the tier, not a model id; the id shifts every release and the injected tier line already carries it.
 
 ---
 
@@ -414,17 +414,20 @@ Authoring/updating craftkit content (rules, skills, commands, agents) is **repo-
 
 Use the everyday model by default. Escalate inline when you detect genuine uncertainty — not as a reflex. For decisions where being confidently wrong is expensive, use the fusion panel instead of a single escalation.
 
-**Claude Code row is plan-aware.** `hooks/craftkit-routing.js` reads `~/.claude.json` → `oauthAccount` every turn and injects the detected tier as `additionalContext` (`Model tier (detected): ...`). Use the tier from that context when present — it overrides the static row below. Detection: Gmail-domain account → personal; else `organizationType` containing "enterprise" → enterprise; anything unreadable/unrecognized → personal (safe default).
+**On Claude Code the tiers arrive per turn — never name a model id yourself.** `hooks/craftkit-routing.js` reads `~/.claude.json` every prompt and injects the resolved trio as `additionalContext` (`Model tiers (resolved from ~/.claude.json entitlements): cheapest=… everyday=… escalate=…`). That line is authoritative wherever a skill names a tier, and it is what makes a model release a no-op here: the hook derives the trio from `modelAccessCache` ∪ `additionalModelOptionsCache` — the newest entitled version of each family, ranked `haiku < sonnet < opus < fable`, top three families become cheapest / everyday / escalate. So an account without fable resolves haiku/sonnet/opus, one with it resolves sonnet/opus/fable, and a new `opus-6` displaces `opus-5` on its own. Entitlements unreadable → the line says so and carries family aliases only.
 
-| AI | Plan | Cheapest | Everyday | Escalate | Fusion panel |
-|---|---|---|---|---|---|
-| Claude Code | personal (Pro, Gmail login) | `claude-haiku-4-5` | `claude-sonnet-5` | `claude-opus-4-8` | 2× `claude-opus-4-8` → opus judge |
-| Claude Code | enterprise | `claude-sonnet-5` | `claude-opus-4-8` | `claude-fable-5` | 2× `claude-fable-5` → fable judge |
-| Gemini CLI | — | `gemini-2.5-flash` | `gemini-2.5-flash` | `gemini-2.5-pro` | 2× `gemini-2.5-pro` → pro judge |
-| Cursor | — | `gpt-4o-mini` | claude-sonnet / gpt-4o | claude-opus / o1 | 2× claude-opus → opus judge |
-| Codex CLI | — | `codex-mini-latest` | `codex-mini-latest` | `o3` | 2× `o3` → `o3` judge |
+**Spawn agents with the family alias** (`haiku` · `sonnet` · `opus` · `fable`), not a versioned id: the Agent tool's `model:` accepts aliases and each tracks the newest model in its family, which is why `agents/*.md` frontmatter pins `sonnet` and stays correct across releases. Concrete ids are for showing the user.
 
-Cheapest = the floor for pure pattern-matching/extraction skills (scaffold, context, a11y, ponytail-*, debug's first pass). On enterprise the floor is `claude-sonnet-5`, not haiku — cold review **agents** (`agents/*.md`) also pin to `sonnet` for this reason (static frontmatter can't branch on plan, so sonnet is the value valid on both plans).
+| AI | Cheapest | Everyday | Escalate | Fusion panel |
+|---|---|---|---|---|
+| Claude Code | injected per turn (see above) | injected | injected | 2× escalate → same-tier judge |
+| Gemini CLI | `flash-lite` | `flash` | `pro` | 2× `pro` → `pro` judge |
+| Cursor | `auto` | `auto` | `cursor-agent --model` or the picker | 2× escalate → same-tier judge |
+| Codex CLI | omit `model`, effort `low` | omit `model`, effort `medium` | omit `model`, effort `high` | 2× escalate → same-tier judge |
+
+**No row names a versioned id, on any tool** — the same reason as the Claude row, reached differently per tool. Gemini CLI ships its own `auto`/`pro`/`flash`/`flash-lite` aliases that resolve against CLI constants *and* the account's preview entitlement, so they self-update on CLI upgrade (prefer these over the API's `gemini-*-latest`, which Google steers production away from and which can land on a rate-limited preview build). Codex CLI has no self-updating model id — OpenAI's undated ids pin the minor version — so leave `model` unset in `~/.codex/config.toml` and let the CLI's server-refreshed catalog pick, expressing the tier as `model_reasoning_effort` instead. Cursor's model lives in the picker or the account default chain; no committed file selects it, so the row is a best-effort note, not a setting. Sources and the retired ids this replaced: `docs/research/self-updating-model-ids.md`.
+
+Cheapest = the floor for pure pattern-matching/extraction skills (scaffold, context, a11y, ponytail-*, debug's first pass) — on an account whose ladder starts at sonnet, that floor *is* sonnet, which is why the cold review agents pin `sonnet` rather than `haiku`.
 
 ### Escalation triggers → single escalate-tier model
 - Architecture decision with significant, non-obvious tradeoffs
@@ -440,7 +443,7 @@ Use when a single higher-model pass might still miss something and being wrong h
 
 ### Escalation process (single higher model)
 
-Never ask the user to switch models — escalate inline. (1) Tell the user one line first: `Low confidence on [problem] — consulting higher model.` (2) Spawn an agent on the tier's **Escalate** model (e.g. `claude-opus-4-8` on personal, `claude-fable-5` on enterprise — see plan-aware table above), scoped to the uncertain part only, not the whole skill. (3) Incorporate the result, continue on the everyday model. (4) Note at end: `[consulted <escalate-model> for: X]`. Targeted question, not a hand-off — you stay in control.
+Never ask the user to switch models — escalate inline. (1) Tell the user one line first: `Low confidence on [problem] — consulting higher model.` (2) Spawn an agent on the tier's **Escalate** model — the alias from the injected tier line — scoped to the uncertain part only, not the whole skill. (3) Incorporate the result, continue on the everyday model. (4) Note at end: `[consulted <escalate-model> for: X]`. Targeted question, not a hand-off — you stay in control.
 
 ### Fusion panel process
 
@@ -449,9 +452,9 @@ Independence-then-synthesis: same prompt → 2 independent runs → judge synthe
 1. Tell the user one line: `High-stakes decision on [X] — routing to fusion panel (2× <escalate-model>).`
 2. Write the question **verbatim** — no lenses/personas; every panelist gets it straight.
 3. Spawn 2 independent panelists, same prompt, no cross-contamination, both on the tier's Escalate model. Spawn mechanism per AI:
-   - **Claude Code** — Agent tool, both in one message (concurrent), `model:` = tier's Escalate column (`claude-opus-4-8` personal / `claude-fable-5` enterprise)
+   - **Claude Code** — Agent tool, both in one message (concurrent), `model:` = the Escalate alias from the injected tier line
    - **Gemini CLI** — shell `&`-parallelism into temp files, judge call reads both
-   - **Cursor** — two background agent tabs at once, same model (`claude-opus`/`o1`)
+   - **Cursor** — two background agent tabs at once, both on the same escalate-tier model
    - **Codex CLI** — two `codex exec` calls backgrounded into temp files, judge call reads both
 4. Classify the deliverable, then synthesize:
    - **Artifact (code/config/script)** → run both candidates, merge by what demonstrably works, verify — the graft seam is where merges silently break, so run the merged result and fix until it passes.

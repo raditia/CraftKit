@@ -351,6 +351,58 @@ else
     pass
 fi
 
+# ---------------------------------------------------------------------------
+# 17. Model tiers stay resolved, never written down. Every Claude release used to
+#     mean editing ~17 files, and the ones missed silently routed work to a
+#     retired model. Tiers now come from the hook's entitlement read, so a
+#     versioned id in the content is a regression to that maintenance treadmill.
+#     Aliases (sonnet/opus/..., Gemini CLI's pro/flash) are the sanctioned form.
+#     All four vendors, not just Claude: the first cut of this check greped
+#     `claude-*` only, which is how `codex-mini-latest` sat in the routing table
+#     for six months after OpenAI retired it on 2026-02-12 — the exact bug the
+#     check exists to catch, missed because the guard was vendor-scoped.
+# ---------------------------------------------------------------------------
+check "content names model tiers, not versioned model ids"
+_mid="$(grep -rEn 'claude-(haiku|sonnet|opus|fable)-[0-9]|gemini-[0-9]|\bgpt-[0-9]|codex-mini|\bo[13]\b' \
+    "$REPO_DIR"/rules "$REPO_DIR"/skills "$REPO_DIR"/commands "$REPO_DIR"/agents 2>/dev/null || true)"
+if [[ -n "$_mid" ]]; then
+    fail "versioned model id in content — name the tier instead, the hook injects the id:"
+    echo "$_mid" | sed 's/^/      /'
+else
+    pass
+fi
+
+# ---------------------------------------------------------------------------
+# 18. The hook resolves the tier trio from entitlements. Behavioral: the whole
+#     point is that a new release needs no edit, and a silent regression here
+#     (bad parse, wrong rank) routes every skill to the wrong model with the
+#     injected line still looking plausible. Fixtures cover both historical plan
+#     shapes, a future version bump, and an unreadable config.
+# ---------------------------------------------------------------------------
+check "routing hook resolves model tiers from entitlements"
+if ! command -v node >/dev/null 2>&1; then
+    echo "    skipped (node not on PATH)"
+else
+    _fx="$(mktemp -d)"
+    _tiers() { printf '%s' "$2" > "$_fx/.claude.json"; echo '{}' | HOME="$_fx" node "$HOOK" 2>/dev/null | tr ',' '\n' | grep -o "$1=[^ ,.\"]*" | head -1; }
+    _NOFABLE='{"modelAccessCache":[{"apiName":"claude-haiku-4-5-20251001","entitled":true},{"apiName":"claude-sonnet-5","entitled":true},{"apiName":"claude-opus-4-8","entitled":true},{"apiName":"claude-fable-5","entitled":false}]}'
+    _FABLE='{"modelAccessCache":[{"apiName":"claude-sonnet-5","entitled":true},{"apiName":"claude-opus-5","entitled":true}],"additionalModelOptionsCache":[{"value":"claude-fable-5[1m]"}]}'
+    _NEWER='{"modelAccessCache":[{"apiName":"claude-haiku-4-5-20251001","entitled":true},{"apiName":"claude-sonnet-5","entitled":true},{"apiName":"claude-opus-5","entitled":true},{"apiName":"claude-opus-6-2","entitled":true}]}'
+    _mt=0
+    [[ "$(_tiers escalate "$_NOFABLE")" == "escalate=claude-opus-4-8" ]] \
+        || { fail "no-fable account did not resolve escalate=opus"; _mt=1; }
+    [[ "$(_tiers cheapest "$_NOFABLE")" == "cheapest=claude-haiku-4-5-20251001" ]] \
+        || { fail "no-fable account did not resolve cheapest=haiku"; _mt=1; }
+    [[ "$(_tiers escalate "$_FABLE")" == "escalate=claude-fable-5" ]] \
+        || { fail "picker-only fable ignored — additionalModelOptionsCache must count"; _mt=1; }
+    [[ "$(_tiers escalate "$_NEWER")" == "escalate=claude-opus-6-2" ]] \
+        || { fail "newer version within a family did not win — releases are not seamless"; _mt=1; }
+    [[ "$(_tiers everyday 'not json')" == "everyday=sonnet" ]] \
+        || { fail "unreadable entitlements did not fall back to family aliases"; _mt=1; }
+    rm -rf "$_fx"
+    [[ $_mt -eq 0 ]] && pass
+fi
+
 echo
 if [[ $FAILURES -eq 0 ]]; then
     echo "All checks passed."

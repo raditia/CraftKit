@@ -4,7 +4,7 @@ description: Turn a discovery brief or clear ask into a PRD before coding — ob
 alwaysApply: false
 ---
 
-**Model:** everyday — escalate (`claude-opus-4-8`) when the feature is hard to reverse (schema, public API, payment/auth surface) per the karpathy hard-to-reverse gate.
+**Model:** everyday — escalate when the feature is hard to reverse (schema, public API, payment/auth surface) per the karpathy hard-to-reverse gate.
 
 > **Core behaviors:** Surface assumptions. STOP and ask when confused — never invent requirements. Simplicity first (YAGNI on scope). See `/using-agent-skills`.
 > **Forward, not backward.** `/spec` defines what *will* be built. `/fe-context` documents what *was* changed (from the diff). They meet in `docs/context.md` — `/spec` writes the forward block, `/fe-context` preserves it.

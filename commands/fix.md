@@ -40,7 +40,7 @@ Detect the platform from the changed/failing files. The debug loop is identical;
 Follow the `/debug` workflow exactly:
 - **Reproduce:** confirm bug is reproducible; write a failing test before touching code
 - **Isolate:** narrow to specific file and line — not "somewhere in the flow"
-- **Hypothesize:** `HYPOTHESIS / EXPECTED / ACTUAL / FIX PLAN` before any code change; escalate to `claude-opus-4-8` if no hypothesis after 2 attempts
+- **Hypothesize:** `HYPOTHESIS / EXPECTED / ACTUAL / FIX PLAN` before any code change; escalate if no hypothesis after 2 attempts
 - **Fix:** surgical changes only — every changed line traces to the hypothesis; `rtk tsc --noEmit` + `rtk lint` must pass
 - **Bloat check:** apply `/ponytail-review` to the fix diff (main-thread — diff is small, no agent spawn). A fix must not smuggle in speculative abstraction or a new indirection layer; if it did, cut it before verifying. Skip only for a one-line diff.
 

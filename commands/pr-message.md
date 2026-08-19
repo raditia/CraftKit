@@ -4,7 +4,7 @@ description: Generate a pull request message from branch commits and diff — ti
 ---
 
 **Commands:** `rtk git log`, `rtk git diff`, `rtk git status`, `rtk git remote`
-**Model:** cheapest — `claude-haiku-4-5` (Claude), `gemini-2.5-flash` (Gemini), `gpt-4o-mini` (Cursor), `codex-mini-latest` (Codex). Escalate to everyday only if diff spans > 15 files with non-obvious interdependencies.
+**Model:** cheapest (Claude Code: the injected cheapest tier · Gemini `flash-lite` · Cursor `auto` · Codex default at effort `low`). Escalate to everyday only if diff spans > 15 files with non-obvious interdependencies.
 
 > Triggered by: "generate PR message", "write PR description", "create pull request message", "draft a PR", "PR message for this branch", "write PR for this branch", "what should my PR say"
 

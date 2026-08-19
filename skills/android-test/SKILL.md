@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `git diff <base>...HEAD`, `./gradlew :<module>:testGeneralDebugUnitTest`, `./gradlew :<module>:lintGeneralDebug`
-**Model:** everyday — escalate to `claude-opus-4-8` if a Presenter path can't be reached without refactoring the production code
+**Model:** everyday — escalate if a Presenter path can't be reached without refactoring the production code
 
 > Triggered by: "write Android tests", "test this presenter", "add tests for this screen", "improve Android coverage"
 

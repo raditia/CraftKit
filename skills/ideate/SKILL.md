@@ -4,7 +4,7 @@ description: Parallel divergent ideation — spawn N isolated idea generators un
 alwaysApply: false
 ---
 
-**Model:** everyday for generators — escalate the critic/deepen pass (`claude-opus-4-8`) for high-stakes decisions.
+**Model:** everyday for generators — escalate the critic/deepen pass for high-stakes decisions.
 **Cost:** ~10 agent calls, 30–90s, 5–10× a direct answer. Not free — the gate below stops casual use.
 
 > **Core behaviors:** Surface assumptions before acting. STOP and ask when confused. See `/using-agent-skills`.

@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `grep -rn "pattern" <feature>/src`, `./gradlew :<module>:lintGeneralDebug`
-**Model:** everyday — escalate to `claude-opus-4-8` for a jank/leak with non-obvious root cause (profile in Android Studio first).
+**Model:** everyday — escalate for a jank/leak with non-obvious root cause (profile in Android Studio first).
 
 ---
 

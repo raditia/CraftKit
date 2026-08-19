@@ -8,7 +8,7 @@ alwaysApply: false
 
 **Commands:** `rtk tsc`, `rtk lint`, `rtk grep "pattern" .`
 **Tests:** `rtk test --testPathPattern=<path> --no-coverage` (run from workspace root)
-**Model:** everyday — escalate to `claude-opus-4-8` if coverage cannot reach 93% and root cause is non-obvious
+**Model:** everyday — escalate if coverage cannot reach 93% and root cause is non-obvious
 
 > Triggered by: "write tests", "add tests", "test this", "coverage is low", "improve coverage", "I need tests for X", "test coverage is failing", "missing tests"
 

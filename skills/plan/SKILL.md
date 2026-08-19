@@ -4,7 +4,7 @@ description: Decompose a spec into small, verifiable, dependency-ordered tasks �
 alwaysApply: false
 ---
 
-**Model:** everyday — escalate (`claude-opus-4-8`) when the dependency graph is large or tasks touch > 5 interdependent files.
+**Model:** everyday — escalate when the dependency graph is large or tasks touch > 5 interdependent files.
 
 > **Core behaviors:** Goal-driven — every task gets a verifiable check. Surface assumptions. Simplicity first — don't invent tasks the spec doesn't need. See `/using-agent-skills`.
 > **Breakdown, not critique.** `/plan` produces the task list. The `plan-roaster` agent attacks it. Run roaster *after* planning, before build.
