@@ -683,9 +683,49 @@ flowchart TD
 
 Each skill runs on the everyday model. Escalation is inline — the AI consults the higher model for a specific question and continues without interrupting you.
 
-**On Claude Code the tiers are resolved per prompt, not written down.** `hooks/craftkit-routing.js` reads `~/.claude.json` — `modelAccessCache` ∪ `additionalModelOptionsCache`, the entitlement list Claude Code keeps there — takes the newest entitled version of each model family, ranks them `haiku < sonnet < opus < fable`, and injects the top three as cheapest / everyday / escalate. So an account without fable resolves haiku/sonnet/opus and one with it resolves sonnet/opus/fable, and **a new model release needs no edit in this repo**: `opus-5` displaces `opus-4-8` the moment the account is entitled to it. Only a brand-new *family* name touches the rank list — a name alone can't say where it sits. Entitlements unreadable → family aliases only, said out loud in the injected line.
+**On Claude Code the tiers are resolved per prompt, not written down.** `hooks/craftkit-routing.js` reads the entitlement list Claude Code already caches in `~/.claude.json` and derives the trio from it:
 
-The other three tools reach the same property by their own means: Gemini CLI's `pro`/`flash`/`flash-lite` aliases resolve against CLI constants plus account entitlement; Codex CLI gets no `model` key at all, so its server-refreshed catalog picks and the tier rides `model_reasoning_effort`; Cursor has no committable model selector, so that row is a note rather than a setting. Working sources in `docs/research/self-updating-model-ids.md` — written after `codex-mini-latest` was found retired since **2026-02-12** while still sitting in this table.
+```mermaid
+flowchart TD
+    A["UserPromptSubmit fires\nhooks/craftkit-routing.js"] --> B{"~/.claude.json\nreadable?"}
+    B -->|no| Z["fall back to family aliases\nhaiku · sonnet · opus\ninjected line says so out loud"]
+    B -->|yes| C["union the two caches\nmodelAccessCache (entitled: true)\n‖ additionalModelOptionsCache (picker extras)"]
+    C --> D["parse each id\nfamily + version · drop a dated suffix"]
+    D --> E["keep newest version per family"]
+    E --> F["rank by family\nhaiku · sonnet · opus · fable"]
+    F --> G{"3+ families\nentitled?"}
+    G -->|yes| H["top three become\ncheapest · everyday · escalate"]
+    G -->|fewer| I["clamp — lower tiers repeat\nthe weakest family available"]
+    H --> J["inject the trio as additionalContext"]
+    I --> J
+    Z --> J
+    J --> K["skills name a tier\nagents spawn on the family alias"]
+```
+
+Two properties fall out of that shape. **A new model release needs no edit in this repo** — `opus-5` displaces `opus-4-8` the moment the account is entitled to it, and the retired personal/enterprise plan rows are just what the same rule produces with and without a fable entitlement, so nothing has to guess which plan you are on. And only a brand-new *family* name touches the rank list, because a name alone cannot say where it sits.
+
+The other three tools reach the same property by their own means — worth seeing side by side, since only the Claude path is entitlement-driven:
+
+```mermaid
+flowchart TD
+    T["tier needed\ncheapest · everyday · escalate"] --> V{"which tool?"}
+    V --> CC["Claude Code"]
+    V --> G["Gemini CLI"]
+    V --> X["Codex CLI"]
+    V --> CU["Cursor"]
+    CC --> CC1["resolve from account entitlements\nevery prompt"]
+    G --> G1["the CLI's own aliases\npro · flash · flash-lite\nentitlement-aware, like Claude's"]
+    X --> X1["name no model at all\nserver-refreshed catalog picks the default\ntier rides model_reasoning_effort"]
+    CU --> CU1["no committable selector exists\npicker or account default chain"]
+    CC1 --> OK["self-updating — nothing to edit"]
+    G1 --> OK
+    X1 --> OK
+    CU1 --> NO["not repo-configurable\nthat row is a note, not a setting"]
+    OK --> GATE["check.sh 17 — build fails on a\nversioned id from any of the four vendors"]
+    NO --> GATE
+```
+
+That last node earns its place: check 17 was Claude-scoped at first, which is exactly how `codex-mini-latest` sat in the table for six months after OpenAI retired it on **2026-02-12**. Working sources, and the independent re-verification pass behind them, are in `docs/research/self-updating-model-ids.md`.
 
 Skills therefore name a tier, never a model id, and agents spawn on the family alias (`haiku`/`sonnet`/`opus`/`fable`), which self-updates to the newest model in that family. `check.sh` fails the build if a versioned id reappears in `rules/`, `skills/`, `commands/`, or `agents/`.
 
