@@ -1,4 +1,4 @@
-# craftkit `v1.28.0`
+# craftkit `v1.28.1`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once — every AI tool gets the same workflows, rules, and commands.
 
@@ -683,26 +683,28 @@ flowchart TD
 
 Each skill runs on the everyday model. Escalation is inline — the AI consults the higher model for a specific question and continues without interrupting you.
 
-**On Claude Code the tiers are resolved per prompt, not written down.** `hooks/craftkit-routing.js` reads the entitlement list Claude Code already caches in `~/.claude.json` and derives the trio from it:
+**On Claude Code the tiers are resolved per prompt, not written down.** `hooks/craftkit-routing.js` reads `~/.claude.json` and splits the job in two: **your plan picks the tier window, your entitlements pick the concrete ids inside it.**
 
 ```mermaid
 flowchart TD
     A["UserPromptSubmit fires\nhooks/craftkit-routing.js"] --> B{"~/.claude.json\nreadable?"}
     B -->|no| Z["fall back to family aliases\nhaiku · sonnet · opus\ninjected line says so out loud"]
-    B -->|yes| C["union the two caches\nmodelAccessCache (entitled: true)\n‖ additionalModelOptionsCache (picker extras)"]
+    B -->|yes| PL{"plan?\noauthAccount.organizationType\n· gmail domain"}
+    PL -->|"enterprise"| W1["window reaches the frontier\nsonnet · opus · fable\neveryday = opus"]
+    PL -->|"personal / unrecognized"| W2["window caps below it\nhaiku · sonnet · opus\neveryday = sonnet"]
+    W1 --> C["union the two caches\nmodelAccessCache (entitled: true)\n‖ additionalModelOptionsCache (picker extras)"]
+    W2 --> C
     C --> D["parse each id\nfamily + version · drop a dated suffix"]
-    D --> E["keep newest version per family"]
-    E --> F["rank by family\nhaiku · sonnet · opus · fable"]
-    F --> G{"3+ families\nentitled?"}
-    G -->|yes| H["top three become\ncheapest · everyday · escalate"]
-    G -->|fewer| I["clamp — lower tiers repeat\nthe weakest family available"]
+    D --> E["newest version per family,\nkeeping only families in the window"]
+    E --> H["fill the window\ncheapest · everyday · escalate"]
     H --> J["inject the trio as additionalContext"]
-    I --> J
     Z --> J
     J --> K["skills name a tier\nagents spawn on the family alias"]
 ```
 
-Two properties fall out of that shape. **A new model release needs no edit in this repo** — `opus-5` displaces `opus-4-8` the moment the account is entitled to it, and the retired personal/enterprise plan rows are just what the same rule produces with and without a fable entitlement, so nothing has to guess which plan you are on. And only a brand-new *family* name touches the rank list, because a name alone cannot say where it sits.
+**A new model release needs no edit in this repo** — `opus-5` displaces `opus-4-8` the moment the account is entitled to it, and only a brand-new *family* name touches the rank list, because a name alone cannot say where it sits.
+
+The plan gate is load-bearing, not decoration. An earlier cut derived the window from "the top three families present" and looked equivalent, since it reproduced both plan rows — but the signal it leaned on was `additionalModelOptionsCache`, a *picker* list rather than an access list. Advertise fable to a Pro account and its everyday tier silently jumps to opus. Capping personal below the frontier family keeps everyday on sonnet no matter what the picker shows, and `check.sh` asserts both windows so the cap cannot quietly come off.
 
 The other three tools reach the same property by their own means — worth seeing side by side, since only the Claude path is entitlement-driven:
 

@@ -22,10 +22,29 @@ const path = require('path');
 // cannot say where it sits. Version bumps inside a known family are automatic.
 const FAMILY_RANK = ['haiku', 'sonnet', 'opus', 'fable'];
 
+// Plan decides the tier WINDOW, entitlements decide the concrete ids. Deriving the
+// window from "top three families present" instead looked equivalent — it reproduced
+// both plan rows — but it rode on fable being absent from personal accounts, and the
+// signal it actually read is additionalModelOptionsCache, a picker list rather than an
+// access list. Advertise fable to a Pro account (upsell, trial) and its everyday tier
+// silently jumps to opus. So personal plans cap below the frontier family: everyday
+// stays sonnet no matter what the picker shows. The ids inside the window still come
+// from entitlements, which is what keeps a release from needing an edit here.
+const PERSONAL_CAP = 'opus';
+
 // Aliases are what the Agent tool's `model:` accepts, and they self-update to the
 // newest model in the family — so a spawn should carry the alias and the concrete
 // id is only ever shown to the user.
-const FALLBACK = { cheapest: 'haiku', everyday: 'sonnet', escalate: 'opus', resolved: false };
+const FALLBACK = { plan: 'personal', cheapest: 'haiku', everyday: 'sonnet', escalate: 'opus', resolved: false };
+
+// Enterprise is the only plan that routes to the frontier family, so anything
+// unreadable or unrecognized falls to personal — the more conservative window.
+function detectPlan(oauthAccount) {
+  const oa = oauthAccount || {};
+  const domain = String(oa.emailAddress || '').toLowerCase().split('@')[1] || '';
+  if (domain === 'gmail.com' || domain === 'googlemail.com') return 'personal';
+  return String(oa.organizationType || '').toLowerCase().includes('enterprise') ? 'enterprise' : 'personal';
+}
 
 // claude-opus-4-8 -> [4,8] · claude-haiku-4-5-20251001 -> [4,5] (date segment ends it)
 // claude-fable-5[1m] -> [5] · claude-3-opus-20240229 -> null (pre-family-first naming)
@@ -59,10 +78,12 @@ function resolveModelTiers() {
       const p = parseModelId(raw);
       if (p && (!best[p.family] || newerVersion(p.version, best[p.family].version))) best[p.family] = p;
     }
-    const ladder = FAMILY_RANK.filter(f => best[f]).map(f => best[f]);
+    const plan = detectPlan(cfg.oauthAccount);
+    const ceiling = plan === 'enterprise' ? FAMILY_RANK.length - 1 : FAMILY_RANK.indexOf(PERSONAL_CAP);
+    const ladder = FAMILY_RANK.slice(0, ceiling + 1).filter(f => best[f]).map(f => best[f]);
     if (!ladder.length) return FALLBACK;
     const at = i => ladder[Math.max(0, ladder.length - i)];
-    return { cheapest: at(3).id, everyday: at(2).id, escalate: at(1).id, resolved: true };
+    return { plan, cheapest: at(3).id, everyday: at(2).id, escalate: at(1).id, resolved: true };
   } catch (e) {
     return FALLBACK;
   }
@@ -123,7 +144,7 @@ process.stdin.on('end', () => {
         "Android (*.kt/*.java, MVP): /android-patterns /android-scaffold /android-review /android-test /android-a11y /android-performance /android-context\n" +
         "iOS (*.swift/*.m, MVVM-C): /ios-patterns /ios-scaffold /ios-review /ios-test /ios-a11y /ios-performance /ios-context\n" +
         "Every orchestrator is platform-routed — /parallel-build /parallel-review /parallel-ship /build /fix /ship /pr-message detect RN-web vs Android vs iOS at Step 0 and swap in that platform's gates, skills, and agents. Native single-screen work uses no EVPMR and no docs/context.md — read a real sibling screen instead; standard context loading does not apply there. Announcing a /fe-* skill on a .kt or .swift task is a routing error.\n\n" +
-        `Model tiers (resolved from ~/.claude.json entitlements): cheapest=${tier.cheapest}, everyday=${tier.everyday}, escalate=${tier.escalate}${tier.resolved ? '' : ' (entitlements unreadable — family aliases only)'}. These are authoritative — use them wherever a skill names a tier, and spawn agents with the family alias (haiku/sonnet/opus/fable), which tracks the newest model in that family on its own.`
+        `Model tiers (${tier.plan} plan, ids resolved from ~/.claude.json entitlements): cheapest=${tier.cheapest}, everyday=${tier.everyday}, escalate=${tier.escalate}${tier.resolved ? '' : ' (entitlements unreadable — family aliases only)'}. These are authoritative — use them wherever a skill names a tier, and spawn agents with the family alias (haiku/sonnet/opus/fable), which tracks the newest model in that family on its own.`
     }
   }));
 });

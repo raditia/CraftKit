@@ -385,17 +385,25 @@ if ! command -v node >/dev/null 2>&1; then
 else
     _fx="$(mktemp -d)"
     _tiers() { printf '%s' "$2" > "$_fx/.claude.json"; echo '{}' | HOME="$_fx" node "$HOOK" 2>/dev/null | tr ',' '\n' | grep -o "$1=[^ ,.\"]*" | head -1; }
-    _NOFABLE='{"modelAccessCache":[{"apiName":"claude-haiku-4-5-20251001","entitled":true},{"apiName":"claude-sonnet-5","entitled":true},{"apiName":"claude-opus-4-8","entitled":true},{"apiName":"claude-fable-5","entitled":false}]}'
-    _FABLE='{"modelAccessCache":[{"apiName":"claude-sonnet-5","entitled":true},{"apiName":"claude-opus-5","entitled":true}],"additionalModelOptionsCache":[{"value":"claude-fable-5[1m]"}]}'
-    _NEWER='{"modelAccessCache":[{"apiName":"claude-haiku-4-5-20251001","entitled":true},{"apiName":"claude-sonnet-5","entitled":true},{"apiName":"claude-opus-5","entitled":true},{"apiName":"claude-opus-6-2","entitled":true}]}'
+    _M='{"apiName":"claude-haiku-4-5-20251001","entitled":true},{"apiName":"claude-sonnet-5","entitled":true},{"apiName":"claude-opus-5","entitled":true},{"apiName":"claude-fable-5","entitled":false}'
+    _PICKER='"additionalModelOptionsCache":[{"value":"claude-fable-5[1m]"}]'
+    _ENT='"oauthAccount":{"organizationType":"claude_enterprise"}'
+    _PRO='"oauthAccount":{"emailAddress":"someone@gmail.com"}'
     _mt=0
-    [[ "$(_tiers escalate "$_NOFABLE")" == "escalate=claude-opus-4-8" ]] \
-        || { fail "no-fable account did not resolve escalate=opus"; _mt=1; }
-    [[ "$(_tiers cheapest "$_NOFABLE")" == "cheapest=claude-haiku-4-5-20251001" ]] \
-        || { fail "no-fable account did not resolve cheapest=haiku"; _mt=1; }
-    [[ "$(_tiers escalate "$_FABLE")" == "escalate=claude-fable-5" ]] \
-        || { fail "picker-only fable ignored — additionalModelOptionsCache must count"; _mt=1; }
-    [[ "$(_tiers escalate "$_NEWER")" == "escalate=claude-opus-6-2" ]] \
+    # Enterprise routes to the frontier family; everyday must be opus, not sonnet.
+    [[ "$(_tiers everyday "{$_ENT,\"modelAccessCache\":[$_M],$_PICKER}")" == "everyday=claude-opus-5" ]] \
+        || { fail "enterprise everyday is not opus"; _mt=1; }
+    [[ "$(_tiers escalate "{$_ENT,\"modelAccessCache\":[$_M],$_PICKER}")" == "escalate=claude-fable-5" ]] \
+        || { fail "picker-only fable ignored on enterprise — additionalModelOptionsCache must count"; _mt=1; }
+    # The regression this cap exists for: a personal plan shown fable in the picker
+    # must still land everyday on sonnet. Deriving the window from "top three families
+    # present" silently promoted it to opus, because the picker is a display list.
+    [[ "$(_tiers everyday "{$_PRO,\"modelAccessCache\":[$_M],$_PICKER}")" == "everyday=claude-sonnet-5" ]] \
+        || { fail "personal everyday is not sonnet — fable in the picker promoted the window"; _mt=1; }
+    [[ "$(_tiers cheapest "{$_PRO,\"modelAccessCache\":[$_M],$_PICKER}")" == "cheapest=claude-haiku-4-5-20251001" ]] \
+        || { fail "personal cheapest is not haiku"; _mt=1; }
+    # A version bump inside a known family must need no edit anywhere.
+    [[ "$(_tiers everyday "{$_ENT,\"modelAccessCache\":[$_M,{\"apiName\":\"claude-opus-6-2\",\"entitled\":true}],$_PICKER}")" == "everyday=claude-opus-6-2" ]] \
         || { fail "newer version within a family did not win — releases are not seamless"; _mt=1; }
     [[ "$(_tiers everyday 'not json')" == "everyday=sonnet" ]] \
         || { fail "unreadable entitlements did not fall back to family aliases"; _mt=1; }

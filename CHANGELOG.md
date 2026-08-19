@@ -7,6 +7,17 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.28.1 — 2026-08-19
+
+**Restore the plan gate on model tiers.** v1.28.0 replaced plan detection with a derivation — "the top three entitled families become cheapest / everyday / escalate" — and it looked equivalent, because it reproduced both historical plan rows exactly. It was not. The signal it leaned on to tell the plans apart was the presence of a fable entry, and on the account it was built against that entry comes from `additionalModelOptionsCache`: a *picker* list, not an access list (`claude-fable-5` itself reads `entitled: false` there). Advertise fable to a Pro account — upsell, trial, "available on a higher plan" — and its everyday tier silently jumps from sonnet to opus, on a repo whose whole point is that skills route by tier.
+
+The mistake was throwing out plan detection along with the hardcoded ids. The ids were what went stale every release; the plan signal never did, and `oauthAccount.organizationType` still carries it.
+
+- **Plan picks the tier window, entitlements pick the ids inside it.** Enterprise reaches the frontier family (sonnet / opus / fable → everyday is opus); personal caps below it (haiku / sonnet / opus → everyday is sonnet) regardless of what the picker advertises. Unreadable config or unrecognized plan falls to the personal window — the conservative side. Ids inside the window are still the newest entitled version of each family, so a release still needs no edit here: an `opus-6` displaces `opus-5` on its own.
+- **`check.sh` check 18 now asserts both windows**, including the exact regression: a personal plan shown fable in the picker must still resolve `everyday=sonnet`. Verified the assertion bites by removing the cap — it fails on precisely that case and on the matching cheapest tier.
+- The injected tier line names the detected plan, so a wrong window is visible in the context rather than only in behavior.
+- README's resolution diagram gained the plan branch, and both diagrams re-rendered through mermaid-cli.
+
 ## v1.28.0 — 2026-08-19
 
 **Model tiers are resolved from account entitlements instead of written down.** Opus 5 shipped, and updating for it meant editing 17 files — the plan table in `rules/using-agent-skills.md`, the same table in `README.md`, 13 skill `**Model:**` lines, `commands/{define,fix,pr-message,team-build}.md`, and two constants in the hook. That treadmill has run on every Claude release since `claude-opus-4-8`, and its failure mode is silent: a missed line keeps routing work to a retired model with a plausible-looking label.
