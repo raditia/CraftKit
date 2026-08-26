@@ -35,7 +35,7 @@ install_cursor_rule() {
 }
 
 # Currency hook used by sync.sh's rules loop: renders to a temp file so the diff-skip
-# check compares dest against the *rendered* output, not the raw source — otherwise the
+# check compares dest against the *rendered* output, not the raw source, because otherwise the
 # injected alwaysApply line makes every rule look changed on every run. sync.sh removes
 # the returned temp file after diffing.
 effective_cursor_rule_source() {

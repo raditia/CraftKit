@@ -20,7 +20,7 @@ else
 fi
 
 # sync.sh handles tool installation (rtk, caveman) + skill sync
-# AGENTIC_SETUP=1 tells sync.sh this is an explicit install — run ensure_tools
+# AGENTIC_SETUP=1 tells sync.sh this is an explicit install, so run ensure_tools
 AGENTIC_SETUP=1 "$REPO_DIR/sync.sh"
 
 echo ""

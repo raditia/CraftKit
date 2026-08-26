@@ -9,15 +9,15 @@ alwaysApply: false
 
 ---
 
-> **Core behaviors:** Surface assumptions before generating. Enforce simplicity — split when complex, not speculatively. Verify with lint + tsc before claiming done. See `/using-agent-skills`.
+> **Core behaviors:** Surface assumptions before generating. Enforce simplicity: split when complex, not speculatively. Verify with lint + tsc before claiming done. See `/using-agent-skills`.
 
 ---
 
-**Context:** `docs/context.md` — read: Summary, Architecture Patterns in Use, Changed Files. Standard load procedure in `/using-agent-skills`. Never invent requirements not in context — ask instead.
+**Context:** `docs/context.md`, reading Summary, Architecture Patterns in Use, Changed Files. Standard load procedure in `/using-agent-skills`. Never invent requirements not in context; ask instead.
 
 ---
 
-## Step 1 — Understand context
+## Step 1: Understand context
 
 State assumptions before generating:
 ```
@@ -33,7 +33,7 @@ Read 1-2 existing feature folders in the same package to confirm exact naming an
 
 ---
 
-## Step 2 — Create the 5-file module
+## Step 2: Create the 5-file module
 
 All files in one folder: `[kebab-case-feature]/`
 Naming: `[Role][ProductPrefix][Platform][FeatureName].[ext]`
@@ -44,7 +44,7 @@ Naming: `[Role][ProductPrefix][Platform][FeatureName].[ext]`
 - Renders `<View[Name] />` with no props
 
 ### `View[Name].tsx`
-- Pure presentational — no `useState`, no `useEffect`, no direct API calls
+- Pure presentational, with no `useState`, no `useEffect`, no direct API calls
 - Calls `usePresenter[Name]()` at top, destructures everything from it
 - Returns JSX using `react-native` primitives (`View`, `Text`, `TouchableOpacity`)
 - All styles via `StyleSheet.create()` at bottom
@@ -52,7 +52,7 @@ Naming: `[Role][ProductPrefix][Platform][FeatureName].[ext]`
 ### `Presenter[Name].ts`
 - Single exported hook `usePresenter[Name]()`
 - All `useState`, `useEffect`, `useCallback`, `useMemo`, React Query calls live here
-- Returns a plain object — never JSX
+- Returns a plain object, never JSX
 - Tracking and navigation via handlers in the returned object
 
 ### `Model[Name].ts`
@@ -78,7 +78,7 @@ Naming: `[Role][ProductPrefix][Platform][FeatureName].[ext]`
 
 ---
 
-## Step 3 — Styling rules
+## Step 3: Styling rules
 
 - **Never** inline styles (`style={{ margin: 8 }}`)
 - **Always** `StyleSheet.create()` at bottom of file
@@ -90,17 +90,17 @@ Naming: `[Role][ProductPrefix][Platform][FeatureName].[ext]`
 
 ---
 
-## Step 4 — TypeScript rules
+## Step 4: TypeScript rules
 
-- `strict: true` — no `any`, no implicit returns
+- `strict: true`. No `any`, no implicit returns
 - `type Props = { ... }` above each component
 - `interface` for API shapes/props, `type` for unions
 
 ---
 
-## Step 5 — Code quality
+## Step 5: Code quality
 
-- **Single responsibility:** one job per function/component. If you need "and" — split it.
+- **Single responsibility:** one job per function/component. If you need "and", split it.
 - **View length:** JSX return > ~80 lines → extract as `UI[Name][Section].tsx` in same folder
 - **Presenter length:** hook > ~100 lines → split into `usePresenter[Name]Data`, `usePresenter[Name]Handlers`
 - **No over-engineering:** only split when genuinely complex. No abstractions for single-use code.
@@ -109,7 +109,7 @@ Naming: `[Role][ProductPrefix][Platform][FeatureName].[ext]`
 
 ---
 
-## Step 6 — Tracking
+## Step 6: Tracking
 
 ```ts
 const track = useTracker(); // from your project's tracking package
@@ -120,9 +120,9 @@ track('FEATURE_NAME', 'ACTION', { ...payload });
 
 ## After generating
 
-- [ ] Ponytail self-pass — scan every generated file against the six tags in `karpathy-guidelines` rule 2; cut each hit or mark it `ponytail:`. Report `ponytail self-pass: clean` or what was cut/marked
-- [ ] `rtk lint path/to/file.tsx` on every file created or modified — zero errors
-- [ ] `rtk tsc --noEmit` — no TypeScript errors
+- [ ] Ponytail self-pass: scan every generated file against the six tags in `karpathy-guidelines` rule 2; cut each hit or mark it `ponytail:`. Report `ponytail self-pass: clean` or what was cut/marked
+- [ ] `rtk lint path/to/file.tsx` on every file created or modified, with zero errors
+- [ ] `rtk tsc --noEmit` with no TypeScript errors
 - [ ] No `// eslint-disable` without a documented reason
 - List each file created with path
 - Note any naming/token assumptions made

@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `rtk grep "ponytail:" . --include="*.ts" --include="*.tsx" --include="*.js"`
-**Model:** cheapest tier (see the plan-aware Model routing table in `using-agent-skills`). No escalation — task is pure extraction.
+**Model:** cheapest tier (see the plan-aware Model routing table in `using-agent-skills`). No escalation, since the task is pure extraction.
 
 ---
 
@@ -18,7 +18,7 @@ User says: "show ponytail debt", "list deliberate shortcuts", "what did we defer
 ## Process
 
 1. Grep repo for `ponytail:` markers, excluding `node_modules/`, `.git/`, build dirs.
-2. Parse each marker — extract: what was simplified, ceiling, upgrade trigger.
+2. Parse each marker and extract: what was simplified, ceiling, upgrade trigger.
 3. Group by file.
 4. Flag entries missing an upgrade trigger with `[no-trigger]`.
 
@@ -27,12 +27,12 @@ User says: "show ponytail debt", "list deliberate shortcuts", "what did we defer
 ## Output format
 
 ```
-<file>:<line> — <what was simplified>. ceiling: <limit>. upgrade: <trigger>.
+<file>:<line> · <what was simplified>. ceiling: <limit>. upgrade: <trigger>.
 ```
 
 Flag missing upgrade trigger:
 ```
-<file>:<line> — <what>. [no-trigger] — deferral may become permanent.
+<file>:<line> · <what>. [no-trigger] deferral may become permanent.
 ```
 
 End with count: `N shortcuts tracked, M with no upgrade trigger.`
@@ -47,4 +47,4 @@ If user asks, write results to `PONYTAIL-DEBT.md` at repo root.
 
 ## Boundaries
 
-Read-only. No edits. Does not evaluate whether shortcuts were good decisions — only surfaces them.
+Read-only. No edits. Does not evaluate whether shortcuts were good decisions; it only surfaces them.

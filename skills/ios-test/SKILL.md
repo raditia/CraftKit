@@ -1,17 +1,17 @@
 ---
 name: ios-test
-description: Write or improve Quick + Nimble unit tests for an iOS ViewModel — mock dependencies via the Dependency struct and the …Action protocol, assert on captured values.
+description: Write or improve Quick + Nimble unit tests for an iOS ViewModel: mock dependencies via the Dependency struct and the …Action protocol, assert on captured values.
 alwaysApply: false
 ---
 
 **Commands:** `git diff <base>...HEAD`, `bazelisk test //Modules/<Module>:<Module>TestsBundle`, `swiftlint lint --path <file>`
-**Model:** everyday — escalate if a ViewModel path can't be reached without refactoring the production code
+**Model:** everyday. Escalate if a ViewModel path can't be reached without refactoring the production code
 
 > Triggered by: "write iOS tests", "test this view model", "add tests for this screen", "improve iOS coverage"
 
 ---
 
-> **Core behaviors:** The unit under test is the **ViewModel** — never the View or VC. Tests must fail if the business rule changes, not just exercise getters. Never skip verification — specs must pass before done. See `/using-agent-skills` and `/ios-patterns`.
+> **Core behaviors:** The unit under test is the **ViewModel**, never the View or VC. Tests must fail if the business rule changes, not just exercise getters. Never skip verification, since specs must pass before done. See `/using-agent-skills` and `/ios-patterns`.
 
 ---
 
@@ -23,7 +23,7 @@ alwaysApply: false
 
 - Framework: **Quick + Nimble** (`QuickSpec`, `describe / context / it`, `expect(...) == ...`). No XCTest `func test…`, no swift-testing.
 - Mocks live in `Modules/<Module>/Mocks/` (one file per protocol) and are compiled into both the unit-test and UI-test targets.
-- Dependencies are injected by passing a hand-built `<Prefix>ViewModelDependency` struct of `…Mock` objects — no runtime mocking framework.
+- Dependencies are injected by passing a hand-built `<Prefix>ViewModelDependency` struct of `…Mock` objects, with no runtime mocking framework.
 - The View↔VM seam is tested by setting `viewModel.action = mockAction` and asserting on the values the mock captured.
 
 ---
@@ -55,7 +55,7 @@ final class <Prefix>ViewModelTest: QuickSpec {
                 // Given an empty spec (default mock)
                 // When
                 viewModel.onViewDidLoad()
-                // Then — the rule: empty spec must surface the default, not ""
+                // Then, the rule: empty spec must surface the default, not ""
                 expect(mockAction.actualTitleText) == expectedDefaultTitleText
             }
         }
@@ -90,7 +90,7 @@ Reuse an existing mock from `Mocks/` before writing a new one. New Fetcher proto
 
 ## What to cover (per changed ViewModel)
 
-Map cases from the diff — max 3 bullets per file, the rest emerge from running:
+Map cases from the diff, max 3 bullets per file, with the rest emerging from running:
 - Each **`<Prefix>ViewModelProtocol` method** (the events): assert the resulting `action?` calls and/or `delegate?` calls.
 - **Branching logic** in the VM: each path that produces a different `action`/`delegate` outcome.
 - **Async/fetcher paths:** success and failure completion → correct `action` repaint or error handling.
@@ -102,15 +102,15 @@ Each `it` comment must state **why** the behavior matters (the rule being protec
 
 ## Workflow
 
-1. **Diff first** — `git diff <base>...HEAD --name-only`; touch only changed ViewModels.
+1. **Diff first:** `git diff <base>...HEAD --name-only`; touch only changed ViewModels.
 2. **Read a sibling spec** in `Tests/<Feature>/` to match style + reuse mocks.
 3. **Write specs** for every behavior path from the diff.
-4. **Run** — all must pass:
+4. **Run:** all must pass:
    ```bash
    bazelisk test //Modules/<Module>:<Module>TestsBundle
    ```
-   (Or run the module's test scheme in Xcode if Bazel is unavailable locally.) Fix failures — never skip or comment out an `it`.
-5. **SwiftLint** — `swiftlint lint --path <each-new-test-file>`; fix all.
-6. **Done** — report specs added, pass/fail count, and any VM path that was unreachable without a production refactor (flag, don't silently skip).
+   (Or run the module's test scheme in Xcode if Bazel is unavailable locally.) Fix failures; never skip or comment out an `it`.
+5. **SwiftLint:** `swiftlint lint --path <each-new-test-file>`; fix all.
+6. **Done:** report specs added, pass/fail count, and any VM path that was unreachable without a production refactor (flag, don't silently skip).
 
 List testing patterns not covered above as **Suggested skill updates**.

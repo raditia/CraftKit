@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Git post-merge hook — runs automatically after every successful 'git pull'
+# Git post-merge hook: runs automatically after every successful 'git pull'
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

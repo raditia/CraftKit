@@ -1,6 +1,6 @@
 ---
 name: ios-context
-description: Generate or update docs/context.md for an iOS branch — MVVM-C flavored summary of changed modules, screens, coordinators, and fetchers. Optional branch-scoping doc that feeds /ios-review and /ship.
+description: Generate or update docs/context.md for an iOS branch: an MVVM-C flavored summary of changed modules, screens, coordinators, and fetchers. Optional branch-scoping doc that feeds /ios-review and /ship.
 alwaysApply: false
 ---
 
@@ -9,19 +9,19 @@ alwaysApply: false
 
 ---
 
-> **Core behaviors:** Surface conflicts — never silently resolve them. Emit an inline plan before executing. Verify output before claiming done. See `/using-agent-skills`.
+> **Core behaviors:** Surface conflicts; never silently resolve them. Emit an inline plan before executing. Verify output before claiming done. See `/using-agent-skills`.
 
 ---
 
 # iOS Feature Context
 
-Optional. Single-screen work does **not** need this — read a sibling feature instead (see `/ios-patterns`). Generate this only for multi-screen or cross-module branches, so `/ios-review` and `/ship` read one summary instead of re-scanning `Modules/`.
+Optional. Single-screen work does **not** need this; read a sibling feature instead (see `/ios-patterns`). Generate this only for multi-screen or cross-module branches, so `/ios-review` and `/ship` read one summary instead of re-scanning `Modules/`.
 
 Unlike the EVPMR frontend, iOS context is organized by **MVVM-C role**, not by Entry/View/Presenter/Model/Resource.
 
 ---
 
-## Step 0 — Inline plan
+## Step 0: Inline plan
 
 ```
 PLAN:
@@ -36,7 +36,7 @@ PLAN:
 
 ---
 
-## Step 1 — Collect changes
+## Step 1: Collect changes
 
 ```bash
 git remote show origin | grep "HEAD branch"     # base, default main
@@ -48,7 +48,7 @@ If `@{u}` errors (no upstream), skip and note it.
 
 ---
 
-## Step 2 — Conflict detection (do not fix — surface only)
+## Step 2: Conflict detection (surface only, do not fix)
 
 Scan the diff for MVVM-C violations:
 - Business logic / networking / `push`/`present` inside a `…ViewController` or `…View`
@@ -67,11 +67,11 @@ CONFLICT: file:line
 
 ---
 
-## Step 3 — Write `docs/context.md`
+## Step 3: Write `docs/context.md`
 
 ```markdown
 # iOS Feature Context
-<!-- managed by ios-context — regenerate with /ios-context -->
+<!-- managed by ios-context, regenerate with /ios-context -->
 **Generated:** {{ISO timestamp}}
 **Branch:** {{branch}} | **Base:** {{base}} | **Commit:** {{git rev-parse HEAD}}
 
@@ -100,14 +100,14 @@ CONFLICT: file:line
 {{Unresolved conflicts surfaced above. Not silently fixed.}}
 
 ## Test Coverage Needed
-{{ViewModels new/changed lacking Quick specs — see /ios-test}}
+{{ViewModels new/changed lacking Quick specs, see /ios-test}}
 ```
 
 Hard limit: **≤ 400 lines**. Summarize; never paste whole files.
 
 ---
 
-## Step 4 — Verify
+## Step 4: Verify
 
 - [ ] `docs/context.md` written at the iOS repo root
 - [ ] Every changed file mapped to a module + role

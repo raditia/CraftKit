@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Content integrity checks for craftkit source. There is no build or test suite here —
+# Content integrity checks for craftkit source. There is no build or test suite here, so
 # the product is markdown, so this is the only thing standing between an authoring slip
 # and every synced tool inheriting it. Every check below exists because the bug it
 # catches actually shipped and sat undetected.
@@ -44,7 +44,7 @@ rule_names() { ls "$RULES_DIR"/*.md 2>/dev/null | xargs -n1 basename | sed 's/\.
 # ---------------------------------------------------------------------------
 # 1. Every subagent_type reference resolves to a real agent file.
 #    Renaming an agent without updating its callers leaves a command spawning
-#    a subagent that does not exist — the orchestrator degrades silently.
+#    a subagent that does not exist, and the orchestrator degrades silently.
 # ---------------------------------------------------------------------------
 check "subagent_type references resolve"
 _refs="$(grep -rhno 'subagent_type: "[a-z0-9-]*"' "$COMMANDS_DIR" "$SKILLS_DIR" 2>/dev/null \
@@ -73,7 +73,7 @@ check "no skill/command dest collision"
 _collide=0
 for s in $(skill_names); do
     if [[ -f "$COMMANDS_DIR/${s}.md" ]] && ! grep -q "^alwaysApply: true" "$SKILLS_DIR/$s/SKILL.md" 2>/dev/null; then
-        fail "skills/$s/ and commands/${s}.md both install to <tool>/commands/${s}.md — delete one"
+        fail "skills/$s/ and commands/${s}.md both install to <tool>/commands/${s}.md, delete one"
         _collide=1
     fi
 done
@@ -114,7 +114,7 @@ done
 # ---------------------------------------------------------------------------
 # 5. Every craftkitInject name resolves.
 #    An injecting agent whose source is renamed loses its whole checklist and
-#    still installs — a review agent with nothing to review by.
+#    still installs: a review agent with nothing to review by.
 # ---------------------------------------------------------------------------
 check "craftkitInject sources resolve"
 _inj=0
@@ -123,7 +123,7 @@ for a in $(agent_names); do
     [[ -z "$_list" ]] && continue
     for n in $(echo "$_list" | tr ',' ' '); do
         if [[ ! -f "$RULES_DIR/${n}.md" && ! -f "$SKILLS_DIR/${n}/SKILL.md" ]]; then
-            fail "agents/$a.md injects '$n' — not in rules/ or skills/"
+            fail "agents/$a.md injects '$n', which is not in rules/ or skills/"
             _inj=1
         fi
     done
@@ -144,7 +144,7 @@ for n in $_hookrefs; do
     # bare prefix (from prose like "/fe-*") carries no target to verify
     case "$n" in fe-|android-|ios-|ponytail-|parallel-) continue ;; esac
     if [[ ! -d "$SKILLS_DIR/$n" && ! -f "$COMMANDS_DIR/${n}.md" ]]; then
-        fail "hook advertises /$n — no such skill or command"
+        fail "hook advertises /$n, but no such skill or command"
         _hk=1
     fi
 done
@@ -157,7 +157,7 @@ done
 #    Exempt: commands that are platform-agnostic by construction.
 # ---------------------------------------------------------------------------
 check "orchestrators cover all platforms"
-_exempt_platform="define"   # pre-code planning only — no platform surface
+_exempt_platform="define"   # pre-code planning only, no platform surface
 _pc=0
 for c in $(command_names); do
     case " $_exempt_platform " in *" $c "*) continue ;; esac
@@ -213,13 +213,13 @@ _log="$(awk '/^## v[0-9]/{print $2;exit}' "$CHANGELOG" | tr -d 'v')"
 if [[ "$_pkg" == "$_hdr" && "$_pkg" == "$_log" ]]; then
     pass
 else
-    fail "package.json=$_pkg  README header=$_hdr  CHANGELOG.md newest=$_log — must match"
+    fail "package.json=$_pkg  README header=$_hdr  CHANGELOG.md newest=$_log, must match"
 fi
 
 # ---------------------------------------------------------------------------
 # 11. Routing hook resolves each platform from cwd, and survives bad stdin.
 #     Platform used to be the model's job to infer from filenames, which is how
-#     a /fe-* skill got announced on a .kt task. It is now injected per prompt —
+#     a /fe-* skill got announced on a .kt task. It is now injected per prompt,
 #     but a marker typo or a crash on malformed stdin removes the whole gate
 #     silently, since a dead UserPromptSubmit hook just yields no context.
 #     Behavioral on purpose: a grep would pass on detection that never fires.
@@ -240,22 +240,22 @@ else
     _probe "$_fx/w" | grep -q "Platform (detected from cwd, authoritative): React Native / web (EVPMR)" \
         || { fail "package.json did not resolve to React Native / web"; _pd=1; }
     echo 'not json' | node "$HOOK" >/dev/null 2>&1 \
-        || { fail "hook exits non-zero on malformed stdin — gate disappears every prompt"; _pd=1; }
+        || { fail "hook exits non-zero on malformed stdin, so the gate disappears every prompt"; _pd=1; }
     rm -rf "$_fx"
     [[ $_pd -eq 0 ]] && pass
 fi
 
 # ---------------------------------------------------------------------------
 # 12. Every hook command ensure_tools registers resolves under a stripped PATH.
-#     Hooks spawn with /usr/gnu/bin:/usr/local/bin:/bin:/usr/bin:. — no homebrew,
-#     no fnm — so a bare `rtk hook claude` died with "rtk: command not found".
+#     Hooks spawn with /usr/gnu/bin:/usr/local/bin:/bin:/usr/bin:. so there is no homebrew,
+#     no fnm, and a bare `rtk hook claude` died with "rtk: command not found".
 #     Non-blocking, so it degraded silently: every Bash call ran unrewritten and
 #     the whole token filter was off with nothing but a dim hook error to show it.
 #     `rtk init` rewrites the entry to bare on each run, hence the re-absolutize.
 # ---------------------------------------------------------------------------
 check "rtk hook is absolutized after rtk init"
 if ! grep -q '_rtk_hook_absolutize$' sync.sh; then
-    fail "ensure_tools does not call _rtk_hook_absolutize — bare 'rtk hook claude' fails under the hooks' stripped PATH"
+    fail "ensure_tools does not call _rtk_hook_absolutize, so bare 'rtk hook claude' fails under the hooks' stripped PATH"
 elif ! grep -q '_rtk_hook_absolutize()' sync.sh; then
     fail "_rtk_hook_absolutize is called but never defined"
 else
@@ -265,7 +265,7 @@ fi
 # ---------------------------------------------------------------------------
 # 13. Every name in ADAPTERS has a sourced adapter file, and every adapter file is
 #     listed. sync.sh calls adapter functions by string interpolation, so a name with
-#     no sourced file dies at the first call — mid-sync, after some tools are already
+#     no sourced file dies at the first call, mid-sync, after some tools are already
 #     written. The reverse direction catches the other half: an adapter left on disk
 #     but absent from ADAPTERS is dead weight that reads as a supported tool.
 # ---------------------------------------------------------------------------
@@ -279,14 +279,14 @@ for a in $_live; do
 done
 for _f in "$REPO_DIR"/adapters/*.sh; do
     _an="$(basename "$_f" .sh)"
-    case " $_live " in *" $_an "*) ;; *) fail "adapters/${_an}.sh exists but is not in ADAPTERS — delete it or list it"; _ad=1 ;; esac
+    case " $_live " in *" $_an "*) ;; *) fail "adapters/${_an}.sh exists but is not in ADAPTERS, so delete it or list it"; _ad=1 ;; esac
 done
 [[ $_ad -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
 # 14. The routing hook's node path is absolute and not version-pinned.
 #     Hooks spawn under a stripped PATH with no profile, so the command must carry an
-#     absolute interpreter — and it must be one that survives, because a dead
+#     absolute interpreter, and it must be one that survives, because a dead
 #     UserPromptSubmit hook silently removes the whole routing gate. A pinned
 #     fnm/node-versions/<v> path is one `fnm uninstall` away from exactly that.
 # ---------------------------------------------------------------------------
@@ -299,14 +299,14 @@ else
         *fnm/node-versions*|*fnm_multishells*)
             fail "_resolve_node_bin returned version-pinned '$_nb' while a managed node exists" ;;
         /*) pass ;;
-        *)  fail "_resolve_node_bin returned non-absolute '$_nb' — hooks get a stripped PATH" ;;
+        *)  fail "_resolve_node_bin returned non-absolute '$_nb', but hooks get a stripped PATH" ;;
     esac
 fi
 
 # ---------------------------------------------------------------------------
 # 15. Every parallel-* orchestrator has a sequential twin, named in both channels.
 #     A parallel-* command exists to spawn agents, so a context that cannot spawn
-#     them cannot run one — a subagent, or a session that disables spawning. With
+#     them cannot run one: a subagent, or a session that disables spawning. With
 #     no sanctioned substitute the routing gate forces a choice between violating
 #     itself and narrating the conflict on every single turn, which is what it did.
 #     Checked in the rule AND the hook because they duplicate this table by design.
@@ -329,7 +329,7 @@ done
 # ---------------------------------------------------------------------------
 # 16. A declared license has license text behind it.
 #     `package.json` said "license": "MIT" for 26 releases with no LICENSE file in
-#     the repo — so npm advertised MIT while the grant existed nowhere, GitHub could
+#     the repo, so npm advertised MIT while the grant existed nowhere, GitHub could
 #     not detect it, and four MIT-licensed upstreams were adapted without the notice
 #     their license requires. A license claim nobody can read is not a license.
 # ---------------------------------------------------------------------------
@@ -359,14 +359,14 @@ fi
 #     Aliases (sonnet/opus/..., Gemini CLI's pro/flash) are the sanctioned form.
 #     All four vendors, not just Claude: the first cut of this check greped
 #     `claude-*` only, which is how `codex-mini-latest` sat in the routing table
-#     for six months after OpenAI retired it on 2026-02-12 — the exact bug the
+#     for six months after OpenAI retired it on 2026-02-12, the exact bug the
 #     check exists to catch, missed because the guard was vendor-scoped.
 # ---------------------------------------------------------------------------
 check "content names model tiers, not versioned model ids"
 _mid="$(grep -rEn 'claude-(haiku|sonnet|opus|fable)-[0-9]|gemini-[0-9]|\bgpt-[0-9]|codex-mini|\bo[13]\b' \
     "$REPO_DIR"/rules "$REPO_DIR"/skills "$REPO_DIR"/commands "$REPO_DIR"/agents 2>/dev/null || true)"
 if [[ -n "$_mid" ]]; then
-    fail "versioned model id in content — name the tier instead, the hook injects the id:"
+    fail "versioned model id in content, so name the tier instead and let the hook inject the id:"
     echo "$_mid" | sed 's/^/      /'
 else
     pass
@@ -394,22 +394,131 @@ else
     [[ "$(_tiers everyday "{$_ENT,\"modelAccessCache\":[$_M],$_PICKER}")" == "everyday=claude-opus-5" ]] \
         || { fail "enterprise everyday is not opus"; _mt=1; }
     [[ "$(_tiers escalate "{$_ENT,\"modelAccessCache\":[$_M],$_PICKER}")" == "escalate=claude-fable-5" ]] \
-        || { fail "picker-only fable ignored on enterprise — additionalModelOptionsCache must count"; _mt=1; }
+        || { fail "picker-only fable ignored on enterprise, but additionalModelOptionsCache must count"; _mt=1; }
     # The regression this cap exists for: a personal plan shown fable in the picker
     # must still land everyday on sonnet. Deriving the window from "top three families
     # present" silently promoted it to opus, because the picker is a display list.
     [[ "$(_tiers everyday "{$_PRO,\"modelAccessCache\":[$_M],$_PICKER}")" == "everyday=claude-sonnet-5" ]] \
-        || { fail "personal everyday is not sonnet — fable in the picker promoted the window"; _mt=1; }
+        || { fail "personal everyday is not sonnet, so fable in the picker promoted the window"; _mt=1; }
     [[ "$(_tiers cheapest "{$_PRO,\"modelAccessCache\":[$_M],$_PICKER}")" == "cheapest=claude-haiku-4-5-20251001" ]] \
         || { fail "personal cheapest is not haiku"; _mt=1; }
     # A version bump inside a known family must need no edit anywhere.
     [[ "$(_tiers everyday "{$_ENT,\"modelAccessCache\":[$_M,{\"apiName\":\"claude-opus-6-2\",\"entitled\":true}],$_PICKER}")" == "everyday=claude-opus-6-2" ]] \
-        || { fail "newer version within a family did not win — releases are not seamless"; _mt=1; }
+        || { fail "newer version within a family did not win, so releases are not seamless"; _mt=1; }
     [[ "$(_tiers everyday 'not json')" == "everyday=sonnet" ]] \
         || { fail "unreadable entitlements did not fall back to family aliases"; _mt=1; }
     rm -rf "$_fx"
     [[ $_mt -eq 0 ]] && pass
 fi
+
+# ---------------------------------------------------------------------------
+# 19. Prose carries no em-dash. It is a recognizable machine-writing tell, and
+#     the sweep that removed ~1600 of them is worthless without a gate: one
+#     authoring slip and the convention rots back file by file. Three classes
+#     are wire format rather than prose, exempted by line pattern rather than by
+#     file so a real slip on the same line still fails: the CHANGELOG section
+#     heading (CHANGELOG.md itself is a historical record, never rewritten), and
+#     the two managed-block markers already written into every user's
+#     CLAUDE.md/GEMINI.md/AGENTS.md, where changing the string would orphan the
+#     existing block instead of replacing it. This file builds the character from
+#     bytes on purpose, so it can scan itself without matching its own source.
+# ---------------------------------------------------------------------------
+check "prose carries no em-dash"
+_emdash="$(printf '\xe2\x80\x94')"
+_em="$(grep -rn "$_emdash" \
+    "$REPO_DIR"/rules "$REPO_DIR"/skills "$REPO_DIR"/commands "$REPO_DIR"/agents \
+    "$REPO_DIR"/adapters "$REPO_DIR"/hooks "$REPO_DIR"/docs \
+    "$REPO_DIR"/README.md "$REPO_DIR"/CLAUDE.md "$REPO_DIR"/CONTRIBUTING.md \
+    "$REPO_DIR"/LICENSE "$REPO_DIR"/check.sh "$REPO_DIR"/sync.sh "$REPO_DIR"/install.sh \
+    "$REPO_DIR"/.github/workflows/release.yml 2>/dev/null \
+    | grep -v 'CHANGELOG' \
+    | grep -v 'BEGIN AGENTIC-SKILLS' \
+    | grep -v 'CRAFTKIT-INJECTED-RULES' || true)"
+if [[ -n "$_em" ]]; then
+    fail "em-dash in prose, so use a comma, colon, semicolon, period, or parentheses:"
+    echo "$_em" | sed 's/^/      /'
+else
+    pass
+fi
+
+# ---------------------------------------------------------------------------
+# 20. In-page anchor links resolve. GitHub derives a heading's anchor from its
+#     text, so editing heading wording silently retargets every link to it.
+#     The em-dash sweep in v1.29.0 rewrote three README headings and broke four
+#     TOC links that way: " - " collapses to "--" in a slug but ", " collapses
+#     to "-", so the link kept a dash the heading no longer had. Nothing failed
+#     loudly, because a dead in-page anchor just scrolls nowhere.
+# ---------------------------------------------------------------------------
+check "in-page anchor links resolve"
+_anchor_out="$(python3 - "$REPO_DIR" <<'PY' 2>/dev/null
+import io, os, re, sys, glob
+root = sys.argv[1]
+def slug(h):
+    s = h.strip().lower()
+    s = re.sub(r'[^\w\s-]', '', s)
+    return s.replace(' ', '-')
+files = ["README.md", "CLAUDE.md", "CONTRIBUTING.md", "CHANGELOG.md"]
+for pat in ("rules/*.md", "skills/*/SKILL.md", "commands/*.md", "agents/*.md"):
+    files += [os.path.relpath(p, root) for p in glob.glob(os.path.join(root, pat))]
+files += [os.path.relpath(p, root) for p in glob.glob(os.path.join(root, "docs/**/*.md"), recursive=True)]
+for f in files:
+    full = os.path.join(root, f)
+    if not os.path.exists(full):
+        continue
+    txt = io.open(full, encoding="utf-8").read()
+    heads = {slug(m.group(1)) for m in re.finditer(r'^#{1,6}\s+(.*)$', txt, re.M)}
+    for m in re.finditer(r'\]\(#([^)]+)\)', txt):
+        if m.group(1) not in heads:
+            print("%s -> #%s" % (f, m.group(1)))
+PY
+)"
+if [[ -n "$_anchor_out" ]]; then
+    fail "in-page anchor does not match any heading, so the link scrolls nowhere:"
+    echo "$_anchor_out" | sed 's/^/      /'
+else
+    pass
+fi
+
+# ---------------------------------------------------------------------------
+# 21. The managed block survives a third-party tool eating its BEGIN marker.
+#     Behavioral. graphify installs a `## graphify` section into the same
+#     CLAUDE.md and its uninstall strips from that heading to the next `## `
+#     heading, which lands inside our block, taking the BEGIN comment with it.
+#     Before the guard, the BEGIN-present test in _rebuild_claude_md then took
+#     the append branch and wrote a SECOND block, leaving the orphaned copy
+#     loading as always-on rules with nothing to signal it. Verified against a
+#     fixture rather than argued, because the failure is silent by construction.
+# ---------------------------------------------------------------------------
+check "managed block recovers from an orphaned END marker"
+_rb=0
+_fx="$(mktemp -d)"
+mkdir -p "$_fx/rules"
+printf -- '---\nname: probe-rule\n---\n\n## Probe section\n- probe constraint\n' > "$_fx/rules/probe.md"
+# CLAUDE.md as graphify's uninstall leaves it: user prose, stale rule text, orphaned END.
+{
+    printf '# CLAUDE.md\n\n## my own notes\nkeep me\n\n'
+    printf '## Layer constraints\n- stale rule text\n'
+    printf '<!-- END AGENTIC-SKILLS -->\n'
+} > "$_fx/CLAUDE.md"
+(
+    set +u
+    # shellcheck disable=SC1090
+    . "$REPO_DIR/adapters/claude.sh" >/dev/null 2>&1
+    # Assigned after sourcing on purpose: claude.sh sets both unconditionally.
+    CLAUDE_MD="$_fx/CLAUDE.md"
+    CLAUDE_RULES_DIR="$_fx/rules"
+    _rebuild_claude_md
+) >/dev/null 2>&1
+_begins="$(grep -cF '<!-- BEGIN AGENTIC-SKILLS' "$_fx/CLAUDE.md" 2>/dev/null || echo 0)"
+_ends="$(grep -cF '<!-- END AGENTIC-SKILLS -->' "$_fx/CLAUDE.md" 2>/dev/null || echo 0)"
+[[ "$_begins" -eq 1 ]] || { fail "expected exactly 1 BEGIN marker after recovery, got $_begins"; _rb=1; }
+[[ "$_ends" -eq 1 ]] || { fail "orphaned END marker survived, so the block is duplicated ($_ends END markers)"; _rb=1; }
+grep -qF 'keep me' "$_fx/CLAUDE.md" \
+    || { fail "recovery destroyed the user's own content outside the block"; _rb=1; }
+grep -qF 'probe constraint' "$_fx/CLAUDE.md" \
+    || { fail "fresh rule body missing after recovery"; _rb=1; }
+rm -rf "$_fx"
+[[ $_rb -eq 0 ]] && pass
 
 echo
 if [[ $FAILURES -eq 0 ]]; then

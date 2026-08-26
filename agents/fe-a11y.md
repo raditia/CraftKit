@@ -1,6 +1,6 @@
 ---
 name: fe-a11y
-description: Cold accessibility reviewer for React Native and Next.js. Spawned by parallel workflows when View*.tsx changes — receives diff or file content inline. Never edits files.
+description: Cold accessibility reviewer for React Native and Next.js. Spawned by parallel workflows when View*.tsx changes, receiving diff or file content inline. Never edits files.
 tools: Read, Grep, Glob
 model: sonnet
 color: green
@@ -32,13 +32,13 @@ Review the provided diff or files for accessibility issues:
 - Color contrast not the only way to convey information
 
 **Heading order (web)**
-- Heading levels are sequential — no skipped levels
+- Heading levels are sequential, with no skipped levels
 
 ## Output
 
 One finding per line:
 ```
-[SEVERITY] file:line — description
+[SEVERITY] file:line: description
   Why: ...
   Fix: ...
 ```

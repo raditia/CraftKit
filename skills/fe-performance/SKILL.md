@@ -6,7 +6,7 @@ alwaysApply: false
 
 **Commands:** `rtk tsc`, `rtk lint`, `rtk grep "pattern" .`
 **Tests:** `rtk test --testPathPattern=<path> --no-coverage` (run from workspace root)
-**Model:** everyday — escalate for Lighthouse regressions with non-obvious root cause or complex waterfall chains
+**Model:** everyday. Escalate for Lighthouse regressions with non-obvious root cause or complex waterfall chains
 
 ---
 
@@ -14,7 +14,7 @@ alwaysApply: false
 
 ---
 
-**Context:** `docs/context.md` — read: Summary, Key Changes, Architecture Patterns in Use. Standard load procedure in `/using-agent-skills`.
+**Context:** `docs/context.md`, reading Summary, Key Changes, Architecture Patterns in Use. Standard load procedure in `/using-agent-skills`.
 
 ---
 
@@ -24,17 +24,17 @@ alwaysApply: false
 
 **Parallelize independent fetches in Presenter:**
 ```ts
-// WRONG — sequential
+// WRONG: sequential
 const user = await getUser(id);
 const trips = await getTrips(id);
 
-// CORRECT — parallel
+// CORRECT: parallel
 const [user, trips] = await Promise.all([getUser(id), getTrips(id)]);
 ```
 
 **Defer `await` until the result is actually needed:**
 ```ts
-// WRONG — awaits before checking if needed
+// WRONG: awaits before checking if needed
 const user = await getUser(id);
 if (mode === 'guest') return renderGuest();
 
@@ -45,27 +45,27 @@ const user = await getUser(id);
 
 **Check cheap sync conditions before awaiting:**
 ```ts
-// CORRECT — skip remote call if id is missing
+// CORRECT: skip remote call if id is missing
 if (!id) return null;
 const data = await getData(id);
 ```
 
-**Next.js RSC — split sibling data fetches into child components (React runs them in parallel):**
+**Next.js RSC: split sibling data fetches into child components (React runs them in parallel):**
 ```tsx
-// WRONG — sequential in one component
+// WRONG: sequential in one component
 export default async function Page() {
   const user = await getUser();
   const cart = await getCart();
   return <View user={user} cart={cart} />;
 }
 
-// CORRECT — split; React renders children concurrently
+// CORRECT: split; React renders children concurrently
 export default async function Page() {
   return <View><UserSection /><CartSection /></View>;
 }
 ```
 
-**Use `<Suspense>` close to the data** — don't hoist to route root. Reserve layout space with skeletons to prevent CLS.
+**Use `<Suspense>` close to the data** and don't hoist to route root. Reserve layout space with skeletons to prevent CLS.
 
 ---
 
@@ -84,9 +84,9 @@ const HeavyChart = dynamic(() => import('./HeavyChart'), {
 const HeavyChart = lazy(() => import('./HeavyChart'));
 ```
 
-**Direct imports, not barrels** — barrel `index.ts` files force bundlers to load the entire graph. Rule and examples: `fe-rules` → Imports. Audit existing barrel imports on any bundle-size investigation.
+**Direct imports, not barrels.** Barrel `index.ts` files force bundlers to load the entire graph. Rule and examples: `fe-rules` → Imports. Audit existing barrel imports on any bundle-size investigation; where a graphify graph exists, `graphify affected <barrel>` names what the barrel actually drags in instead of reasoning it out.
 
-**Statically analyzable import paths** — dynamic template literals defeat tree-shaking:
+**Statically analyzable import paths.** Dynamic template literals defeat tree-shaking:
 ```ts
 // WRONG
 const mod = await import(`./screens/${name}`);
@@ -95,19 +95,19 @@ const mod = await import(`./screens/${name}`);
 const mod = name === 'home' ? await import('./screens/Home') : await import('./screens/Search');
 ```
 
-**Defer third-party scripts** — use `next/script` with `strategy="afterInteractive"` for analytics, support widgets.
+**Defer third-party scripts.** Use `next/script` with `strategy="afterInteractive"` for analytics, support widgets.
 
 ---
 
 ## 3. Server-side (Next.js HIGH)
 
-**`React.cache()` for per-request deduplication** — calling the same data function from multiple Server Components costs one DB query, not N:
+**`React.cache()` for per-request deduplication.** Calling the same data function from multiple Server Components costs one DB query, not N:
 ```ts
 import { cache } from 'react';
 export const getUser = cache(async (id: string) => db.user.findUnique({ where: { id } }));
 ```
 
-**Authenticate every Server Action** — `"use server"` functions are public endpoints:
+**Authenticate every Server Action**, since `"use server"` functions are public endpoints:
 ```ts
 'use server';
 export async function deleteBooking(formData: FormData) {
@@ -117,7 +117,7 @@ export async function deleteBooking(formData: FormData) {
 }
 ```
 
-**Minimize data serialized to Client Components** — strip unused fields at the DB/API layer before passing props.
+**Minimize data serialized to Client Components.** Strip unused fields at the DB/API layer before passing props.
 
 **`after()` for non-blocking post-response work** (Next.js 15):
 ```ts
@@ -131,7 +131,7 @@ after(() => logAnalytics(data)); // runs after response is sent
 
 > `fe-rules` (always active) covers: derive during render not useEffect, primitive effect deps, functional setState. Not repeated here.
 
-**`React.memo` only when:** component re-renders frequently + props are usually the same + render is measurably expensive. Memo adds an equality check on every render — overhead if props differ on most renders.
+**`React.memo` only when:** component re-renders frequently + props are usually the same + render is measurably expensive. Memo adds an equality check on every render, which is overhead if props differ on most renders.
 
 **Hoist default non-primitive props** to avoid breaking memo:
 ```tsx
@@ -141,11 +141,11 @@ const EMPTY: Route[] = [];
 
 **Subscribe to derived booleans in selectors, not raw values:**
 ```ts
-// WRONG — re-renders on any cart change
+// WRONG: re-renders on any cart change
 const cart = useStore((s) => s.cart);
 const hasItems = cart.length > 0;
 
-// CORRECT — re-renders only when emptiness flips
+// CORRECT: re-renders only when emptiness flips
 const hasItems = useStore((s) => s.cart.length > 0);
 ```
 
@@ -165,7 +165,7 @@ const results = useMemo(() => expensiveSearch(deferredQuery), [deferredQuery]);
 
 ## 5. React Native specific
 
-**`FlatList` over `ScrollView` for long lists** — `ScrollView` renders all children upfront:
+**`FlatList` over `ScrollView` for long lists**, because `ScrollView` renders all children upfront:
 ```tsx
 <FlatList
   data={routes}
@@ -177,9 +177,9 @@ const results = useMemo(() => expensiveSearch(deferredQuery), [deferredQuery]);
 />
 ```
 
-**`StyleSheet.create()` is a performance optimization** — styles are registered and referenced by ID, reducing bridge traffic. Never inline style objects (also a `fe-rules` constraint):
+**`StyleSheet.create()` is a performance optimization:** styles are registered and referenced by ID, reducing bridge traffic. Never inline style objects (also a `fe-rules` constraint):
 ```tsx
-// WRONG — new object identity on every render
+// WRONG: new object identity on every render
 <View style={{ margin: 8 }} />
 
 // CORRECT
@@ -187,7 +187,7 @@ const results = useMemo(() => expensiveSearch(deferredQuery), [deferredQuery]);
 const styles = StyleSheet.create({ container: { margin: Token.spacing.xs } });
 ```
 
-**`getItemLayout` on FlatList** when row heights are fixed — skips expensive measurement:
+**`getItemLayout` on FlatList** when row heights are fixed, which skips expensive measurement:
 ```tsx
 getItemLayout={(_data, index) => ({ length: 80, offset: 80 * index, index })}
 ```
@@ -197,7 +197,7 @@ getItemLayout={(_data, index) => ({ length: 80, offset: 80 * index, index })}
 <FlatList removeClippedSubviews={true} ... />
 ```
 
-**`useNativeDriver: true`** in Animated — runs animations on the native thread, no JS bridge involvement:
+**`useNativeDriver: true`** in Animated runs animations on the native thread, with no JS bridge involvement:
 ```ts
 Animated.timing(opacity, { toValue: 1, useNativeDriver: true }).start();
 ```
@@ -228,8 +228,8 @@ const [tree] = useState(() => parseTree(largeInput));
 
 ## Verification
 
-- [ ] `rtk test --testPathPattern=<changed-path> --coverage` — 93% maintained
-- [ ] `rtk tsc --noEmit` — zero errors
+- [ ] `rtk test --testPathPattern=<changed-path> --coverage` with 93% maintained
+- [ ] `rtk tsc --noEmit` with zero errors
 - [ ] No `Promise.all` opportunities missed in Presenter
 - [ ] No inline style objects in React Native components
 - [ ] `FlatList` used for lists > ~20 items

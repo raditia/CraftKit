@@ -1,6 +1,6 @@
 ---
 name: ios-scaffold
-description: Scaffold a new iOS feature screen in a modular monorepo following the MVVM-C contract — Contract + ViewController + View + ViewModel + Factory + Fetcher stub. Bazel/CocoaPods globs auto-wire new files.
+description: Scaffold a new iOS feature screen in a modular monorepo following the MVVM-C contract: Contract + ViewController + View + ViewModel + Factory + Fetcher stub. Bazel/CocoaPods globs auto-wire new files.
 alwaysApply: false
 ---
 
@@ -9,7 +9,7 @@ alwaysApply: false
 
 ---
 
-> **Core behaviors:** Surface assumptions before generating. Copy a real sibling feature — never invent structure. Don't pre-split into sub-views speculatively. See `/using-agent-skills` and the pattern map in `/ios-patterns`.
+> **Core behaviors:** Surface assumptions before generating. Copy a real sibling feature; never invent structure. Don't pre-split into sub-views speculatively. See `/using-agent-skills` and the pattern map in `/ios-patterns`.
 
 ---
 
@@ -17,7 +17,7 @@ alwaysApply: false
 
 ---
 
-## Step 1 — Understand context
+## Step 1: Understand context
 
 State assumptions before generating:
 ```
@@ -26,7 +26,7 @@ ASSUMPTIONS I'M MAKING:
 2. Feature name: [PascalCase, e.g. DetailSelection]
 3. File prefix: <Module><Feature> → e.g. <Prefix>
 4. Sibling I'm copying from: [path to an existing feature folder]
-5. Contract language: [.h ObjC / .swift] — match the module's dominant style
+5. Contract language: [.h ObjC / .swift], matching the module's dominant style
 6. Has its own screen (gets a Coordinator hook)? [yes/no]
 → Correct me now or I'll proceed with these.
 ```
@@ -35,12 +35,12 @@ Read the sibling folder first. Prefer copying the newest/cleanest sibling in the
 
 ---
 
-## Step 2 — Create the feature folder
+## Step 2: Create the feature folder
 
 All files in `Modules/<Module>/<Module>/<Feature>/`. Naming: **`<Module><Feature><Role>`** (`<Prefix>` = `<Module><Feature>`).
 
 ### `<Prefix>Contract.h` (or `.swift` if module is Swift-forward)
-The View↔VM seam — two protocols:
+The View↔VM seam, as two protocols:
 ```objc
 @protocol <Prefix>ViewModelAction <NSObject>
 // callbacks the VM fires to repaint the view: setX:, openY:
@@ -54,7 +54,7 @@ The View↔VM seam — two protocols:
 ```
 
 ### `<Prefix>ViewController.swift`
-Thin UIKit VC — forward and repaint only, **no logic**:
+Thin UIKit VC that forwards and repaints only, with **no logic**:
 ```swift
 final class <Prefix>ViewController: BaseViewController {
     private let viewModel: <Prefix>ViewModelProtocol
@@ -131,7 +131,7 @@ enum <Prefix>Factory {
 ```
 
 ### `Fetcher/<Prefix>Fetcher.swift`
-Data layer behind a protocol — stub the methods the VM needs:
+Data layer behind a protocol; stub the methods the VM needs:
 ```swift
 protocol <Prefix>FetcherProtocol {
     func fetch(completion: @escaping (Result<<Model>, ErrorResponse>) -> Void)
@@ -145,18 +145,18 @@ final class <Prefix>Fetcher: <Prefix>FetcherProtocol {
 
 ---
 
-## Step 3 — Wire navigation (only if the screen is reachable)
+## Step 3: Wire navigation (only if the screen is reachable)
 
 The VM does NOT navigate. Add the new screen to the module's Coordinator:
 1. Make the Coordinator conform to `<Prefix>ViewModelDelegate`.
 2. Add a private `navigateTo<Feature>(...)` helper that calls `<Prefix>Factory.makeViewController(delegate: self)` and `pushViewController`.
 3. If reachable from another module/deeplink, add a `static` entry to `<Module>Module.swift` (only if the module has a façade).
 
-State the wiring you did or skipped — don't silently leave a screen unreachable.
+State the wiring you did or skipped; don't silently leave a screen unreachable.
 
 ---
 
-## Step 4 — Strings
+## Step 4: Strings
 
 No resource file. Add keys to `App/en.lproj/Localizable.strings` (and other `.lproj` if the team requires), reference via:
 ```swift
@@ -166,20 +166,20 @@ Never hardcode display text in the View or VC.
 
 ---
 
-## Step 5 — Quality rules
+## Step 5: Quality rules
 
-- VC and View hold **no business logic** — all logic in the VM.
+- VC and View hold **no business logic**; all logic in the VM.
 - VM never imports a view type or navigates directly.
-- One responsibility per file. Split a View into sub-views only when it genuinely grows complex — not speculatively.
+- One responsibility per file. Split a View into sub-views only when it genuinely grows complex, not speculatively.
 - Match the sibling's exact import style and ObjC/Swift split. Don't introduce SwiftUI unless copying a `…V2`/`…Revamp` sibling that already uses it.
 
 ---
 
 ## After generating
 
-- [ ] Ponytail self-pass — scan every generated file against the six tags in `karpathy-guidelines` rule 2; cut each hit or mark it `ponytail:`. Report `ponytail self-pass: clean` or what was cut/marked
-- [ ] `swiftlint lint --path <each-new-swift-file>` — zero violations (config: `.swiftlint.yml`)
-- [ ] New files sit in the correct folder so Bazel/CocoaPods globs pick them up — no `BUILD`/`podspec` edit needed unless you added a cross-module dependency
+- [ ] Ponytail self-pass: scan every generated file against the six tags in `karpathy-guidelines` rule 2; cut each hit or mark it `ponytail:`. Report `ponytail self-pass: clean` or what was cut/marked
+- [ ] `swiftlint lint --path <each-new-swift-file>` with zero violations (config: `.swiftlint.yml`)
+- [ ] New files sit in the correct folder so Bazel/CocoaPods globs pick them up, with no `BUILD`/`podspec` edit needed unless you added a cross-module dependency
 - [ ] If you added a cross-module dep: update both `Modules/<Module>/BUILD` (`deps=[…]`) and `<Module>.podspec` (`s.dependency`)
 - [ ] Build check (optional, slow): `bazelisk build //Modules/<Module>:<Module>`
 - List each file created with its path

@@ -1,6 +1,6 @@
 ---
 name: pr-message
-description: Generate a pull request message from branch commits and diff — title, summary, goal, changed files, test coverage status, and reviewer notes. Copies result to clipboard.
+description: Generate a pull request message from branch commits and diff: title, summary, goal, changed files, test coverage status, and reviewer notes. Copies result to clipboard.
 ---
 
 **Commands:** `rtk git log`, `rtk git diff`, `rtk git status`, `rtk git remote`
@@ -10,11 +10,11 @@ description: Generate a pull request message from branch commits and diff — ti
 
 ---
 
-> **Core behaviors:** Surface assumptions before writing. Never invent goals — derive from commits and diff only. See `/using-agent-skills`.
+> **Core behaviors:** Surface assumptions before writing. Never invent goals; derive from commits and diff only. See `/using-agent-skills`.
 
 ---
 
-## Step 0 — Inline plan
+## Step 0: Inline plan
 
 ```
 PLAN:
@@ -30,7 +30,7 @@ PLAN:
 
 ---
 
-## Step 1 — Branch context
+## Step 1: Branch context
 
 ```bash
 rtk git remote show origin | grep "HEAD branch"
@@ -43,7 +43,7 @@ Default base to `main` if remote detection fails.
 
 ---
 
-## Step 2 — Diff analysis
+## Step 2: Diff analysis
 
 ```bash
 rtk git diff <base>...HEAD --stat
@@ -51,20 +51,20 @@ rtk git diff <base>...HEAD
 ```
 
 From the diff, extract:
-- **Goal** — infer from commit messages + what changed (be specific, not generic)
-- **Changed files** — group by layer or domain (e.g. View, Presenter, tests, config)
-- **Test coverage** — test files in the diff? Web/RN: `*.test.*` / `*.spec.*`. Android: `*Test.kt` under `src/test/`. iOS: `*Test.swift` / `*Spec.swift` (Quick). If yes: note what's covered. If no: flag as untested.
+- **Goal:** infer from commit messages + what changed (be specific, not generic)
+- **Changed files:** group by layer or domain (e.g. View, Presenter, tests, config)
+- **Test coverage:** test files in the diff? Web/RN: `*.test.*` / `*.spec.*`. Android: `*Test.kt` under `src/test/`. iOS: `*Test.swift` / `*Spec.swift` (Quick). If yes: note what's covered. If no: flag as untested.
 
 ---
 
-## Step 3 — Write PR message
+## Step 3: Write PR message
 
 ```markdown
-# <PR title — concise, imperative, < 70 chars. Conventional-commit prefix if branch commits use one (feat:/fix:/etc.).>
+# <PR title: concise, imperative, < 70 chars. Conventional-commit prefix if branch commits use one (feat:/fix:/etc.).>
 
 ## Summary
 
-<1–3 sentences. What this PR does and why. Derived from commits — not generic.>
+<1–3 sentences. What this PR does and why. Derived from commits, not generic.>
 
 ## Goal
 
@@ -79,7 +79,7 @@ From the diff, extract:
 
 ## Test coverage
 
-- [ ] Unit tests added/updated: <yes — list test files / no — reason>
+- [ ] Unit tests added/updated: <yes, list test files / no, reason>
 - [ ] Integration tests: <yes / no / not applicable>
 - [ ] Manual verification: <describe what to check if no automated tests>
 
@@ -89,15 +89,15 @@ From the diff, extract:
 ```
 
 Rules:
-- Title must be concrete and imperative — match the branch's conventional-commit prefix if its commits use one
-- Goal must be concrete — "adds X to enable Y" not "improves code"
-- File table: only files that matter to the reviewer — skip auto-generated, lock files, trivial renames
+- Title must be concrete and imperative, matching the branch's conventional-commit prefix if its commits use one
+- Goal must be concrete: "adds X to enable Y" not "improves code"
+- File table: only files that matter to the reviewer, so skip auto-generated, lock files, trivial renames
 - Test coverage: if no test files changed, always flag it explicitly
 - Notes section: omit if nothing warrants reviewer attention
 
 ---
 
-## Step 3.5 — Humanize pass (optional)
+## Step 3.5: Humanize pass (optional)
 
 If the [humanizer skill](https://github.com/blader/humanizer) is installed, run the full generated message through it to strip AI-writing tells before copying.
 
@@ -105,14 +105,14 @@ If the [humanizer skill](https://github.com/blader/humanizer) is installed, run 
 test -f ~/.claude/skills/humanizer/SKILL.md && echo "humanizer: present" || echo "humanizer: absent"
 ```
 
-- **Present** → invoke `/humanizer` on the whole message from Step 3. Instruct it to preserve markdown structure verbatim — the `## Changes` table, the test-coverage checkboxes, and any inline `code` must pass through untouched (patterns #14–16 must not collapse them). Use the humanized output as the final message.
+- **Present** → invoke `/humanizer` on the whole message from Step 3. Instruct it to preserve markdown structure verbatim: the `## Changes` table, the test-coverage checkboxes, and any inline `code` must pass through untouched (patterns #14–16 must not collapse them). Use the humanized output as the final message.
 - **Absent** → skip silently and use the Step 3 message as-is. No warning.
 
-> Only Claude Code supports `/humanizer`. On the other synced tools (Cursor, Gemini, Codex) the file check fails and this step is a no-op — by design.
+> Only Claude Code supports `/humanizer`. On the other synced tools (Cursor, Gemini, Codex) the file check fails and this step is a no-op, by design.
 
 ---
 
-## Step 4 — Copy to clipboard
+## Step 4: Copy to clipboard
 
 ```bash
 echo "<generated message>" | pbcopy          # macOS

@@ -9,7 +9,7 @@ alwaysApply: false
 
 ---
 
-> **Core behaviors:** Accessibility is applied in the View, but the *label strings and derived state* come from the Presenter/ViewModel (via `R.string`) — never hardcode labels in the layout. See `/using-agent-skills` and `/android-patterns`.
+> **Core behaviors:** Accessibility is applied in the View, but the *label strings and derived state* come from the Presenter/ViewModel (via `R.string`), so never hardcode labels in the layout. See `/using-agent-skills` and `/android-patterns`.
 
 ---
 
@@ -25,7 +25,7 @@ alwaysApply: false
 | **ViewModel** | Exposes the a11y label/state as `@Bindable` (or in the Compose state). |
 | **View** | Binds `contentDescription`/semantics from the VM; sets static roles; groups decorative views. |
 
-Never build a label string in the layout XML or Composable — it belongs upstream (so it uses `R.string` and reflects state).
+Never build a label string in the layout XML or Composable; it belongs upstream (so it uses `R.string` and reflects state).
 
 ---
 
@@ -39,7 +39,7 @@ Never build a label string in the layout XML or Composable — it belongs upstre
 ```
 
 ```kotlin
-// State/role that TalkBack must announce — set via AccessibilityDelegate or view APIs
+// State/role that TalkBack must announce, set via AccessibilityDelegate or view APIs
 ViewCompat.setAccessibilityDelegate(button, object : AccessibilityDelegateCompat() {
     override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfoCompat) {
         super.onInitializeAccessibilityNodeInfo(host, info)
@@ -86,7 +86,7 @@ Minimum touch target in Compose: `Modifier.sizeIn(minWidth = 48.dp, minHeight = 
 ## Anti-patterns
 
 ```xml
-<!-- BAD: icon button with no contentDescription — TalkBack says "button" -->
+<!-- BAD: icon button with no contentDescription, so TalkBack says "button" -->
 <ImageButton android:src="@drawable/ic_trash" />
 
 <!-- BAD: label hardcoded in layout instead of R.string via VM -->
@@ -99,7 +99,7 @@ Minimum touch target in Compose: `Modifier.sizeIn(minWidth = 48.dp, minHeight = 
 // BAD: announcing on every recomposition (no key)
 view.announceForAccessibility(message)   // called in composition body
 
-// BAD: fixed dp for text — ignores user font scale
+// BAD: fixed dp for text, which ignores user font scale
 fontSize = 14.dp   // use sp
 ```
 
@@ -112,7 +112,7 @@ fontSize = 14.dp   // use sp
 - [ ] Touch targets ≥ 48dp
 - [ ] Decorative images set `importantForAccessibility="no"` / `contentDescription = null`; related text grouped into one node
 - [ ] In-place updates use a live region; screen transitions move accessibility focus
-- [ ] Announcements fired after async work with a key — not on every recomposition/repaint
+- [ ] Announcements fired after async work with a key, not on every recomposition/repaint
 - [ ] Text uses `sp`; font scaling not disabled; layout reflows
 - [ ] No accessibility label strings hardcoded in layout XML / Composable
 

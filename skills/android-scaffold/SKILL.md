@@ -1,6 +1,6 @@
 ---
 name: android-scaffold
-description: Scaffold a new Android feature screen in a modular monorepo following the MVP + Core-framework contract — View (Activity/Fragment/Widget) + Presenter + ViewModel + NavigationModel + Repository stub, wired into the feature's Dagger component.
+description: Scaffold a new Android feature screen in a modular monorepo following the MVP + Core-framework contract: View (Activity/Fragment/Widget) + Presenter + ViewModel + NavigationModel + Repository stub, wired into the feature's Dagger component.
 alwaysApply: false
 ---
 
@@ -9,7 +9,7 @@ alwaysApply: false
 
 ---
 
-> **Core behaviors:** Surface assumptions before generating. Copy a real sibling screen — never invent structure. Don't pre-split into widgets speculatively. See `/using-agent-skills` and the pattern map in `/android-patterns`.
+> **Core behaviors:** Surface assumptions before generating. Copy a real sibling screen; never invent structure. Don't pre-split into widgets speculatively. See `/using-agent-skills` and the pattern map in `/android-patterns`.
 
 ---
 
@@ -17,7 +17,7 @@ alwaysApply: false
 
 ---
 
-## Step 1 — Understand context
+## Step 1: Understand context
 
 ```
 ASSUMPTIONS I'M MAKING:
@@ -25,7 +25,7 @@ ASSUMPTIONS I'M MAKING:
 2. Screen name: [PascalCase, e.g. Detail]
 3. Prefix: <Feature><Screen> → e.g. <Prefix>
 4. Sibling I'm copying from: [path to an existing screen package]
-5. UI tech: [Data Binding / Compose-in-widget] — match the sibling
+5. UI tech: [Data Binding / Compose-in-widget], matching the sibling
 6. Reachable from another feature? [yes → needs -api NavigatorService / no]
 → Correct me now or I'll proceed with these.
 ```
@@ -34,11 +34,11 @@ Prefer copying the newest sibling that uses the module's current conventions.
 
 ---
 
-## Step 2 — Create the screen package
+## Step 2: Create the screen package
 
-Package: `com.<org>.<app>.<feature>.<screen>` — Android-facing files go in a `view/` sub-package.
+Package: `com.<org>.<app>.<feature>.<screen>`, where Android-facing files go in a `view/` sub-package.
 
-### `<Prefix>ViewModel.kt` — display state (`CoreViewModel`, `@Bindable`, `Parcelable`)
+### `<Prefix>ViewModel.kt`: display state (`CoreViewModel`, `@Bindable`, `Parcelable`)
 ```kotlin
 class <Prefix>ViewModel : CoreViewModel() {
     @get:Bindable
@@ -48,7 +48,7 @@ class <Prefix>ViewModel : CoreViewModel() {
 }
 ```
 
-### `<Prefix>Presenter.kt` — business logic (`CorePresenter<VM>`)
+### `<Prefix>Presenter.kt`: business logic (`CorePresenter<VM>`)
 ```kotlin
 class <Prefix>Presenter @Inject constructor(
     private val repository: <Feature>ApiRepository,
@@ -62,9 +62,9 @@ class <Prefix>Presenter @Inject constructor(
     }
 }
 ```
-**No Android view references** beyond the base contract; no navigation `startActivity` here — call `navigate(intent)` from the base.
+**No Android view references** beyond the base contract; no navigation `startActivity` here, so call `navigate(intent)` from the base.
 
-### `<Prefix>Activity.kt` (or `Fragment`/`Widget`) — the View
+### `<Prefix>Activity.kt` (or `Fragment`/`Widget`): the View
 ```kotlin
 class <Prefix>Activity : CoreActivity<<Prefix>Presenter, <Prefix>ViewModel>() {
     override fun layoutId() = R.layout.activity_<prefix_snake>
@@ -78,7 +78,7 @@ class <Prefix>Activity : CoreActivity<<Prefix>Presenter, <Prefix>ViewModel>() {
 ```
 Wire listeners → `presenter.onX()`. Display-only formatting (image load, tooltips) may live here. **No business logic.**
 
-### `<Prefix>ActivityNavigationModel.kt` — in `<feature>-navigation`
+### `<Prefix>ActivityNavigationModel.kt`, in `<feature>-navigation`
 ```kotlin
 @DartModel
 class <Prefix>ActivityNavigationModel {
@@ -88,45 +88,45 @@ class <Prefix>ActivityNavigationModel {
 
 ---
 
-## Step 3 — Dagger wiring
+## Step 3: Dagger wiring
 
 Add the new View to the feature `@Component`:
 ```kotlin
 fun inject(activity: <Prefix>Activity)
 ```
-Constructor-injected Presenter/Repository need no manual provider unless they require a binding — add one to the feature module if so. Reuse the existing `<Feature>ComponentBuilder`.
+Constructor-injected Presenter/Repository need no manual provider unless they require a binding, so add one to the feature module if so. Reuse the existing `<Feature>ComponentBuilder`.
 
 State the wiring you did or skipped.
 
 ---
 
-## Step 4 — Navigation
+## Step 4: Navigation
 
 - **Reachable within the feature:** the caller builds the Intent via the generated Henson/Dart builder (`Henson.with(context).gotoXActivity()...build()`).
 - **Reachable from another feature:** add `getXIntent(context, params): Intent` to the feature's `<Feature>NavigatorService` in `-api`, implement it in the DFM, and register the impl in the holder. Never let another feature depend on the DFM directly.
 
 ---
 
-## Step 5 — Strings
+## Step 5: Strings
 
 Add to the module's `res/values/strings.xml`; reference `R.string.<key>`. Never hardcode display text in View/Presenter. For market-variant copy, use the string variant switcher.
 
 ---
 
-## Step 6 — Quality rules
+## Step 6: Quality rules
 
 - Presenter holds logic; ViewModel holds state; View renders. No leakage.
 - ViewModel is `Parcelable`-safe for process death.
-- Split a screen into widgets only when it genuinely grows complex — not speculatively.
+- Split a screen into widgets only when it genuinely grows complex, not speculatively.
 - Match the sibling's Data-Binding vs Compose-in-widget choice; don't introduce a `StateFlow` ViewModel unless the sibling already uses one.
 
 ---
 
 ## After generating
 
-- [ ] Ponytail self-pass — scan every generated file against the six tags in `karpathy-guidelines` rule 2; cut each hit or mark it `ponytail:`. Report `ponytail self-pass: clean` or what was cut/marked
-- [ ] `./gradlew :<feature>:lintGeneralDebug` — zero new violations
-- [ ] `./gradlew :<feature>:testGeneralDebugUnitTest` compiles (add a Presenter test — see `/android-test`)
+- [ ] Ponytail self-pass: scan every generated file against the six tags in `karpathy-guidelines` rule 2; cut each hit or mark it `ponytail:`. Report `ponytail self-pass: clean` or what was cut/marked
+- [ ] `./gradlew :<feature>:lintGeneralDebug` with zero new violations
+- [ ] `./gradlew :<feature>:testGeneralDebugUnitTest` compiles (add a Presenter test, see `/android-test`)
 - [ ] Dagger graph compiles (the View is in the `@Component`'s `inject(...)` list)
 - List each file created with its path + package
 - Note the sibling you copied and any wiring assumptions

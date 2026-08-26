@@ -1,6 +1,6 @@
 ---
 name: android-context
-description: Generate or update docs/context.md for an Android branch — MVP flavored summary of changed feature modules, screens, presenters, and Dagger wiring. Optional branch-scoping doc that feeds /android-review and /ship.
+description: Generate or update docs/context.md for an Android branch: an MVP flavored summary of changed feature modules, screens, presenters, and Dagger wiring. Optional branch-scoping doc that feeds /android-review and /ship.
 alwaysApply: false
 ---
 
@@ -9,19 +9,19 @@ alwaysApply: false
 
 ---
 
-> **Core behaviors:** Surface conflicts — never silently resolve them. Emit an inline plan before executing. Verify output before claiming done. See `/using-agent-skills`.
+> **Core behaviors:** Surface conflicts; never silently resolve them. Emit an inline plan before executing. Verify output before claiming done. See `/using-agent-skills`.
 
 ---
 
 # Android Feature Context
 
-Optional. Single-screen work does **not** need this — read a sibling screen instead (see `/android-patterns`). Generate this only for multi-screen or cross-feature branches, so `/android-review` and `/ship` read one summary instead of re-scanning modules.
+Optional. Single-screen work does **not** need this; read a sibling screen instead (see `/android-patterns`). Generate this only for multi-screen or cross-feature branches, so `/android-review` and `/ship` read one summary instead of re-scanning modules.
 
 Organized by **MVP role + module split**, not EVPMR.
 
 ---
 
-## Step 0 — Inline plan
+## Step 0: Inline plan
 
 ```
 PLAN:
@@ -36,7 +36,7 @@ PLAN:
 
 ---
 
-## Step 1 — Collect changes
+## Step 1: Collect changes
 
 ```bash
 git remote show origin | grep "HEAD branch"     # base, default main
@@ -48,7 +48,7 @@ If `@{u}` errors (no upstream), skip and note it.
 
 ---
 
-## Step 2 — Conflict detection (surface only — do not fix)
+## Step 2: Conflict detection (surface only, do not fix)
 
 - Business logic / repository calls in an Activity/Fragment/Widget or ViewModel
 - Presenter doing Android view manipulation beyond the base contract, or navigating outside `navigate(...)`
@@ -66,11 +66,11 @@ CONFLICT: file:line
 
 ---
 
-## Step 3 — Write `docs/context.md`
+## Step 3: Write `docs/context.md`
 
 ```markdown
 # Android Feature Context
-<!-- managed by android-context — regenerate with /android-context -->
+<!-- managed by android-context, regenerate with /android-context -->
 **Generated:** {{ISO timestamp}}
 **Branch:** {{branch}} | **Base:** {{base}} | **Commit:** {{git rev-parse HEAD}}
 
@@ -99,14 +99,14 @@ CONFLICT: file:line
 {{Unresolved conflicts surfaced above. Not silently fixed.}}
 
 ## Test Coverage Needed
-{{Presenters new/changed lacking JUnit/MockK tests — see /android-test}}
+{{Presenters new/changed lacking JUnit/MockK tests, see /android-test}}
 ```
 
 Hard limit: **≤ 400 lines**. Summarize; never paste whole files.
 
 ---
 
-## Step 4 — Verify
+## Step 4: Verify
 
 - [ ] `docs/context.md` written at the Android repo root
 - [ ] Every changed file mapped to a module + role

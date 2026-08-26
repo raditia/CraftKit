@@ -1,15 +1,15 @@
 ---
 name: android-review
-description: Review an Android feature diff against the MVP + Core-framework contract — layer violations, Dagger DI, NavigatorService navigation, string resources, coroutine/main-thread correctness, Android Lint compliance.
+description: Review an Android feature diff against the MVP + Core-framework contract: layer violations, Dagger DI, NavigatorService navigation, string resources, coroutine/main-thread correctness, Android Lint compliance.
 alwaysApply: false
 ---
 
 **Commands:** `git diff <base>...HEAD`, `./gradlew :<module>:lintGeneralDebug`, `grep -rn "pattern" <feature>/src`
-**Model:** everyday — escalate if the review surfaces an architectural conflict with non-obvious resolution
+**Model:** everyday. Escalate if the review surfaces an architectural conflict with non-obvious resolution
 
 ---
 
-> **Core behaviors:** Read the actual changed files before commenting — never assume from filename. Push back on real issues, no sycophancy. Surface every violation. See `/using-agent-skills` and the pattern map in `/android-patterns`.
+> **Core behaviors:** Read the actual changed files before commenting; never assume from filename. Push back on real issues, no sycophancy. Surface every violation. See `/using-agent-skills` and the pattern map in `/android-patterns`.
 
 ---
 
@@ -21,10 +21,10 @@ alwaysApply: false
 
 ### Layer boundaries (MVP + Core framework)
 
-- [ ] **View (Activity/Fragment/Widget)** — inflates layout, wires listeners, display-only formatting? **Flag** business logic, data fetching, or decision logic in the View.
-- [ ] **Presenter** — owns business logic, extends `CorePresenter<VM>`, writes into the ViewModel? **Flag** direct Android view manipulation beyond the base contract, or `startActivity`/`Intent` navigation done outside the base `navigate(...)`.
-- [ ] **ViewModel** — display-state holder (`CoreViewModel`, `@Bindable`), `Parcelable`? **Flag** business logic, repository calls, or network access in the VM.
-- [ ] **Effects** — one-off UI effects (toast/snackbar/navigate/close/loading) go through the VM event queue, not called directly from the Presenter into the View.
+- [ ] **View (Activity/Fragment/Widget):** inflates layout, wires listeners, display-only formatting? **Flag** business logic, data fetching, or decision logic in the View.
+- [ ] **Presenter:** owns business logic, extends `CorePresenter<VM>`, writes into the ViewModel? **Flag** direct Android view manipulation beyond the base contract, or `startActivity`/`Intent` navigation done outside the base `navigate(...)`.
+- [ ] **ViewModel:** display-state holder (`CoreViewModel`, `@Bindable`), `Parcelable`? **Flag** business logic, repository calls, or network access in the VM.
+- [ ] **Effects:** one-off UI effects (toast/snackbar/navigate/close/loading) go through the VM event queue, not called directly from the Presenter into the View.
 
 ### Dependency injection (Dagger)
 
@@ -35,34 +35,34 @@ alwaysApply: false
 
 ### Navigation
 
-- [ ] Cross-feature navigation goes through the `<Feature>NavigatorService` interface (in `-api`) + holder — **flag** a direct dependency on another feature's DFM.
+- [ ] Cross-feature navigation goes through the `<Feature>NavigatorService` interface (in `-api`) + holder. **Flag** a direct dependency on another feature's DFM.
 - [ ] Intent extras use the generated `@DartModel`/`@BindExtra` binder, not manual `Bundle` string keys.
 
 ### Strings / resources
 
-- [ ] No hardcoded display text in View/Presenter — all via `R.string`.
+- [ ] No hardcoded display text in View/Presenter; all via `R.string`.
 - [ ] Market-variant copy uses the string variant switcher, not ad-hoc country `if`s.
 
 ### Coroutine / correctness
 
-- [ ] Repository suspend functions wrap IO in `withContext(dispatcher.io())` — **flag** network/DB on the main dispatcher.
-- [ ] Presenter launches in its lifecycle-bound scope (from `CorePresenter`) — **flag** `GlobalScope` or leaked scopes.
+- [ ] Repository suspend functions wrap IO in `withContext(dispatcher.io())`. **Flag** network/DB on the main dispatcher.
+- [ ] Presenter launches in its lifecycle-bound scope (from `CorePresenter`). **Flag** `GlobalScope` or leaked scopes.
 - [ ] VM mutations that drive Data Binding happen on the main thread.
 - [ ] No `!!` on nullable API/DB results that can be null.
 
 ### Android Lint
 
-- [ ] `./gradlew :<module>:lintGeneralDebug` — zero new violations (custom rules on).
+- [ ] `./gradlew :<module>:lintGeneralDebug` with zero new violations (custom rules on).
 - [ ] No `@Suppress`/`tools:ignore` without a documented reason.
 
 ### Over-engineering
 
-- [ ] Diff scanned against the ponytail rubric (`karpathy-guidelines` rule 2) — `delete:` `stdlib:` `native:` `yagni:` `shrink:` `narrate:`, protected list respected. Common Android hits: a UseCase that only forwards to one Repository call, a hand-rolled mapper Kotlin stdlib covers (`map`/`associateBy`/`takeIf`), a `sealed class` state hierarchy with one subclass, an interface with one implementation and one caller.
-- [ ] Findings are applied as deletion at the named `file:line` — never a restructure of the surrounding Presenter/VM.
+- [ ] Diff scanned against the ponytail rubric (`karpathy-guidelines` rule 2): `delete:` `stdlib:` `native:` `yagni:` `shrink:` `narrate:`, protected list respected. Common Android hits: a UseCase that only forwards to one Repository call, a hand-rolled mapper Kotlin stdlib covers (`map`/`associateBy`/`takeIf`), a `sealed class` state hierarchy with one subclass, an interface with one implementation and one caller.
+- [ ] Findings are applied as deletion at the named `file:line`, never a restructure of the surrounding Presenter/VM.
 
 ### Tests
 
-- [ ] Presenter changes have matching JUnit + MockK tests in `src/test/...` mirroring the source path — see `/android-test`.
+- [ ] Presenter changes have matching JUnit + MockK tests in `src/test/...` mirroring the source path, see `/android-test`.
 
 ---
 
@@ -70,11 +70,11 @@ alwaysApply: false
 
 For each issue:
 ```
-[SEVERITY] File:line — description
+[SEVERITY] File:line: description
   Why: ...
   Fix: ...
 ```
 
 `[ERROR]` = breaks the MVP contract / DI graph / coroutine correctness | `[WARNING]` = convention deviation, test gap | `[SUGGESTION]` = improvement worth considering.
 
-Push back on real issues — do not soften findings. At the end, list patterns observed not covered by `/android-patterns` as **Suggested skill updates**.
+Push back on real issues and do not soften findings. At the end, list patterns observed not covered by `/android-patterns` as **Suggested skill updates**.
