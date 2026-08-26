@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Codex CLI adapter.
 #
-# Codex has no slash command system — all rules, skills, and commands are
+# Codex has no slash command system, so all rules, skills, and commands are
 # concatenated into a managed block in ~/.codex/AGENTS.md (32 KiB total limit).
 # Staging dir: ~/.craftkit/codex/
 
@@ -85,12 +85,12 @@ finalize_codex() {
 
     if [[ $has_content -eq 1 ]]; then
         if [[ ! -f "$CODEX_AGENTS_MD" ]] || ! grep -qF "$_CODEX_SECTION_START" "$CODEX_AGENTS_MD"; then
-            echo "    ! AGENTS.md managed section missing — rebuilding"
+            echo "    ! AGENTS.md managed section missing, rebuilding"
             _rebuild_codex_agents_md
         fi
     else
         if [[ -f "$CODEX_AGENTS_MD" ]] && grep -qF "$_CODEX_SECTION_START" "$CODEX_AGENTS_MD"; then
-            echo "    ! AGENTS.md has stale managed section (no content) — cleaning"
+            echo "    ! AGENTS.md has stale managed section (no content), cleaning"
             _remove_codex_section
         fi
     fi

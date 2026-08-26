@@ -5,17 +5,17 @@ alwaysApply: false
 ---
 
 **Commands:** `grep -rn "pattern" Modules/<Module>`, `swiftlint lint --path <file>`
-**Model:** everyday — escalate for a screen with novel state/effect orchestration not covered below
+**Model:** everyday. Escalate for a screen with novel state/effect orchestration not covered below
 
 > Triggered by: "how does this screen work", "iOS architecture", "explain this module", "where does state live", "how do I structure an iOS feature"
 
 ---
 
-> **Core behaviors:** Patterns serve the architecture — MVVM-C always wins. Read a real sibling feature folder before claiming the pattern; the codebase is the source of truth, this file is the map. See `/using-agent-skills`.
+> **Core behaviors:** Patterns serve the architecture, so MVVM-C always wins. Read a real sibling feature folder before claiming the pattern; the codebase is the source of truth, this file is the map. See `/using-agent-skills`.
 
 ---
 
-**Context:** No `docs/context.md` — iOS modules are not EVPMR. Instead, read one real sibling feature in `Modules/<Module>/<Module>/<Feature>/` to confirm exact naming and imports before acting.
+**Context:** No `docs/context.md`, since iOS modules are not EVPMR. Instead, read one real sibling feature in `Modules/<Module>/<Module>/<Feature>/` to confirm exact naming and imports before acting.
 
 ---
 
@@ -30,7 +30,7 @@ Naming is rigid: **`<Module><Feature><Role>`** (referred to below as `<Prefix>` 
 | File | Role | Hard rule |
 |------|------|-----------|
 | `<Prefix>Contract.h` (or `.swift`) | Declares the two seam protocols (below) | The View↔VM boundary lives here, nowhere else |
-| `<Prefix>ViewController.swift` | Thin UIKit `UIViewController`. Owns the `<Prefix>View`, forwards UIKit events to the VM, implements `<Prefix>ViewModelAction` to push state into the view | **No business logic** — forward and repaint only |
+| `<Prefix>ViewController.swift` | Thin UIKit `UIViewController`. Owns the `<Prefix>View`, forwards UIKit events to the VM, implements `<Prefix>ViewModelAction` to push state into the view | **No business logic**, forward and repaint only |
 | `<Prefix>View.swift` | `UIView` subclass, programmatic layout (a constraint DSL + the design-system kit). No logic | **No state, no VM reference** |
 | `<Prefix>ViewModel.swift` | `final class …: NSObject, <Prefix>ViewModelProtocol`. All state, logic, tracking. `weak var action` (→ VC) + `weak var delegate` (→ Coordinator). Init takes a `Dependency` struct | **Never imports UIKit views; never navigates directly** |
 | `<Prefix>Factory.swift` | `makeViewModel(...)` + `makeViewController(...)`. Declares the `<Prefix>ViewModelDependency` struct + `static getProductionDeps()` | DI assembly point |
@@ -39,7 +39,7 @@ Naming is rigid: **`<Module><Feature><Role>`** (referred to below as `<Prefix>` 
 
 ### The two seam protocols (the heart of the pattern)
 
-Declared in `<Prefix>Contract.h`. This replaces Combine/Rx — data flow is **imperative push** through these two protocols:
+Declared in `<Prefix>Contract.h`. This replaces Combine/Rx, because data flow is **imperative push** through these two protocols:
 
 ```objc
 // VC → VM: events the View Controller forwards
@@ -85,14 +85,14 @@ func onViewDidLoad() {
 |----------|--------|
 | Where does state live? | In the **ViewModel** as mutable domain objects (`private(set) var …`) |
 | How does the View update? | VM calls `action?.setX(...)`; VC implements `<Prefix>ViewModelAction` and mutates the `<Prefix>View` |
-| How does the screen tell the app something happened? | VM fires `delegate?.…(self, didChange: …)` — the Coordinator implements `<Prefix>ViewModelDelegate` |
+| How does the screen tell the app something happened? | VM fires `delegate?.…(self, didChange: …)`, and the Coordinator implements `<Prefix>ViewModelDelegate` |
 | Combine / RxSwift / async-await in the view layer? | **No.** Imperative push only. Async results use completion closures or a custom observer/poller (e.g. `…PollingObserver` with `didSuccess/didFail/didUpdateProgress`) |
 
 Newer flows may formalize outputs into explicit `<Prefix>ViewModelOutput` structs and split the single `delegate` into named ones (`actionDelegate`, `coordinatorDelegate`). Same pattern, more structure.
 
 ---
 
-## Navigation — Coordinator only
+## Navigation: Coordinator only
 
 ViewModels **never** call `push/present/pop`. They fire a `delegate` callback; the Coordinator does the navigation.
 
@@ -115,9 +115,9 @@ override func start() {
 
 ## Dependency injection
 
-Two mechanisms, both manual — no app-wide auto-resolving container required:
+Two mechanisms, both manual, with no app-wide auto-resolving container required:
 
-1. **Per-screen `Dependency` struct + `getProductionDeps()`** — the dominant pattern. Declared in the Factory, injected via the VM's `init(dependency:)`. Tests pass a hand-built struct of mocks.
+1. **Per-screen `Dependency` struct + `getProductionDeps()`**, the dominant pattern. Declared in the Factory, injected via the VM's `init(dependency:)`. Tests pass a hand-built struct of mocks.
    ```swift
    struct <Prefix>ViewModelDependency {
        let fetcher: <Prefix>FetcherProtocol
@@ -128,7 +128,7 @@ Two mechanisms, both manual — no app-wide auto-resolving container required:
        }
    }
    ```
-2. **A `Factory`-library `@Injected` container** — reserved for cross-cutting app singletons only (metrics, session, etc.):
+2. **A `Factory`-library `@Injected` container**, reserved for cross-cutting app singletons only (metrics, session, etc.):
    ```swift
    @Injected(\MetricsContainer.metricsManager)
    private var metricsManager: MetricsManagerProtocol?
@@ -138,7 +138,7 @@ Two mechanisms, both manual — no app-wide auto-resolving container required:
 
 ---
 
-## Networking / data layer — "Fetcher"
+## Networking / data layer: "Fetcher"
 
 Every network/DB access is wrapped in a `<Prefix>Fetcher` behind a `<Prefix>FetcherProtocol`, injected via the Dependency struct.
 
@@ -150,7 +150,7 @@ Every network/DB access is wrapped in a `<Prefix>Fetcher` behind a `<Prefix>Fetc
 
 ## Module API boundary
 
-`Modules/<Module>/<Module>/ModuleApi/<Module>Module.swift` — a single public façade exposing only `static` factory methods that return **base/protocol types**, hiding concrete VC/VM/Coordinator classes. `@objc` where an ObjC app delegate must call it.
+`Modules/<Module>/<Module>/ModuleApi/<Module>Module.swift` is a single public façade exposing only `static` factory methods that return **base/protocol types**, hiding concrete VC/VM/Coordinator classes. `@objc` where an ObjC app delegate must call it.
 
 ```swift
 public final class <Module>Module: NSObject {
@@ -160,7 +160,7 @@ public final class <Module>Module: NSObject {
 }
 ```
 
-Not every module has a façade — an older module may be reached through its ObjC `Coordinator` directly. If adding a public entry point, add a static method to `<Module>Module.swift`.
+Not every module has a façade, since an older module may be reached through its ObjC `Coordinator` directly. If adding a public entry point, add a static method to `<Module>Module.swift`.
 
 ---
 
@@ -172,7 +172,7 @@ Not every module has a façade — an older module may be reached through its Ob
 NSLocalizedString("<module>.<screen>.<widget>.<descriptor>", comment: "<design-link>")
 ```
 
-Key scheme: `<module>.<screen>.<widget>.<descriptor>`. Plurals via `String(format: NSLocalizedString("<module>.<screen>.label.item-%ld", ...), count)`. A lint rule commonly forbids assigning `NSLocalizedString(...)` to a `static let/var` (must read live for language switching). `<Module>Resources/` holds **only** image assets + `.xib` — not text.
+Key scheme: `<module>.<screen>.<widget>.<descriptor>`. Plurals via `String(format: NSLocalizedString("<module>.<screen>.label.item-%ld", ...), count)`. A lint rule commonly forbids assigning `NSLocalizedString(...)` to a `static let/var` (must read live for language switching). `<Module>Resources/` holds **only** image assets + `.xib`, not text.
 
 ---
 
@@ -184,7 +184,7 @@ Within one repo, modules sit on a spectrum. Read before copying:
 |--------|----------------------------------|---------------|
 | Language | Swift-forward | More ObjC `.h/.m` |
 | Coordinators | Swift | Mostly ObjC |
-| Module façade | `<Module>Module.swift` present | May be absent — app uses the `Coordinator` directly |
+| Module façade | `<Module>Module.swift` present | May be absent, where the app uses the `Coordinator` directly |
 | Lists | Mixed | List-diffing lib pervasive (`ListDiffable` models) |
 | `.xib` | rare | heavy |
 | SwiftUI | isolated files | none |
@@ -195,7 +195,7 @@ All share: VM-centric logic, `…Action`/`…Delegate` reverse-binding, Fetcher 
 
 ## Build system
 
-**Bazel (primary) + CocoaPods (secondary)**, both glob-driven. A new file dropped in the correct folder is auto-picked-up — no manifest edit. You manually manage only: new cross-module dep (add to `BUILD` `deps=[…]` AND `<Module>.podspec` `s.dependency`), new public entry point (`<Module>Module.swift`), new string (central `Localizable.strings`).
+**Bazel (primary) + CocoaPods (secondary)**, both glob-driven. A new file dropped in the correct folder is auto-picked-up, with no manifest edit. You manually manage only: new cross-module dep (add to `BUILD` `deps=[…]` AND `<Module>.podspec` `s.dependency`), new public entry point (`<Module>Module.swift`), new string (central `Localizable.strings`).
 
 - Build a module: `bazelisk build //Modules/<Module>:<Module>`
 - Or generate/open a module-scoped Xcode workspace for day-to-day dev (e.g. `make project_module MODULE=<Module>`).
@@ -204,4 +204,4 @@ All share: VM-centric logic, `…Action`/`…Delegate` reverse-binding, Fetcher 
 
 ## After using this skill
 
-List any pattern you observed in the code that this map doesn't cover as **Suggested skill updates** — the codebase evolves faster than this doc.
+List any pattern you observed in the code that this map doesn't cover as **Suggested skill updates**, because the codebase evolves faster than this doc.

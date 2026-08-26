@@ -20,7 +20,7 @@ jobs:
         run: |
           VERSION=$(grep -m1 '^# craftkit' README.md | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')
           if [ -z "$VERSION" ]; then
-            echo "No version found in README header — skipping."
+            echo "No version found in README header; skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -51,7 +51,7 @@ jobs:
             flag              { print }
           ' CHANGELOG.md | sed -e '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}')
           if [ -z "$ENTRY" ]; then
-            echo "::error::No CHANGELOG.md section for ${VERSION} — add one before releasing."
+            echo "::error::No CHANGELOG.md section for ${VERSION}; add one before releasing."
             exit 1
           fi
           # Use delimiter-safe output for multiline safety

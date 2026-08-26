@@ -24,18 +24,18 @@ alwaysApply: false
 
 ## EVPMR mapping
 
-Accessibility is a cross-cutting concern — each layer has a specific responsibility:
+Accessibility is a cross-cutting concern, and each layer has a specific responsibility:
 
 | Layer | Responsibility |
 |-------|---------------|
 | **Presenter** | Computes accessible state: `accessibilityLabel`, `accessibilityState`, `isReduceMotionEnabled` result, focus ref |
-| **View** | Applies a11y props from Presenter to elements — never derives them inline |
+| **View** | Applies a11y props from Presenter to elements, never deriving them inline |
 | **Model** | Types for a11y-related state (e.g. `{ disabled: boolean; selected: boolean }`) |
-| **Entry** | Wraps with `<ErrorBoundary>` — no a11y responsibility |
-| **Resource** | Owns all `accessibilityLabel` strings — never hardcode in View |
+| **Entry** | Wraps with `<ErrorBoundary>`; no a11y responsibility |
+| **Resource** | Owns all `accessibilityLabel` strings, never hardcoded in View |
 
 ```ts
-// PresenterFeatureName.ts — return a11y props as plain object
+// PresenterFeatureName.ts: return a11y props as plain object
 const accessibilityProps = {
   label: Resource.submitButton,          // string from Resource
   hint: Resource.submitButtonHint,
@@ -46,7 +46,7 @@ return { accessibilityProps, ... };
 ```
 
 ```tsx
-// ViewFeatureName.tsx — apply from Presenter, no inline derivation
+// ViewFeatureName.tsx: apply from Presenter, no inline derivation
 <Pressable
   accessibilityLabel={accessibilityProps.label}
   accessibilityHint={accessibilityProps.hint}
@@ -65,7 +65,7 @@ return { accessibilityProps, ... };
 ```tsx
 <Pressable
   accessible={true}
-  accessibilityLabel={Resource.submitLabel}   // from Resource — never hardcode
+  accessibilityLabel={Resource.submitLabel}   // from Resource, never hardcoded
   accessibilityHint={Resource.submitHint}
   accessibilityRole="button"
   accessibilityState={{ disabled: isLoading, selected: isActive }}
@@ -91,7 +91,7 @@ return { accessibilityProps, ... };
 
 ### TextInput
 
-Combine error into `accessibilityLabel` from Presenter — RN has no `aria-describedby`:
+Combine error into `accessibilityLabel` from Presenter, because RN has no `aria-describedby`:
 
 ```ts
 // PresenterFeatureName.ts
@@ -103,7 +103,7 @@ const emailA11yLabel = emailError
 ### Focus management (modals / screen transitions)
 
 ```ts
-// PresenterFeatureName.ts — call after modal opens
+// PresenterFeatureName.ts: call after modal opens
 import { AccessibilityInfo, findNodeHandle } from 'react-native';
 const node = findNodeHandle(ref.current);
 if (node) AccessibilityInfo.setAccessibilityFocus(node);
@@ -117,7 +117,7 @@ if (node) AccessibilityInfo.setAccessibilityFocus(node);
 ### Dynamic announcements
 
 ```ts
-// PresenterFeatureName.ts — after async action, NOT on every render
+// PresenterFeatureName.ts: after async action, NOT on every render
 AccessibilityInfo.announceForAccessibility(Resource.successMessage);
 ```
 
@@ -141,7 +141,7 @@ useEffect(() => {
 Use native HTML semantics first. ARIA only when native is insufficient.
 
 ```tsx
-// Forms — label must be explicit, not placeholder
+// Forms: label must be explicit, not placeholder
 <label htmlFor="email">{Resource.emailLabel}</label>
 <input id="email" type="email"
   aria-describedby={emailError ? 'email-error' : undefined}
@@ -160,16 +160,16 @@ Heading hierarchy must be sequential (h1 → h2 → h3). Never skip levels. Use 
 ## Anti-patterns
 
 ```tsx
-// BAD: Pressable with no label — screen reader says "button" with no context
+// BAD: Pressable with no label, so the screen reader says "button" with no context
 <Pressable onPress={onDelete}><Icon name="trash" /></Pressable>
 
 // BAD: accessibilityLabel hardcoded in View (belongs in Resource)
 <Pressable accessibilityLabel="Delete item" />
 
-// BAD: accessible={false} on an interactive element — keyboard/switch users can't reach it
+// BAD: accessible={false} on an interactive element, so keyboard/switch users can't reach it
 <Pressable accessible={false} onPress={onPress} />
 
-// BAD: state not communicated — user can't tell button is disabled
+// BAD: state not communicated, so the user can't tell the button is disabled
 <Pressable style={isDisabled ? styles.dim : styles.normal} onPress={isDisabled ? undefined : onPress} />
 // GOOD: accessibilityState={{ disabled: isDisabled }} + onPress={isDisabled ? undefined : onPress}
 
@@ -192,7 +192,7 @@ useEffect(() => { AccessibilityInfo.announceForAccessibility(message); });  // n
 - [ ] Decorative icons use `importantForAccessibility="no-hide-descendants"`
 - [ ] Modal/dialog uses `accessibilityViewIsModal={true}` and focuses on open
 - [ ] State changes announced via `AccessibilityInfo.announceForAccessibility` (not on every render)
-- [ ] Animations respect `AccessibilityInfo.isReduceMotionEnabled()` — result computed in Presenter
-- [ ] All `accessibilityLabel` strings live in Resource file — none hardcoded in View
+- [ ] Animations respect `AccessibilityInfo.isReduceMotionEnabled()`, with the result computed in Presenter
+- [ ] All `accessibilityLabel` strings live in Resource file, none hardcoded in View
 - [ ] (Web) Every `<input>` has a `<label>` with matching `htmlFor`/`id`
 - [ ] (Web) Error messages linked via `aria-describedby` with `role="alert"`

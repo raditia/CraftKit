@@ -24,7 +24,7 @@ ADAPTERS=("claude" "cursor" "gemini" "codex")
 
 # Routing drift guard: every skill in skills/ must be named in the routing hook,
 # else the skill-first gate silently can't route it. Fail loud before syncing.
-# (Sensor for the routing-duplication seam — the curated tables stay hand-authored.)
+# (Sensor for the routing-duplication seam; the curated tables stay hand-authored.)
 _routing_hook="$REPO_DIR/hooks/craftkit-routing.js"
 if [[ -f "$_routing_hook" ]]; then
     _drift=""
@@ -33,7 +33,7 @@ if [[ -f "$_routing_hook" ]]; then
         grep -Eq "/$_n([^A-Za-z0-9-]|\$)" "$_routing_hook" || _drift="$_drift $_n"
     done
     if [[ -n "$_drift" ]]; then
-        echo "ROUTING DRIFT — skill(s) missing from hooks/craftkit-routing.js:$_drift" >&2
+        echo "ROUTING DRIFT: skill(s) missing from hooks/craftkit-routing.js:$_drift" >&2
         echo "Add each to the hook's routing list (and rules/using-agent-skills.md) before syncing." >&2
         exit 1
     fi
@@ -290,7 +290,7 @@ sync_commands_adapter() {
 
 # `rtk init -g --auto-patch` registers the PreToolUse hook as bare `rtk hook claude`.
 # Claude Code spawns hooks under a stripped PATH (/usr/gnu/bin:/usr/local/bin:/bin:/usr/bin:.)
-# with no /opt/homebrew/bin, so a bare name dies with "rtk: command not found" — non-blocking,
+# with no /opt/homebrew/bin, so a bare name dies with "rtk: command not found". Non-blocking,
 # so every Bash call then runs unrewritten and unfiltered. Rewrite to an absolute path after
 # each rtk init, the same way _resolve_node_bin pins node for the routing hook.
 _rtk_hook_absolutize() {
@@ -321,7 +321,7 @@ ensure_tools() {
     echo ""
     echo "[tools]"
 
-    # RTK — install if missing
+    # RTK: install if missing
     if ! command -v rtk &>/dev/null; then
         echo "    + installing rtk..."
         if command -v brew &>/dev/null; then
@@ -333,13 +333,13 @@ ensure_tools() {
         echo "    rtk $(rtk --version 2>/dev/null | head -1) (ok)"
     fi
 
-    # RTK — wire up the Claude Code auto-rewrite hook (idempotent)
+    # RTK: wire up the Claude Code auto-rewrite hook (idempotent)
     if command -v rtk &>/dev/null; then
         rtk init -g --auto-patch 2>/dev/null && echo "    rtk hook (ok)" || true
         _rtk_hook_absolutize
     fi
 
-    # Humanizer — de-AI-writing skill (used by /pr-message). Clone SKILL.md from
+    # Humanizer: de-AI-writing skill (used by /pr-message). Clone SKILL.md from
     # upstream into ~/.agents/skills and symlink into ~/.claude/skills as a native
     # Agent Skill. The vendored skills/humanizer/ copy fans out to the other 5 tools
     # via the adapter sync; this wires only Claude's native skill path.
@@ -354,7 +354,7 @@ ensure_tools() {
             ln -sfn "$hz_src" "$HOME/.claude/skills/humanizer"
             echo "    humanizer (ok)"
         else
-            echo "    ! humanizer install failed — clone https://github.com/blader/humanizer manually"
+            echo "    ! humanizer install failed, clone https://github.com/blader/humanizer manually"
         fi
         rm -rf "$hz_tmp"
     else
@@ -365,7 +365,7 @@ ensure_tools() {
 
 echo "==> Syncing craftkit..."
 
-# RTK patches shell profile and is interactive — only run from install.sh,
+# RTK patches shell profile and is interactive, so only run from install.sh,
 # never from the post-merge hook.
 if [[ "${AGENTIC_SETUP:-0}" == "1" ]]; then
     ensure_tools

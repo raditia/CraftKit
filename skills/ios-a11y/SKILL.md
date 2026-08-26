@@ -9,7 +9,7 @@ alwaysApply: false
 
 ---
 
-> **Core behaviors:** Accessibility is applied in the View/VC, but the *strings and derived state* come from the ViewModel (via `NSLocalizedString`) — never hardcode labels in the view. See `/using-agent-skills` and `/ios-patterns`.
+> **Core behaviors:** Accessibility is applied in the View/VC, but the *strings and derived state* come from the ViewModel (via `NSLocalizedString`), so never hardcode labels in the view. See `/using-agent-skills` and `/ios-patterns`.
 
 ---
 
@@ -25,7 +25,7 @@ alwaysApply: false
 | **ViewController** | Applies accessibility props onto the view when repainting. Manages focus on screen appear. |
 | **View** | Sets static `accessibilityTraits`, groups decorative subviews. No dynamic label derivation. |
 
-Never build a label string inside the View — it belongs to the VM (so it uses `NSLocalizedString` and reflects state).
+Never build a label string inside the View; it belongs to the VM (so it uses `NSLocalizedString` and reflects state).
 
 ---
 
@@ -55,7 +55,7 @@ decorativeIcon.isAccessibilityElement = false
 ### Focus management (screen transitions / modals)
 
 ```swift
-// In VC, after the screen/modal appears — move VoiceOver focus
+// In VC, after the screen/modal appears, move VoiceOver focus
 override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
     UIAccessibility.post(notification: .screenChanged, argument: titleLabel)
@@ -71,7 +71,7 @@ func announceResult(_ message: String) {
     UIAccessibility.post(notification: .announcement, argument: message)
 }
 ```
-The VM calls `action?.announceResult(NSLocalizedString("<module>.<screen>.a11y.loaded", comment: ""))` — announce on state change, not on every repaint.
+The VM calls `action?.announceResult(NSLocalizedString("<module>.<screen>.a11y.loaded", comment: ""))` to announce on state change, not on every repaint.
 
 ### Dynamic Type
 
@@ -97,19 +97,19 @@ if UIAccessibility.isReduceMotionEnabled {
 ## Anti-patterns
 
 ```swift
-// BAD: icon-only button with no label — VoiceOver says "button"
+// BAD: icon-only button with no label, so VoiceOver says "button"
 let b = UIButton(); b.setImage(trashIcon, for: .normal)   // no accessibilityLabel
 
 // BAD: label hardcoded in the View instead of NSLocalizedString from VM
 button.accessibilityLabel = "Delete item"
 
-// BAD: disabled shown only via dim style — VoiceOver still says "button", enabled
+// BAD: disabled shown only via dim style, so VoiceOver still says "button", enabled
 button.alpha = 0.4    // missing .notEnabled trait
 
 // BAD: announcing on every repaint
 func setTitleText(_ t: String) { UIAccessibility.post(notification: .announcement, argument: t) }
 
-// BAD: fixed font size — ignores Dynamic Type
+// BAD: fixed font size, which ignores Dynamic Type
 label.font = UIFont.systemFont(ofSize: 14)
 ```
 
@@ -122,7 +122,7 @@ label.font = UIFont.systemFont(ofSize: 14)
 - [ ] Selected/expanded state reflected in traits (`.selected`) or `accessibilityValue`
 - [ ] Decorative subviews set `isAccessibilityElement = false`; related text grouped into one element
 - [ ] Screen transition posts `.screenChanged`; in-place update posts `.layoutChanged`
-- [ ] State-change announcements fired by the VM after async work — not on every repaint
+- [ ] State-change announcements fired by the VM after async work, not on every repaint
 - [ ] Text uses `preferredFont(forTextStyle:)` + `adjustsFontForContentSizeCategory = true`
 - [ ] Animations gated on `UIAccessibility.isReduceMotionEnabled`
 - [ ] No accessibility label strings hardcoded in the View/VC

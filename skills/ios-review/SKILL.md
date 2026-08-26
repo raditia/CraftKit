@@ -1,15 +1,15 @@
 ---
 name: ios-review
-description: Review an iOS feature diff against the MVVM-C contract — layer violations, Dependency-struct DI, Coordinator-only navigation, NSLocalizedString usage, retain cycles, SwiftLint compliance.
+description: Review an iOS feature diff against the MVVM-C contract: layer violations, Dependency-struct DI, Coordinator-only navigation, NSLocalizedString usage, retain cycles, SwiftLint compliance.
 alwaysApply: false
 ---
 
 **Commands:** `git diff <base>...HEAD`, `swiftlint lint --path <file>`, `grep -rn "pattern" Modules`
-**Model:** everyday — escalate if the review surfaces an architectural conflict with non-obvious resolution
+**Model:** everyday. Escalate if the review surfaces an architectural conflict with non-obvious resolution
 
 ---
 
-> **Core behaviors:** Read the actual changed files before commenting — never assume from filename. Push back on real issues, no sycophancy. Surface every violation. See `/using-agent-skills` and the pattern map in `/ios-patterns`.
+> **Core behaviors:** Read the actual changed files before commenting; never assume from filename. Push back on real issues, no sycophancy. Surface every violation. See `/using-agent-skills` and the pattern map in `/ios-patterns`.
 
 ---
 
@@ -21,49 +21,49 @@ alwaysApply: false
 
 ### Layer boundaries (the core of MVVM-C)
 
-- [ ] **ViewController** — forwards events + repaints only? **Flag** business logic, data fetching, computation, or navigation calls in the VC.
-- [ ] **View (`<Prefix>View.swift`)** — pure `UIView`, programmatic layout? **Flag** any state, ViewModel reference, or networking.
-- [ ] **ViewModel** — holds all state/logic, returns nothing to UIKit directly? **Flag** any imported view type, any direct `push/present/pop`, or `UIViewController` reference.
-- [ ] **Contract** — both seam protocols (`<Prefix>ViewModelProtocol` + `<Prefix>ViewModelAction`) declared here, not scattered?
-- [ ] **Fetcher** — all network/DB access behind a `<Prefix>FetcherProtocol`? **Flag** raw network-service or local-DB calls inside a ViewModel.
+- [ ] **ViewController:** forwards events + repaints only? **Flag** business logic, data fetching, computation, or navigation calls in the VC.
+- [ ] **View (`<Prefix>View.swift`):** pure `UIView`, programmatic layout? **Flag** any state, ViewModel reference, or networking.
+- [ ] **ViewModel:** holds all state/logic, returns nothing to UIKit directly? **Flag** any imported view type, any direct `push/present/pop`, or `UIViewController` reference.
+- [ ] **Contract:** both seam protocols (`<Prefix>ViewModelProtocol` + `<Prefix>ViewModelAction`) declared here, not scattered?
+- [ ] **Fetcher:** all network/DB access behind a `<Prefix>FetcherProtocol`? **Flag** raw network-service or local-DB calls inside a ViewModel.
 
 ### Navigation
 
-- [ ] ViewModel navigates **only** by firing `delegate?` callbacks — never calls `pushViewController`/`present` itself.
+- [ ] ViewModel navigates **only** by firing `delegate?` callbacks, never calling `pushViewController`/`present` itself.
 - [ ] Coordinator (not the VC/VM) owns all navigation and conforms to the screen's `<Prefix>ViewModelDelegate`.
 - [ ] Cross-module navigation routed through the app-level navigation API, not by importing another module's internals.
 
 ### Dependency injection
 
 - [ ] Feature dependencies injected via the `<Prefix>ViewModelDependency` struct (init injection), built by the Factory's `getProductionDeps()`.
-- [ ] `@Injected` / `Factory` container used **only** for cross-cutting app singletons (metrics, session, etc.) — not for feature-local deps.
+- [ ] `@Injected` / `Factory` container used **only** for cross-cutting app singletons (metrics, session, etc.), not for feature-local deps.
 - [ ] No singleton reached for directly inside the VM where a protocol dependency belongs.
 
 ### Strings / localization
 
-- [ ] No hardcoded display text in View or VC — all via `NSLocalizedString`.
+- [ ] No hardcoded display text in View or VC; all via `NSLocalizedString`.
 - [ ] Keys follow `<module>.<screen>.<widget>.<descriptor>`; new keys added to `App/<lang>.lproj/Localizable.strings`.
 - [ ] No `NSLocalizedString` assigned to a `static let/var` (must read live).
 
 ### Memory / correctness
 
-- [ ] `action` and `delegate` are `weak` on the ViewModel — **flag** strong references (retain cycle: VC owns VM owns action→VC).
+- [ ] `action` and `delegate` are `weak` on the ViewModel. **Flag** strong references (retain cycle: VC owns VM owns action→VC).
 - [ ] `[weak self]` in escaping closures (Fetcher completions, async callbacks) where `self` is captured.
 - [ ] No force-unwrap (`!`) on network/DB results that can be nil.
 
 ### SwiftLint
 
-- [ ] `swiftlint lint --path <file>` on every changed Swift file — zero violations (config `.swiftlint.yml`).
+- [ ] `swiftlint lint --path <file>` on every changed Swift file, with zero violations (config `.swiftlint.yml`).
 - [ ] No `// swiftlint:disable` without a documented reason on the same line.
 
 ### Over-engineering
 
-- [ ] Diff scanned against the ponytail rubric (`karpathy-guidelines` rule 2) — `delete:` `stdlib:` `native:` `yagni:` `shrink:` `narrate:`, protected list respected. Common iOS hits: a protocol with one conformer and one call site, a Fetcher wrapper that only forwards, hand-rolled logic Foundation/Swift stdlib covers (`compactMap`, `first(where:)`, `Result`, `DateFormatter`), an `enum` state with a single case, a Dependency-struct field nothing reads.
-- [ ] Findings are applied as deletion at the named `file:line` — never a restructure of the surrounding ViewModel/VC.
+- [ ] Diff scanned against the ponytail rubric (`karpathy-guidelines` rule 2): `delete:` `stdlib:` `native:` `yagni:` `shrink:` `narrate:`, protected list respected. Common iOS hits: a protocol with one conformer and one call site, a Fetcher wrapper that only forwards, hand-rolled logic Foundation/Swift stdlib covers (`compactMap`, `first(where:)`, `Result`, `DateFormatter`), an `enum` state with a single case, a Dependency-struct field nothing reads.
+- [ ] Findings are applied as deletion at the named `file:line`, never a restructure of the surrounding ViewModel/VC.
 
 ### Tests
 
-- [ ] ViewModel changes have matching Quick/Nimble specs in `Modules/<Module>/Tests/<Feature>/` — see `/ios-test`.
+- [ ] ViewModel changes have matching Quick/Nimble specs in `Modules/<Module>/Tests/<Feature>/`, see `/ios-test`.
 - [ ] New Fetcher protocols have a `…Mock` in `Modules/<Module>/Mocks/`.
 
 ---
@@ -72,11 +72,11 @@ alwaysApply: false
 
 For each issue:
 ```
-[SEVERITY] File:line — description
+[SEVERITY] File:line: description
   Why: ...
   Fix: ...
 ```
 
 `[ERROR]` = breaks the MVVM-C contract / retain cycle / correctness | `[WARNING]` = convention deviation, test gap | `[SUGGESTION]` = improvement worth considering.
 
-Push back on real issues — do not soften findings. At the end, list patterns observed not covered by `/ios-patterns` as **Suggested skill updates**.
+Push back on real issues and do not soften findings. At the end, list patterns observed not covered by `/ios-patterns` as **Suggested skill updates**.

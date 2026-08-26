@@ -1,13 +1,13 @@
 ---
 name: spec
-description: Turn a discovery brief or clear ask into a PRD before coding — objective, users, scope, constraints, boundaries, acceptance criteria. Writes a forward-planning block into docs/context.md so downstream skills execute with intent, not guesses. Adapted from addyosmani/agent-skills spec-driven-development (MIT).
+description: Turn a discovery brief or clear ask into a PRD before coding: objective, users, scope, constraints, boundaries, acceptance criteria. Writes a forward-planning block into docs/context.md so downstream skills execute with intent, not guesses. Adapted from addyosmani/agent-skills spec-driven-development (MIT).
 alwaysApply: false
 ---
 
-**Model:** everyday — escalate when the feature is hard to reverse (schema, public API, payment/auth surface) per the karpathy hard-to-reverse gate.
+**Model:** everyday. Escalate when the feature is hard to reverse (schema, public API, payment/auth surface) per the karpathy hard-to-reverse gate.
 
-> **Core behaviors:** Surface assumptions. STOP and ask when confused — never invent requirements. Simplicity first (YAGNI on scope). See `/using-agent-skills`.
-> **Forward, not backward.** `/spec` defines what *will* be built. `/fe-context` documents what *was* changed (from the diff). They meet in `docs/context.md` — `/spec` writes the forward block, `/fe-context` preserves it.
+> **Core behaviors:** Surface assumptions. STOP and ask when confused; never invent requirements. Simplicity first (YAGNI on scope). See `/using-agent-skills`.
+> **Forward, not backward.** `/spec` defines what *will* be built. `/fe-context` documents what *was* changed (from the diff). They meet in `docs/context.md`, where `/spec` writes the forward block and `/fe-context` preserves it.
 
 ---
 
@@ -17,12 +17,12 @@ Starting a new feature/module/significant change. Best run after `/interview` (f
 
 ## Pre-flight
 
-- No Discovery Brief and the ask is underspecified → `Ask is underspecified — run /interview first? (y/n)`. Don't guess requirements into a spec.
+- No Discovery Brief and the ask is underspecified → `Ask is underspecified. Run /interview first? (y/n)`. Don't guess requirements into a spec.
 - Approach genuinely open (multiple viable architectures) → offer `/ideate` before committing the spec.
 
 ---
 
-## The PRD — sections
+## The PRD: sections
 
 Keep each tight. A spec is a contract, not an essay. Omit a section only if truly N/A (say why).
 
@@ -30,15 +30,15 @@ Keep each tight. A spec is a contract, not an essay. Omit a section only if trul
 |---------|----------|
 | **Objective** | 1–2 sentences: the user problem and why it's worth solving now. |
 | **Users & job** | Who, and the job they hire this for. |
-| **Success criteria** | Measurable — how we verify it worked. Each maps to a later acceptance test. |
-| **In scope** | Bullets — what this delivers. |
-| **Out of scope** | Bullets — explicit non-goals. The most-skipped, highest-value section. |
+| **Success criteria** | Measurable: how we verify it worked. Each maps to a later acceptance test. |
+| **In scope** | Bullets: what this delivers. |
+| **Out of scope** | Bullets: explicit non-goals. The most-skipped, highest-value section. |
 | **Constraints** | Platform, stack, deadline, existing systems, data, compliance. |
 | **Key decisions** | Non-obvious choices + the *why* (link `/adr` for weighty ones). |
 | **Risks & open questions** | What could break the plan; anything still unresolved (flagged, not invented). |
-| **Acceptance criteria** | Given/when/then or a checklist — the definition of done `/plan` breaks into tasks. |
+| **Acceptance criteria** | Given/when/then or a checklist: the definition of done `/plan` breaks into tasks. |
 
-Every success criterion must be verifiable — if you can't name how it's checked, it's a wish, not a criterion. Push back on unmeasurable goals.
+Every success criterion must be verifiable. If you can't name how it's checked, it's a wish, not a criterion. Push back on unmeasurable goals.
 
 ---
 
@@ -46,14 +46,14 @@ Every success criterion must be verifiable — if you can't name how it's checke
 
 `docs/context.md` is the single source of truth all fe-* skills read. `/spec` owns a delimited **PLANNING** block there; `/plan` and `/adr` append into the same block. `/fe-context` preserves it verbatim on regenerate.
 
-Create `docs/context.md` (and `docs/`) if absent — a header-only stub is fine; `/fe-context` fills the backward sections later. Insert/replace this block:
+Create `docs/context.md` (and `docs/`) if absent, where a header-only stub is fine; `/fe-context` fills the backward sections later. Insert/replace this block:
 
 ```markdown
-<!-- BEGIN PLANNING — managed by /spec /plan /adr; preserved by /fe-context -->
+<!-- BEGIN PLANNING: managed by /spec /plan /adr; preserved by /fe-context -->
 ## Planning (forward)
 **Updated:** {{ISO timestamp}} · **By:** /spec
 
-### Spec — {{feature}}
+### Spec: {{feature}}
 - **Objective:** …
 - **Users & job:** …
 - **Success:** …
@@ -71,7 +71,7 @@ _(appended by /adr)_
 <!-- END PLANNING -->
 ```
 
-Keep the block inside the 600-line budget `/fe-context` enforces — summarize, don't paste. If the block already exists, update the `### Spec` subsection only; leave Plan/Decisions intact.
+Keep the block inside the 600-line budget `/fe-context` enforces, so summarize, don't paste. If the block already exists, update the `### Spec` subsection only; leave Plan/Decisions intact.
 
 ---
 
@@ -79,9 +79,9 @@ Keep the block inside the 600-line budget `/fe-context` enforces — summarize, 
 
 Print the PRD to the user, then confirm the write:
 ```
-SPEC — <feature>  ·  written to docs/context.md PLANNING block
+SPEC: <feature>  ·  written to docs/context.md PLANNING block
 Verifiable success criteria: <N>   Out-of-scope items: <N>   Open questions: <N>
 → Next: /plan to break this into tasks · optionally /ideate if approach still open.
 ```
 
-Do not proceed to `/plan` automatically — opt-in.
+Do not proceed to `/plan` automatically; it is opt-in.

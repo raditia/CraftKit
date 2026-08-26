@@ -1,19 +1,19 @@
 ---
 name: fe-patterns
-description: React/React Native composition patterns, hooks discipline, and state location — all mapped to the EVPMR architecture. Use when designing or reviewing component structure.
+description: React/React Native composition patterns, hooks discipline, and state location, all mapped to the EVPMR architecture. Use when designing or reviewing component structure.
 alwaysApply: false
 ---
 
 **Commands:** `rtk grep "pattern" .`, `rtk tsc`, `rtk lint`
-**Model:** everyday — escalate for novel state architecture with non-obvious tradeoffs
+**Model:** everyday. Escalate for novel state architecture with non-obvious tradeoffs
 
 ---
 
-> **Core behaviors:** Patterns serve the architecture — EVPMR always wins. When a pattern conflicts with EVPMR, adapt the pattern, not the architecture. See `/using-agent-skills`.
+> **Core behaviors:** Patterns serve the architecture, so EVPMR always wins. When a pattern conflicts with EVPMR, adapt the pattern, not the architecture. See `/using-agent-skills`.
 
 ---
 
-**Context:** `docs/context.md` — read: Summary, Architecture Patterns in Use, Key Changes. Standard load procedure in `/using-agent-skills`.
+**Context:** `docs/context.md`, reading Summary, Architecture Patterns in Use, Key Changes. Standard load procedure in `/using-agent-skills`.
 
 ---
 
@@ -37,9 +37,9 @@ Never put state in View. Never fetch data outside a Presenter.
 
 > `fe-rules` (always active) enforces: derive during render not useEffect, primitive effect deps, no nested components, ternary not `&&`, stable keys, functional setState. Not repeated here.
 
-- Top-level only — never conditional or inside loops
+- Top-level only, never conditional or inside loops
 - Cleanup every subscription, interval, and listener in return of `useEffect`
-- Default: **do not memoize** — add `useMemo`/`useCallback` only when a profiler proves it matters or a dependency chain requires stability
+- Default: **do not memoize.** Add `useMemo`/`useCallback` only when a profiler proves it matters or a dependency chain requires stability
 - Extract to a custom hook only when the same hook sequence appears in 2+ Presenters
 
 ---
@@ -54,7 +54,7 @@ Never put state in View. Never fetch data outside a Presenter.
 | One-off fire-and-forget | Presenter handler | `fetch()` in event handler |
 | Real-time subscription | Presenter | WebSocket / SSE hook |
 
-Avoid `useEffect` + `fetch` for application data — no cache, no retry, no Suspense integration.
+Avoid `useEffect` + `fetch` for application data, which has no cache, no retry, no Suspense integration.
 
 ---
 
@@ -78,9 +78,9 @@ type Props = {
 function UILayout({ header, footer, children }: Props) { ... }
 ```
 
-### Compound components (shared state via Context — lives in Entry)
+### Compound components (shared state via Context, living in Entry)
 ```tsx
-// Entry.tsx — provides context
+// Entry.tsx: provides context
 const TabsContext = createContext<TabsContextValue | undefined>(undefined);
 
 export function EntryCheckout() {
@@ -109,7 +109,7 @@ function UICheckoutTabs() {
 </DataLoader>
 ```
 
-Prefer a Presenter hook (`useDataLoader(id)`) — cleaner, testable.
+Prefer a Presenter hook (`useDataLoader(id)`), which is cleaner and testable.
 
 ---
 
@@ -155,7 +155,7 @@ const stable = useCallback((arg: string) => handlerRef.current(arg), [handlerRef
 
 Form state and validation belong in Presenter. View renders dumb inputs.
 
-**Simple forms — Presenter owns state:**
+**Simple forms, where Presenter owns state:**
 ```ts
 // PresenterCheckout.ts
 function usePresenterCheckout() {
@@ -178,7 +178,7 @@ function usePresenterCheckout() {
 }
 ```
 
-**Complex forms** (multi-step, dynamic fields, cross-field validation) — use React Hook Form or TanStack Form. Rolling your own state for complex forms is a maintenance trap.
+**Complex forms** (multi-step, dynamic fields, cross-field validation) use React Hook Form or TanStack Form. Rolling your own state for complex forms is a maintenance trap.
 
 **Next.js Server Actions** (web, React 19):
 ```tsx
@@ -193,13 +193,13 @@ Server action validation with Zod; form state via `useActionState`. Never put bu
 ## Server / Client split (Next.js)
 
 ```tsx
-// Server Component — default, no "use client", can async
+// Server Component: default, no "use client", can async
 export default async function PageCheckout({ params }) {
   const routes = await getRoutes(params.id);
   return <ViewCheckout routes={routes} />;
 }
 
-// Client Component — needed for hooks, interactivity
+// Client Component: needed for hooks, interactivity
 'use client';
 export function ViewCheckout() {
   const { ... } = usePresenterCheckout();
@@ -209,7 +209,7 @@ export function ViewCheckout() {
 
 Rules:
 - Server → Client: pass serializable props or `children`
-- Never `import` a Server Component from a Client Component file — compose via `children`
+- Never `import` a Server Component from a Client Component file; compose via `children`
 - Client → Server: via Server Actions (`<form action={...}>` or from event handlers)
 
 ---

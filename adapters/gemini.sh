@@ -83,7 +83,7 @@ with open(md_path, 'w') as f:
 PYEOF
 }
 
-# Called after every sync pass — rebuilds GEMINI.md if the managed section is
+# Called after every sync pass. Rebuilds GEMINI.md if the managed section is
 # missing or stale (e.g. file was manually edited or accidentally deleted).
 finalize_gemini() {
     local has_skills=0
@@ -93,12 +93,12 @@ finalize_gemini() {
 
     if [[ $has_skills -eq 1 ]]; then
         if [[ ! -f "$GEMINI_MD" ]] || ! grep -qF "$_SECTION_START" "$GEMINI_MD"; then
-            echo "    ! GEMINI.md managed section missing — rebuilding"
+            echo "    ! GEMINI.md managed section missing, rebuilding"
             _rebuild_gemini_md
         fi
     else
         if [[ -f "$GEMINI_MD" ]] && grep -qF "$_SECTION_START" "$GEMINI_MD"; then
-            echo "    ! GEMINI.md has stale managed section (no skills) — cleaning"
+            echo "    ! GEMINI.md has stale managed section (no skills), cleaning"
             _remove_gemini_section
         fi
     fi

@@ -1,35 +1,35 @@
 ---
 name: team-build
-description: Experimental agent-teams build — this session acts as team lead (escalated model) coordinating everyday-model teammates through a shared task list. Teammates implement files in parallel and message each other directly. Platform-routed (RN/web EVPMR, Android MVP, iOS MVVM-C).
+description: Experimental agent-teams build where this session acts as team lead (escalated model) coordinating everyday-model teammates through a shared task list. Teammates implement files in parallel and message each other directly. Platform-routed (RN/web EVPMR, Android MVP, iOS MVVM-C).
 ---
 
-**Commands:** platform gates — see Phase 5
+**Commands:** platform gates, see Phase 5
 **Model:** lead = escalated, teammates = everyday
 
-> Triggered by: `/team-build` **only** — never auto-routed. "build feature X" in natural language still routes to `/parallel-build`. This command is an explicit opt-in: it requires the experimental agent-teams feature and costs roughly (1 + teammate count) × a solo build in tokens.
+> Triggered by: `/team-build` **only**, never auto-routed. "build feature X" in natural language still routes to `/parallel-build`. This command is an explicit opt-in: it requires the experimental agent-teams feature and costs roughly (1 + teammate count) × a solo build in tokens.
 
-**Why teams:** subagents fit one-shot report-back work; teams fit collaborative implementation — task claiming, dependency auto-resolve, direct teammate messaging (full rationale: README).
+**Why teams:** subagents fit one-shot report-back work; teams fit collaborative implementation, meaning task claiming, dependency auto-resolve, direct teammate messaging (full rationale: README).
 
 ---
 
-## Phase −1 — Preflight (hard gates)
+## Phase −1: Preflight (hard gates)
 
-0. **Harness.** Agent teams are a **Claude Code runtime feature** (teammate spawn, shared task list, mailbox) — not a model capability. Running under any other synced tool (Cursor, Gemini CLI, Codex CLI) → stop and fall back: `/parallel-build` where the tool has subagents (Cursor background agents, Gemini and Codex shell-parallel headless calls per the fusion-panel table in `using-agent-skills`), else sequential `/build`.
+0. **Harness.** Agent teams are a **Claude Code runtime feature** (teammate spawn, shared task list, mailbox), not a model capability. Running under any other synced tool (Cursor, Gemini CLI, Codex CLI) → stop and fall back: `/parallel-build` where the tool has subagents (Cursor background agents, Gemini and Codex shell-parallel headless calls per the fusion-panel table in `using-agent-skills`), else sequential `/build`.
 1. **Feature flag.** Check `echo "$CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"`. If not `1` → stop and instruct:
    ```json
    // settings.json
    { "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" } }
    ```
-   Restart the session after enabling. Do not proceed degraded — fall back to `/parallel-build` if the user declines.
-2. **Lead model.** The team lead is *this* session — a command cannot switch it. If the session runs the everyday tier, warn: lead work is judgment-heavy (task DAG design, contradiction adjudication, synthesis) and merits the escalated tier (`/model`). Proceed on everyday only with explicit user OK. *(Deliberate exception to the model-routing "never ask the user to switch" rule — inline escalation spawns cover targeted questions, not a session-long lead role.)*
-3. **Session caveats — tell the user before spawning:**
-   - `/resume` and `/rewind` do not restore in-process teammates — a long build interrupted mid-team restarts its coordination from the task list, not the conversation.
+   Restart the session after enabling. Do not proceed degraded; fall back to `/parallel-build` if the user declines.
+2. **Lead model.** The team lead is *this* session, and a command cannot switch it. If the session runs the everyday tier, warn: lead work is judgment-heavy (task DAG design, contradiction adjudication, synthesis) and merits the escalated tier (`/model`). Proceed on everyday only with explicit user OK. *(Deliberate exception to the model-routing "never ask the user to switch" rule: inline escalation spawns cover targeted questions, not a session-long lead role.)*
+3. **Session caveats, told to the user before spawning:**
+   - `/resume` and `/rewind` do not restore in-process teammates, so a long build interrupted mid-team restarts its coordination from the task list, not the conversation.
    - One team per session; teammates cannot spawn background subagents.
    - All teammates inherit the lead's permission mode at spawn.
 
 ---
 
-## Phase 0 — Platform routing
+## Phase 0: Platform routing
 
 Detect platform from project root + target module (same detection as `/build` Step 0):
 
@@ -39,13 +39,13 @@ Detect platform from project root + target module (same detection as `/build` St
 | Android (MVP) | `/android-scaffold` | `/android-patterns` + `/android-performance` | `/android-review` skill | `/android-test` |
 | iOS (MVVM-C) | `/ios-scaffold` | `/ios-patterns` + `/ios-performance` | `/ios-review` skill | `/ios-test` |
 
-FE reviewer teammate is spawned **from the `fe-review` agent definition** (`"spawn a teammate using the fe-review agent type"` — its tools allowlist and model are honored). Native platforms have no cold agent — spawn a plain teammate and instruct it to run the review skill (teammates are full sessions with all skills installed).
+FE reviewer teammate is spawned **from the `fe-review` agent definition** (`"spawn a teammate using the fe-review agent type"`, so its tools allowlist and model are honored). Native platforms have no cold agent, so spawn a plain teammate and instruct it to run the review skill (teammates are full sessions with all skills installed).
 
 ---
 
-## Phase 1 — Context + scaffold (lead, sequential)
+## Phase 1: Context + scaffold (lead, sequential)
 
-Scaffold **before** spawning the team — the scaffold's file list *is* the ownership map, and letting teammates scaffold concurrently invites file conflicts.
+Scaffold **before** spawning the team, because the scaffold's file list *is* the ownership map, and letting teammates scaffold concurrently invites file conflicts.
 
 - FE: `/fe-context` then `/fe-scaffold` (surface assumptions first).
 - Native: read a real sibling screen; `/android-context` / `/ios-context` only for multi-screen scope. Then the platform scaffold skill.
@@ -54,9 +54,9 @@ Scaffold **before** spawning the team — the scaffold's file list *is* the owne
 
 ---
 
-## Phase 2 — Task DAG (lead writes the shared task list)
+## Phase 2: Task DAG (lead writes the shared task list)
 
-**Ownership law: one file, one owner, for the whole session.** Two teammates editing the same file causes silent overwrites — this is the feature's main hazard. Cross-file wiring that touches shared files (Dagger component, Bazel `BUILD`, navigation registry) is always a single dedicated task with one owner.
+**Ownership law: one file, one owner, for the whole session.** Two teammates editing the same file causes silent overwrites, and this is the feature's main hazard. Cross-file wiring that touches shared files (Dagger component, Bazel `BUILD`, navigation registry) is always a single dedicated task with one owner.
 
 Create tasks with these dependencies (the task system auto-unblocks dependents):
 
@@ -64,8 +64,8 @@ Create tasks with these dependencies (the task system auto-unblocks dependents):
 
 | Task | Files | Depends on | Owner |
 |------|-------|-----------|-------|
-| T1 model | `Model*.ts` | — | impl-a |
-| T2 resource | `Resource*.ts` | — | impl-b |
+| T1 model | `Model*.ts` | none | impl-a |
+| T2 resource | `Resource*.ts` | none | impl-b |
 | T3 presenter | `Presenter*.ts` | T1 | impl-a |
 | T4 view + entry | `View*.tsx`, `Entry*.tsx` | T2, T3 | impl-b |
 | T5 review | read-only | T3, T4 | reviewer |
@@ -75,8 +75,8 @@ Create tasks with these dependencies (the task system auto-unblocks dependents):
 
 | Task | Files | Depends on | Owner |
 |------|-------|-----------|-------|
-| T1 contract | `*Contract.swift` | — | impl-a |
-| T2 fetcher | `*Fetcher.swift` stub | — | impl-b |
+| T1 contract | `*Contract.swift` | none | impl-a |
+| T2 fetcher | `*Fetcher.swift` stub | none | impl-b |
 | T3 viewmodel | `*ViewModel.swift` | T1, T2 | impl-a |
 | T4 view + vc | `*View.swift`, `*ViewController.swift` | T1 | impl-b |
 | T5 factory + coordinator wiring | `*Factory.swift`, coordinator edit | T3, T4 | impl-a |
@@ -87,8 +87,8 @@ Create tasks with these dependencies (the task system auto-unblocks dependents):
 
 | Task | Files | Depends on | Owner |
 |------|-------|-----------|-------|
-| T1 viewmodel + navmodel | `*ViewModel.kt`, `*NavigationModel.kt` | — | impl-a |
-| T2 repository | `*Repository.kt` stub | — | impl-b |
+| T1 viewmodel + navmodel | `*ViewModel.kt`, `*NavigationModel.kt` | none | impl-a |
+| T2 repository | `*Repository.kt` stub | none | impl-b |
 | T3 presenter | `*Presenter.kt` | T1, T2 | impl-a |
 | T4 view | Activity/Fragment + layout | T1 | impl-b |
 | T5 dagger wiring | feature component/module | T3, T4 | impl-a |
@@ -97,37 +97,37 @@ Create tasks with these dependencies (the task system auto-unblocks dependents):
 
 ---
 
-## Phase 3 — Spawn the team (staged)
+## Phase 3: Spawn the team (staged)
 
-Four teammates, everyday model, named **impl-a**, **impl-b**, **reviewer**, **tester** — spawned when their first task can run, not upfront:
+Four teammates, everyday model, named **impl-a**, **impl-b**, **reviewer**, **tester**, spawned when their first task can run, not upfront:
 
 1. **Now:** impl-a + impl-b.
 2. **When the last implementation task completes:** reviewer.
 3. **When the review task completes:** tester.
 
-An early-spawned reviewer burns its activation with nothing to review, then idles emitting notifications the lead must triage — and idle teammates sometimes self-assign speculative work. The lead is already woken by task-completion notifications at each stage boundary, so staging adds no polling and no extra coordination logic.
+An early-spawned reviewer burns its activation with nothing to review, then idles emitting notifications the lead must triage, and idle teammates sometimes self-assign speculative work. The lead is already woken by task-completion notifications at each stage boundary, so staging adds no polling and no extra coordination logic.
 
 Every implementer's spawn prompt must state:
-1. Its owned files (from the DAG) — **never edit outside this set**.
+1. Its owned files (from the DAG). **Never edit outside this set**.
 2. The platform skills to apply while implementing (Phase 0 table).
-3. Contract questions go **directly to the owning teammate** (e.g. impl-a owns the Model — impl-b messages impl-a about prop types), not to the lead.
-4. Definition of done per task: owned files typecheck clean **and** ponytail self-pass run on them (`karpathy-guidelines` rule 2 — cut each hit or mark it `ponytail:`, report the one-line result) → mark the task complete. Unmarked tasks block dependents.
+3. Contract questions go **directly to the owning teammate** (e.g. impl-a owns the Model, so impl-b messages impl-a about prop types), not to the lead.
+4. Definition of done per task: owned files typecheck clean **and** ponytail self-pass run on them (`karpathy-guidelines` rule 2: cut each hit or mark it `ponytail:`, report the one-line result) → mark the task complete. Unmarked tasks block dependents.
 5. Do not spawn subagents (unsupported for teammates).
 
 Reviewer: findings only, severity labels per `using-agent-skills`, never edits files. Tester: coverage bar per platform (`/fe-test` enforces ≥93%; native reports module's actual coverage).
 
 ---
 
-## Phase 4 — Lead coordination loop
+## Phase 4: Lead coordination loop
 
 - **Do not poll.** Act on teammate idle notifications and mailbox messages.
 - **Task-status lag** (known caveat): a teammate can finish work but fail to mark the task complete, blocking dependents. Idle teammate + in-progress task → nudge it; still stale → verify the files yourself and mark the task complete or reassign.
-- **Dead teammate** (infra error): apply Step 5 of `using-agent-skills` in spirit — its axis is a coverage gap, never silently clean. Reassign its tasks to the surviving implementer or take them inline; if the reviewer died and no re-review ran, the verdict is `INCOMPLETE`.
+- **Dead teammate** (infra error): apply Step 5 of `using-agent-skills` in spirit, since its axis is a coverage gap, never silently clean. Reassign its tasks to the surviving implementer or take them inline; if the reviewer died and no re-review ran, the verdict is `INCOMPLETE`.
 - **Contradictions** (reviewer vs implementer, or impl-a vs impl-b on a contract): lead adjudicates per core behavior #9 (`using-agent-skills`).
 
 ---
 
-## Phase 5 — Gates (lead, after all tasks complete)
+## Phase 5: Gates (lead, after all tasks complete)
 
 | Platform | Gates |
 |----------|-------|
@@ -135,11 +135,11 @@ Reviewer: findings only, severity labels per `using-agent-skills`, never edits f
 | Android | `./gradlew :<module>:lintGeneralDebug` + `./gradlew :<module>:testGeneralDebugUnitTest` |
 | iOS | `swiftlint` + `bazelisk test //Modules/<M>:<M>TestsBundle` |
 
-Teammates verified their own files; the lead verifies the **integration** — gates run on the whole feature, not per-file.
+Teammates verified their own files; the lead verifies the **integration**, so gates run on the whole feature, not per-file.
 
 ---
 
-## Phase 6 — Synthesize + report
+## Phase 6: Synthesize + report
 
 ```
 TEAM BUILD COMPLETE
@@ -150,13 +150,13 @@ Tasks:      N complete / N total  [list any reassigned or lead-completed]
 Files:      [list, with owner]
 
 FINDINGS (from reviewer)
-[ERROR]      file:line — description
+[ERROR]      file:line: description
 [WARNING]    ...
 [SUGGESTION] ...
 
 Gates:      typecheck PASS | lint PASS | tests PASS (N tests)
 Coverage:   [per platform bar]
-Verdict:    DONE / BLOCKED — <blockers> / INCOMPLETE — <axis unverified: dead teammate / unreviewed reassignment>
+Verdict:    DONE / BLOCKED (<blockers>) / INCOMPLETE (<axis unverified: dead teammate / unreviewed reassignment>)
 ```
 
 Team config is auto-removed at session end; the task list persists under `~/.claude/tasks/` for post-mortem.

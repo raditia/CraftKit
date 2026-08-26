@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 
 **Commands:** `grep -rn "pattern" <feature>/src`, `./gradlew :<module>:lintGeneralDebug`
-**Model:** everyday — escalate for a jank/leak with non-obvious root cause (profile in Android Studio first).
+**Model:** everyday. Escalate for a jank/leak with non-obvious root cause (profile in Android Studio first).
 
 ---
 
@@ -24,7 +24,7 @@ alwaysApply: false
 suspend fun requestX(p: P): R = withContext(dispatcher.io()) { apiProvider.requestX(p).await() }
 ```
 - **Flag** network, JSON/DB, bitmap decode, or regex on `Dispatchers.Main`.
-- Presenter launches in the `CorePresenter` lifecycle scope — **flag** `GlobalScope` (leaks + runs after screen death).
+- Presenter launches in the `CorePresenter` lifecycle scope. **Flag** `GlobalScope` (leaks + runs after screen death).
 - VM mutations that drive Data Binding must be on main.
 
 ---
@@ -32,10 +32,10 @@ suspend fun requestX(p: P): R = withContext(dispatcher.io()) { apiProvider.reque
 ## 2. Parallelism
 
 ```kotlin
-// WRONG — serial round trips
+// WRONG: serial round trips
 val a = repo.getA(); val b = repo.getB()
 
-// CORRECT — concurrent
+// CORRECT: concurrent
 coroutineScope {
     val a = async { repo.getA() }
     val b = async { repo.getB() }
@@ -48,9 +48,9 @@ Orchestrate in the **Presenter**, not the View.
 
 ## 3. RecyclerView
 
-- **DiffUtil / ListAdapter** — never `notifyDataSetChanged()` for list updates; it rebinds everything.
+- **DiffUtil / ListAdapter.** Never `notifyDataSetChanged()` for list updates; it rebinds everything.
 - `setHasFixedSize(true)` when item size doesn't change.
-- Compute display values in the Presenter/VM; hand the ViewHolder a ready-to-render item — **no** formatting/business logic in `onBindViewHolder`.
+- Compute display values in the Presenter/VM; hand the ViewHolder a ready-to-render item, with **no** formatting/business logic in `onBindViewHolder`.
 - Share a `RecycledViewPool` across nested/horizontal RecyclerViews.
 - Cancel image loads on `onViewRecycled` to avoid wrong-image flashes.
 
@@ -58,18 +58,18 @@ Orchestrate in the **Presenter**, not the View.
 
 ## 4. Compose recomposition
 
-- **Stable params** — pass stable/immutable types to Composables; unstable params (mutable classes, `List` from an unstable source) cause needless recomposition. Mark model classes `@Immutable`/`@Stable` where true, or use `ImmutableList`.
+- **Stable params.** Pass stable/immutable types to Composables; unstable params (mutable classes, `List` from an unstable source) cause needless recomposition. Mark model classes `@Immutable`/`@Stable` where true, or use `ImmutableList`.
 - `remember` expensive computations; `derivedStateOf` for values derived from state that changes more often than the derived result.
-- **Stable `key`** in `LazyColumn` items — never the index for dynamic lists.
+- **Stable `key`** in `LazyColumn` items, never the index for dynamic lists.
 - Hoist state; pass lambdas that are stable (`remember` them or reference method refs) so children don't recompose.
 - Defer reads: read state as low in the tree as possible (`Modifier.offset { }` lambda form, not the value form, for scroll-driven values).
-- Verify with **recomposition counts** in Layout Inspector — optimize what actually recomposes.
+- Verify with **recomposition counts** in Layout Inspector, and optimize what actually recomposes.
 
 ---
 
 ## 5. Images
 
-- Use the app's image library (Glide/Coil) with explicit target size / `override(w,h)` — don't decode full-resolution into a small view.
+- Use the app's image library (Glide/Coil) with explicit target size / `override(w,h)`; don't decode full-resolution into a small view.
 - Enable memory + disk cache; cancel requests on view recycle / `DisposableEffect` cleanup in Compose.
 
 ---
@@ -84,23 +84,23 @@ Orchestrate in the **Presenter**, not the View.
 
 ## 7. Startup / lazy work
 
-- Dynamic Feature Modules load on demand — don't force-pull a DFM's code from the base; go through the `-api` NavigatorService.
-- Don't fetch in `init`/`onCreate` before the screen is visible — fetch when the View signals it's ready.
+- Dynamic Feature Modules load on demand, so don't force-pull a DFM's code from the base; go through the `-api` NavigatorService.
+- Don't fetch in `init`/`onCreate` before the screen is visible; fetch when the View signals it's ready.
 - Defer non-critical init (analytics, prefetch) off the critical path.
 
 ---
 
 ## 8. Memory / leaks
 
-- Cancel coroutines/observers/animators on lifecycle stop — the `CorePresenter` scope should tear down with the screen.
-- No `Context`/`View`/`Activity` reference held by a longer-lived object (Presenter/singleton) — leaks the whole screen.
+- Cancel coroutines/observers/animators on lifecycle stop, since the `CorePresenter` scope should tear down with the screen.
+- No `Context`/`View`/`Activity` reference held by a longer-lived object (Presenter/singleton), which leaks the whole screen.
 - Verify with the Memory Profiler / LeakCanary on navigate-away.
 
 ---
 
 ## Verification
 
-- [ ] No blocking work on `Dispatchers.Main` — profiled in CPU profiler
+- [ ] No blocking work on `Dispatchers.Main`, profiled in CPU profiler
 - [ ] Independent fetches concurrent (`async`), orchestrated in the Presenter
 - [ ] RecyclerView uses DiffUtil/ListAdapter; no per-row work in `onBindViewHolder`
 - [ ] Compose: stable params, keyed lazy items, low recomposition counts (Layout Inspector)

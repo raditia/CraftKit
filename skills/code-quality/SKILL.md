@@ -1,15 +1,15 @@
 ---
 name: code-quality
-description: Two-mode skill — review code for correctness/arch/security/performance, or simplify complex-but-working code. Rules applied from rules/ automatically.
+description: Two-mode skill. Review code for correctness/arch/security/performance, or simplify complex-but-working code. Rules applied from rules/ automatically.
 alwaysApply: false
 ---
 
 **Commands:** `rtk lint`, `rtk tsc`, `rtk git diff`, `rtk jest`, `rtk grep "pattern" .`
-**Model:** everyday — escalate for security-sensitive changes, architecture decisions with significant tradeoffs, or refactors > 500 lines
+**Model:** everyday. Escalate for security-sensitive changes, architecture decisions with significant tradeoffs, or refactors > 500 lines
 
-**Context:** `docs/context.md` — read: Summary, Key Changes, Architecture Patterns in Use. Standard load procedure in `using-agent-skills`.
+**Context:** `docs/context.md`, reading Summary, Key Changes, Architecture Patterns in Use. Standard load procedure in `using-agent-skills`.
 
-> For day-to-day reviews use the `/review` command — it runs this + fe-review automatically.
+> For day-to-day reviews use the `/review` command, which runs this + fe-review automatically.
 
 ---
 
@@ -34,7 +34,7 @@ Determine which mode applies from the request:
 **1. Correctness**
 - Matches spec/task requirements?
 - Edge cases handled (null, empty, boundary values)?
-- Error paths handled — not just the happy path?
+- Error paths handled, not just the happy path?
 - Off-by-one errors, race conditions, state inconsistencies?
 
 **2. Readability**
@@ -44,11 +44,11 @@ Determine which mode applies from the request:
 - Dead code present? (no-op variables, backwards-compat shims)
 
 **3. Architecture (EVPMR)**
-- **View** — only calls `usePresenter*()` and renders? Flag `useState`, `useEffect`, API calls
-- **Presenter** — returns plain object? Flag any JSX
-- **Model** — types and pure functions only? Flag React imports or side effects
-- **Entry** — wraps in `<ErrorBoundary>`?
-- **Resource** — all display strings here, not hardcoded in View?
+- **View:** only calls `usePresenter*()` and renders? Flag `useState`, `useEffect`, API calls
+- **Presenter:** returns plain object? Flag any JSX
+- **Model:** types and pure functions only? Flag React imports or side effects
+- **Entry:** wraps in `<ErrorBoundary>`?
+- **Resource:** all display strings here, not hardcoded in View?
 - No circular dependencies?
 
 **4. Security**
@@ -70,7 +70,7 @@ Determine which mode applies from the request:
 ```
 ~100 lines  → Good. Reviewable in one sitting.
 ~300 lines  → Acceptable for a single logical change.
-~1000 lines → Too large — ask to split.
+~1000 lines → Too large, ask to split.
 ```
 
 One change = one self-contained modification. Separate refactoring from feature work.
@@ -84,9 +84,9 @@ Before adding any dependency: Does the existing stack solve this? Bundle impact?
 ### Output
 
 ```
-[ERROR]      File:line — description (blocks merge)
-[WARNING]    File:line — description (should fix)
-[SUGGESTION] File:line — description (optional)
+[ERROR]      File:line: description (blocks merge)
+[WARNING]    File:line: description (should fix)
+[SUGGESTION] File:line: description (optional)
   Why: ...
   Fix: ...
 ```
@@ -102,14 +102,14 @@ Verdict: APPROVE / REQUEST CHANGES
 
 ### Honesty
 - Don't rubber-stamp. "LGTM" without evidence helps no one.
-- Quantify problems with evidence — specific beats general.
+- Quantify problems with evidence, since specific beats general.
 - Accept override gracefully when author has full context and disagrees.
 
 ---
 
 ## Simplify mode
 
-> "Not fewer lines — code easier to read, understand, modify, and debug."
+> "Not fewer lines. Code easier to read, understand, modify, and debug."
 
 ### When to use
 - Feature works and tests pass, but implementation feels heavier than needed
@@ -118,12 +118,12 @@ Verdict: APPROVE / REQUEST CHANGES
 
 ### When NOT to use
 - Code is already clean
-- You don't fully understand it yet — read first
+- You don't fully understand it yet, so read first
 - Module is about to be rewritten entirely
 
 ### Process
 
-**Step 1 — Understand before touching (Chesterton's Fence)**
+**Step 1: Understand before touching (Chesterton's Fence)**
 ```
 BEFORE SIMPLIFYING:
 - What is this code's responsibility?
@@ -133,7 +133,7 @@ BEFORE SIMPLIFYING:
   rtk git log -p -- path/to/file
 ```
 
-**Step 2 — Identify opportunities**
+**Step 2: Identify opportunities**
 
 | Pattern | Fix |
 |---------|-----|
@@ -148,7 +148,7 @@ BEFORE SIMPLIFYING:
 | Hardcoded strings in View | Move to `Resource[Name].ts` |
 | Magic numbers in StyleSheet | Replace with `Token.spacing.*` / `Token.color.*` |
 
-**Step 3 — Apply incrementally**
+**Step 3: Apply incrementally**
 
 One simplification at a time:
 ```bash
@@ -161,10 +161,10 @@ If tests fail → revert and reconsider. Never batch multiple simplifications un
 
 **Never mix simplification with feature work.**
 
-**Step 4 — Verify**
+**Step 4: Verify**
 - Genuinely easier to understand?
 - No behavior change?
-- Diff is clean — no unrelated changes?
+- Diff is clean, with no unrelated changes?
 
 ### Red flags
 - Tests require modification to pass → behavior was changed
@@ -175,7 +175,7 @@ If tests fail → revert and reconsider. Never batch multiple simplifications un
 
 ## Verification (both modes)
 
-- [ ] `rtk test --testPathPattern=<changed-path> --no-coverage` — all pass (simplify: without modification)
-- [ ] `rtk tsc --noEmit` — zero errors
-- [ ] `rtk lint` — zero errors
+- [ ] `rtk test --testPathPattern=<changed-path> --no-coverage` all pass (simplify: without modification)
+- [ ] `rtk tsc --noEmit` zero errors
+- [ ] `rtk lint` zero errors
 - [ ] No unrelated changes mixed in

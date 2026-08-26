@@ -9,18 +9,18 @@ Hard constraints for the Entry/View/Presenter/Model/Resource architecture. These
 
 ## Layer constraints
 
-**View (`View*.tsx`) — render only**
+**View (`View*.tsx`): render only**
 - NEVER `useState`, `useEffect`, or direct API/React Query calls
-- Call `usePresenter*()` at top — destructure everything from it
-- Pure JSX return — no logic, no conditionals beyond rendering
+- Call `usePresenter*()` at top, destructure everything from it
+- Pure JSX return: no logic, no conditionals beyond rendering
 - JSX > ~80 lines → extract `UI[Name][Section].tsx` sub-component in same folder
 
-**Presenter (`Presenter*.ts`) — logic only**
-- NEVER return JSX — returns a plain object
+**Presenter (`Presenter*.ts`): logic only**
+- NEVER return JSX; returns a plain object
 - All hooks, state, React Query, `useCallback`, `useMemo` live here
 - Hook > ~100 lines → split into `usePresenter[Name]Data` + `usePresenter[Name]Handlers`
 
-**Model (`Model*.ts`) — types and pure functions only**
+**Model (`Model*.ts`): types and pure functions only**
 - No React imports, no side effects
 - Async data as discriminated unions:
   ```ts
@@ -31,17 +31,17 @@ Hard constraints for the Entry/View/Presenter/Model/Resource architecture. These
     | { type: 'ERROR'; error: string }
   ```
 
-**Resource (`Resource*.ts`) — strings only**
-- All display strings here — never hardcode text in View
+**Resource (`Resource*.ts`): strings only**
+- All display strings here; never hardcode text in View
 
-**Entry (`Entry*.tsx`) — boundary only**
+**Entry (`Entry*.tsx`): boundary only**
 - Always wraps in `<ErrorBoundary>` from `react-error-boundary`
 
 ---
 
 ## TypeScript
 
-- `strict: true` — no `any`, no implicit returns
+- `strict: true`. No `any`, no implicit returns
 - `type Props = { ... }` above each component
 - Exported functions must have explicit return types
 - **No unused variables** (`no-unused-vars`): remove unused destructured names; if intentionally unused, prefix with `_` (e.g. `_inventoryActive`)
@@ -50,14 +50,14 @@ Hard constraints for the Entry/View/Presenter/Model/Resource architecture. These
 
 ## Imports
 
-- **Import the module, never the folder barrel.** A barrel `index.ts` re-exports hooks, providers and contexts next to pure utils, so reaching one helper through it pulls that whole graph — react-query, feature-control and provider code — into the importer:
+- **Import the module, never the folder barrel.** A barrel `index.ts` re-exports hooks, providers and contexts next to pure utils, so reaching one helper through it pulls that whole graph (react-query, feature-control and provider code) into the importer:
   ```ts
-  // WRONG — drags the barrel's hooks/providers in for one function
+  // WRONG: drags the barrel's hooks/providers in for one function
   import { getPassengerName } from '@scope/pkg/booking-seat-map';
   // CORRECT
   import { getPassengerName } from '@scope/pkg/booking-seat-map/utils/getPassengerName';
   ```
-- **Don't add a new shared helper to the barrel.** Export it from its own file only — an available barrel path invites the expensive import next time.
+- **Don't add a new shared helper to the barrel.** Export it from its own file only, because an available barrel path invites the expensive import next time.
 - Already importing other symbols from that barrel? There's no graph win, but deep-import anyway for consistency.
 - Bonus in tests: a `jest.mock` of the barrel leaves a deep-imported helper real, so it needs no `jest.requireActual` threading.
 
@@ -67,7 +67,7 @@ Hard constraints for the Entry/View/Presenter/Model/Resource architecture. These
 
 - NEVER inline styles: `style={{ margin: 8 }}` → forbidden
 - ALWAYS `StyleSheet.create({})` at the bottom of the file
-- ALWAYS design tokens — no magic numbers:
+- ALWAYS design tokens, no magic numbers:
   - Spacing: `Token.spacing.xs / s / m / l / xl`
   - Color: `Token.color.uiBluePrimary / uiLightPrimary / ...`
   - Border: `Token.border.radius.normal`
@@ -76,7 +76,7 @@ Hard constraints for the Entry/View/Presenter/Model/Resource architecture. These
 
 ## React correctness
 
-- **Derive during render** — never `useEffect` to sync derived state:
+- **Derive during render.** Never `useEffect` to sync derived state:
   ```ts
   // WRONG
   const [full, setFull] = useState('');
@@ -84,18 +84,18 @@ Hard constraints for the Entry/View/Presenter/Model/Resource architecture. These
   // CORRECT
   const full = `${first} ${last}`;
   ```
-- **No components defined inside components** — new type every render, breaks reconciliation
-- **Ternary over `&&`** for conditional render — `0` renders as text:
+- **No components defined inside components.** New type every render, breaks reconciliation
+- **Ternary over `&&`** for conditional render, because `0` renders as text:
   ```tsx
   // WRONG: {count && <Badge />}
   // CORRECT: {count > 0 ? <Badge /> : null}
   ```
-- **Primitive deps in effects** — objects/arrays get new identity every render:
+- **Primitive deps in effects.** Objects/arrays get new identity every render:
   ```ts
   // WRONG: useEffect(() => {}, [{ id }])
   // CORRECT: useEffect(() => {}, [id])
   ```
-- **Stable `key` props** — use database ID, never array index
+- **Stable `key` props.** Use database ID, never array index
 - **Functional `setState`** when new state depends on old: `setCount(c => c + 1)`
 
 ---

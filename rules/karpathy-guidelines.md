@@ -1,6 +1,6 @@
 ---
 name: karpathy-guidelines
-description: Behavioral rules to reduce common LLM coding mistakes. Always active — applies to every skill and task.
+description: Behavioral rules to reduce common LLM coding mistakes. Always active, applying to every skill and task.
 ---
 
 > Derived from Andrej Karpathy's observations on LLM coding pitfalls. Adapted for this project's EVPMR architecture and tooling.
@@ -15,7 +15,7 @@ description: Behavioral rules to reduce common LLM coding mistakes. Always activ
 
 Before implementing anything non-trivial:
 - State assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them — don't pick silently.
+- If multiple interpretations exist, present them; don't pick silently.
 - If a simpler approach exists, say so and push back.
 - If something is unclear, stop. Name what's confusing. Ask.
 
@@ -44,11 +44,11 @@ Before writing any code, stop at the first rung that holds:
 Rules:
 - No abstractions for single-use code.
 - No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios — trust framework and internal guarantees.
+- No error handling for impossible scenarios. Trust framework and internal guarantees.
 - If you wrote 200 lines and it could be 50, rewrite it.
 - Deletion over addition. Boring over clever. Fewest files possible.
 
-**Comment discipline — code explains itself, comments are the exception.** Do not narrate. Write a comment only when it earns its place:
+**Comment discipline: code explains itself, comments are the exception.** Do not narrate. Write a comment only when it earns its place:
 - The *why* is non-obvious (a workaround, a spec quirk, a deliberate `ponytail:` ceiling).
 - A subtle gotcha a reader would otherwise trip on.
 
@@ -59,7 +59,7 @@ Never add:
 - Comments on obvious JSX, imports, type fields, or one-line getters.
 - Placeholder chatter (`// TODO`, `// added by`, `// this function does X`) unless asked.
 
-Match the file's existing comment density — if the surrounding code has none, add none. When editing, don't leave behind comments describing what you changed; the diff is the record. If a comment is needed to understand a line, first ask whether a clearer name or smaller function removes the need — excessive comments are a signal the code isn't expressive enough, so fix the code, don't explain it. A breach of this block is a `narrate:` hit in the rubric below: caught in the self-pass, cut before reporting done.
+Match the file's existing comment density: if the surrounding code has none, add none. When editing, don't leave behind comments describing what you changed; the diff is the record. If a comment is needed to understand a line, first ask whether a clearer name or smaller function removes the need, because excessive comments are a signal the code isn't expressive enough, so fix the code, don't explain it. A breach of this block is a `narrate:` hit in the rubric below: caught in the self-pass, cut before reporting done.
 
 Ask: "Would a senior engineer say 'why didn't you just…'?" If yes, simplify.
 
@@ -68,7 +68,7 @@ Ask: "Would a senior engineer say 'why didn't you just…'?" If yes, simplify.
 // ponytail: linear scan over all items. ceiling: >10k rows gets slow. upgrade: add index when perf becomes issue.
 ```
 
-**Ponytail rubric — one list for writing and for reviewing.** `/ponytail-review`, `/ponytail-audit`, and the `ponytail-review` agent judge code by these six tags. Author under them, so review has nothing left to change:
+**Ponytail rubric: one list for writing and for reviewing.** `/ponytail-review`, `/ponytail-audit`, and the `ponytail-review` agent judge code by these six tags. Author under them, so review has nothing left to change:
 
 | Tag | Fails when |
 |-----|-----------|
@@ -79,11 +79,11 @@ Ask: "Would a senior engineer say 'why didn't you just…'?" If yes, simplify.
 | `shrink:` | Same logic achievable in fewer lines |
 | `narrate:` | Comment restating the code, or denser comments than the file around it (see comment discipline above) |
 
-Protected — never counted as over-engineering by either side: validation at trust boundaries, error handling that prevents data loss, security and accessibility code, smoke tests / basic assertions, and anything already marked `ponytail:` (the marker is the contract). For `narrate:` specifically, also protected: a comment carrying a non-obvious *why*, a license/pragma header, and a doc comment on a public API a consumer reads without opening the file.
+Protected, never counted as over-engineering by either side: validation at trust boundaries, error handling that prevents data loss, security and accessibility code, smoke tests / basic assertions, and anything already marked `ponytail:` (the marker is the contract). For `narrate:` specifically, also protected: a comment carrying a non-obvious *why*, a license/pragma header, and a doc comment on a public API a consumer reads without opening the file.
 
-**Self-pass before reporting done.** Any turn that writes or edits code scans its own diff against those six tags before claiming completion. Each hit is cut now, or marked `ponytail:` with its ceiling. Report one line — `ponytail self-pass: clean` or `ponytail self-pass: cut <what>, marked <what>`. Bloat that reaches review unmarked is a defect in the write step, not a review finding.
+**Self-pass before reporting done.** Any turn that writes or edits code scans its own diff against those six tags before claiming completion. Each hit is cut now, or marked `ponytail:` with its ceiling. Report one line: `ponytail self-pass: clean` or `ponytail self-pass: cut <what>, marked <what>`. Bloat that reaches review unmarked is a defect in the write step, not a review finding.
 
-**Applying ponytail findings is deletion, not rewrite.** A finding names `file:line` plus a tag — act on exactly those lines: remove them, or swap in the named stdlib/native call. Never restructure surrounding code, rename, reorder, or tidy while in there. If a finding looks like it needs a rewrite, say so and stop; file churn costs more than the complexity does.
+**Applying ponytail findings is deletion, not rewrite.** A finding names `file:line` plus a tag, so act on exactly those lines: remove them, or swap in the named stdlib/native call. Never restructure surrounding code, rename, reorder, or tidy while in there. If a finding looks like it needs a rewrite, say so and stop; file churn costs more than the complexity does.
 
 **EVPMR corollary:** don't pre-split a View into sub-components until it exceeds ~80 lines. Don't pre-split a Presenter until it exceeds ~100 lines. Split when complex, not speculatively.
 
@@ -98,13 +98,13 @@ Before adding any code, read:
 - Immediate callers of the function you're modifying
 - Shared utilities that might already solve the problem
 
-"Looks orthogonal" is dangerous. If unsure why code is structured a certain way, ask — don't guess and restructure.
+"Looks orthogonal" is dangerous. If unsure why code is structured a certain way, ask. Don't guess and restructure.
 
 When editing existing code:
 - Don't "improve" adjacent code, comments, or formatting.
 - Don't refactor things that aren't broken.
 - Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it — don't delete it.
+- If you notice unrelated dead code, mention it; don't delete it.
 
 When your changes create orphans:
 - Remove imports, variables, and functions that **your** changes made unused.
@@ -112,7 +112,7 @@ When your changes create orphans:
 
 When your changes add required fields to a type or interface:
 - Search test files for mock objects that implement that type and add the missing fields.
-- Run `npx tsc --noEmit` on affected test files before reporting done — Jest skips type checks, so TS2739 errors are invisible until CI.
+- Run `npx tsc --noEmit` on affected test files before reporting done, because Jest skips type checks, so TS2739 errors are invisible until CI.
 
 Test: every changed line should trace directly to the user's request.
 
@@ -130,7 +130,7 @@ Convert vague requests into verifiable goals before starting:
 | "Add validation" | Write tests for invalid inputs, then make them pass |
 | "Refactor X" | Ensure `rtk test --testPathPattern=<path>` passes before and after |
 | "Scaffold the feature" | `rtk tsc --noEmit` and `rtk lint` pass on every generated file |
-| Any code change | `npx tsc --noEmit` filtered to changed files — jest skips type checks |
+| Any code change | `npx tsc --noEmit` filtered to changed files, since jest skips type checks |
 
 For multi-step tasks, emit a brief plan before starting:
 ```
@@ -149,17 +149,17 @@ Strong success criteria let you loop independently. "Make it work" requires cons
 
 ## 5. Tests verify intent, not just behavior
 
-**Tests must encode WHY behavior matters — not just WHAT it does.**
+**Tests must encode WHY behavior matters, not just WHAT it does.**
 
 A test that can't fail when business logic changes is wrong.
 
 Before writing a test, ask: "If someone accidentally deleted the rule this test is protecting, would it fail?" If no → the test is testing implementation, not intent.
 
 ```ts
-// WRONG — tests what, not why
+// WRONG: tests what, not why
 expect(result.status).toBe('LOADING');
 
-// CORRECT — tests why it matters
+// CORRECT: tests why it matters
 // Status must be LOADING during fetch so the UI shows a spinner and blocks interactions
 expect(result.status).toBe('LOADING');
 expect(result.canSubmit).toBe(false);
@@ -176,7 +176,7 @@ After completing any significant step (scaffold, implementation chunk, test run,
 ```
 CHECKPOINT:
 Done:     [what was completed]
-Verified: [evidence — test output, tsc clean, lint clean]
+Verified: [evidence: test output, tsc clean, lint clean]
 Left:     [remaining steps]
 ```
 

@@ -47,6 +47,23 @@ _rebuild_claude_md() {
         return
     fi
 
+    # A third-party tool that writes its own section into CLAUDE.md can eat our
+    # BEGIN marker on its uninstall: graphify's `_remove_marker_section` deletes
+    # from its `## graphify` heading to the next `## ` heading, and our block
+    # opens with an HTML comment followed by rule bodies full of `## ` headings.
+    # That leaves stale rule text plus an orphaned END, and the plain
+    # BEGIN-present test below would then append a *second* block, so the stale
+    # copy keeps loading as always-on rules forever. Drop the orphaned END and
+    # say so; the remnant above it is indistinguishable from the user's own
+    # prose by position, so it is reported rather than guessed at.
+    if ! grep -qF "$_CLAUDE_SECTION_START" "$CLAUDE_MD" \
+        && grep -qF "$_CLAUDE_SECTION_END" "$CLAUDE_MD"; then
+        grep -vF "$_CLAUDE_SECTION_END" "$CLAUDE_MD" > "$CLAUDE_MD.tmp" \
+            && mv "$CLAUDE_MD.tmp" "$CLAUDE_MD"
+        echo "    ! $CLAUDE_MD had an END marker with no BEGIN (a third-party tool removed it)."
+        echo "      Dropped the orphaned marker. Stale rule text may remain above where it sat."
+    fi
+
     if grep -qF "$_CLAUDE_SECTION_START" "$CLAUDE_MD"; then
         python3 - "$CLAUDE_MD" "$tmp_section" << 'PYEOF'
 import re, sys
@@ -175,7 +192,7 @@ _resolve_node_bin() {
 
     local fnm_dir="$HOME/.local/share/fnm/node-versions"
     if [[ -d "$fnm_dir" ]]; then
-        # Highest version available — pinned, so _craftkit_hook_wire_settings migrates off
+        # Highest version available, pinned, so _craftkit_hook_wire_settings migrates off
         # this the moment a managed path appears.
         local stable
         stable="$(ls -1 "$fnm_dir" | sort -V | tail -1)"
@@ -223,7 +240,7 @@ def interpreter(cmd):
 # whatever existed on install day. Two ways that goes wrong, both re-pointed here:
 # the path stopped existing (dead hook, no routing gate, no error the user would notice),
 # or it is a version-pinned fnm path that is one `fnm uninstall` away from becoming the
-# first case. A working non-pinned command is left alone — it may be deliberate.
+# first case. A working non-pinned command is left alone, since it may be deliberate.
 for entry in ups:
     for h in entry.get('hooks', []):
         cmd = h.get('command', '')
@@ -280,7 +297,7 @@ install_claude_craftkit_hook() {
     fi
     # Wired on every sync, not only when the script content changed. Registration is
     # idempotent and now repairs a stale interpreter, so gating it on the copy meant the
-    # repair could never reach a machine whose hook script was already up to date —
+    # repair could never reach a machine whose hook script was already up to date,
     # which is every machine that had synced once.
     _craftkit_hook_wire_settings "$dest"
 }
@@ -294,7 +311,7 @@ uninstall_claude_craftkit_hook() {
     fi
 }
 
-# Called after every sync pass — rebuilds CLAUDE.md if the managed section is
+# Called after every sync pass. Rebuilds CLAUDE.md if the managed section is
 # missing or stale (e.g. file was manually edited or accidentally deleted).
 finalize_claude() {
     local has_rules=0
@@ -304,12 +321,12 @@ finalize_claude() {
 
     if [[ $has_rules -eq 1 ]]; then
         if [[ ! -f "$CLAUDE_MD" ]] || ! grep -qF "$_CLAUDE_SECTION_START" "$CLAUDE_MD"; then
-            echo "    ! CLAUDE.md managed section missing — rebuilding"
+            echo "    ! CLAUDE.md managed section missing, rebuilding"
             _rebuild_claude_md
         fi
     else
         if [[ -f "$CLAUDE_MD" ]] && grep -qF "$_CLAUDE_SECTION_START" "$CLAUDE_MD"; then
-            echo "    ! CLAUDE.md has stale managed section (no rule skills) — cleaning"
+            echo "    ! CLAUDE.md has stale managed section (no rule skills), cleaning"
             _remove_claude_md_section
         fi
     fi
@@ -343,7 +360,7 @@ _claude_strip_frontmatter() {
 # Renders an agent source file into $out. If the agent opts in via
 # `craftkitInject: ruleA, skillB`, the bodies of rules/<ruleA>.md /
 # skills/<skillB>/SKILL.md ... are spliced in as a managed block right after the
-# agent's frontmatter — so cold agents carry the live text instead of a
+# agent's frontmatter, so cold agents carry the live text instead of a
 # hand-maintained copy. No opt-in → plain copy.
 _claude_render_agent() {
     local src="$1" out="$2"
@@ -369,7 +386,7 @@ _claude_render_agent() {
                 echo ""
                 _claude_strip_frontmatter "$SKILLS_DIR/${r}/SKILL.md"
             else
-                echo "    ! craftkitInject: '$r' not found in rules/ or skills/ — skipped" >&2
+                echo "    ! craftkitInject: '$r' not found in rules/ or skills/, skipped" >&2
             fi
         done
         echo ""
