@@ -371,6 +371,60 @@ if [[ "${AGENTIC_SETUP:-0}" == "1" ]]; then
     ensure_tools
 fi
 
+# Retiring an adapter deletes its state files but left its staging dir behind: the
+# v1.25.1 removal of copilot and crush took the adapters out of ADAPTERS and the
+# repo, yet ~/.craftkit/copilot and ~/.craftkit/crush-rules were still on disk
+# months later. Staging dirs are ours and are rebuilt every sync, so any whose
+# prefix no longer matches a live adapter is an orphan. Pruned by prefix rather
+# than by an explicit retired-list, so the next retirement self-cleans.
+prune_orphan_staging() {
+    local staging="$HOME/.craftkit"
+    [[ -d "$staging" ]] || return 0
+    local d base live
+    for d in "$staging"/*; do
+        [[ -d "$d" ]] || continue
+        base="$(basename "$d")"
+        live=0
+        for adapter in "${ADAPTERS[@]}"; do
+            case "$base" in "$adapter"|"$adapter"-*) live=1; break ;; esac
+        done
+        if [[ $live -eq 0 ]]; then
+            rm -rf "$d"
+            echo "    - pruned orphan staging dir: ~/.craftkit/$base"
+        fi
+    done
+}
+
+prune_orphan_staging
+
+# The managed-block marker was named AGENTIC-SKILLS before this repo was called
+# craftkit, so the wire format disagreed with the product for six releases and a
+# reader had no way to tell whose block it was. Renaming the constant alone would
+# make every adapter miss the block already written into the user's file, append a
+# second one, and orphan the first, which is exactly the graphify failure mode
+# check 21 covers. So the legacy pair is rewritten in place first, before any
+# adapter looks for its markers. Idempotent: once rewritten there is nothing left
+# to match. The new marker also drops the em-dash, retiring one check 19 exemption.
+craftkit_migrate_markers() {
+    local f
+    for f in "$HOME/.claude/CLAUDE.md" "$HOME/GEMINI.md" "$HOME/.codex/AGENTS.md"; do
+        [[ -f "$f" ]] || continue
+        grep -qF "BEGIN AGENTIC-SKILLS" "$f" || continue
+        python3 - "$f" <<'PY'
+import io, sys
+p = sys.argv[1]
+s = io.open(p, encoding="utf-8").read()
+s = s.replace("<!-- BEGIN AGENTIC-SKILLS (managed \u2014 do not edit manually) -->",
+              "<!-- BEGIN CRAFTKIT (managed: do not edit manually) -->")
+s = s.replace("<!-- END AGENTIC-SKILLS -->", "<!-- END CRAFTKIT -->")
+io.open(p, "w", encoding="utf-8").write(s)
+PY
+        echo "    - migrated legacy managed-block marker in $f"
+    done
+}
+
+craftkit_migrate_markers
+
 for adapter in "${ADAPTERS[@]}"; do
     echo ""
     echo "[$adapter]"

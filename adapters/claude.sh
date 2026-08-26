@@ -11,8 +11,8 @@ CLAUDE_SETTINGS="$HOME/.claude/settings.json"
 CLAUDE_RULES_DIR="$HOME/.craftkit/claude-rules"
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
 _CRAFTKIT_HOOK_SCRIPT="craftkit-routing.js"
-_CLAUDE_SECTION_START="<!-- BEGIN AGENTIC-SKILLS (managed — do not edit manually) -->"
-_CLAUDE_SECTION_END="<!-- END AGENTIC-SKILLS -->"
+_CLAUDE_SECTION_START="<!-- BEGIN CRAFTKIT (managed: do not edit manually) -->"
+_CLAUDE_SECTION_END="<!-- END CRAFTKIT -->"
 _CLAUDE_AGENT_RULES_START="<!-- BEGIN CRAFTKIT-INJECTED-RULES (managed — regenerated on sync from rules/ or skills/) -->"
 _CLAUDE_AGENT_RULES_END="<!-- END CRAFTKIT-INJECTED-RULES -->"
 
@@ -73,7 +73,7 @@ with open(md_path) as f:
 with open(section_path) as f:
     replacement = f.read().strip()
 new_content = re.sub(
-    r'<!-- BEGIN AGENTIC-SKILLS.*?<!-- END AGENTIC-SKILLS -->',
+    r'<!-- BEGIN CRAFTKIT .*?<!-- END CRAFTKIT -->',
     lambda _: replacement,
     content,
     flags=re.DOTALL,
@@ -99,7 +99,7 @@ md_path = sys.argv[1]
 with open(md_path) as f:
     content = f.read()
 new_content = re.sub(
-    r'\n?<!-- BEGIN AGENTIC-SKILLS.*?<!-- END AGENTIC-SKILLS -->\n?',
+    r'\n?<!-- BEGIN CRAFTKIT .*?<!-- END CRAFTKIT -->\n?',
     '',
     content,
     flags=re.DOTALL,

@@ -112,13 +112,26 @@ done
 [[ $_fm -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
-# 5. Every craftkitInject name resolves.
+# 5. Every craftkitInject name resolves, and the field itself is spelled right.
 #    An injecting agent whose source is renamed loses its whole checklist and
 #    still installs: a review agent with nothing to review by.
+#    The target half of this check greps `^craftkitInject:`, so a misspelled
+#    FIELD passes vacuously: awk finds no list, the loop is skipped, and the
+#    agent installs with no injected body at all. fe-review would then review
+#    without the EVPMR constraints it exists to enforce, silently. Any
+#    frontmatter key that mentions inject but is not exactly craftkitInject is
+#    therefore a failure, which is cheaper than inferring intent.
 # ---------------------------------------------------------------------------
 check "craftkitInject sources resolve"
 _inj=0
 for a in $(agent_names); do
+    # Ordered before the empty-list skip on purpose: a misspelled field is exactly
+    # what leaves _list empty, so checking after the skip is never reached.
+    _bad_key="$(awk 'NR==1&&$0=="---"{fm=1;next} fm&&$0=="---"{exit} fm&&/^[A-Za-z_-]+:/{k=$0; sub(/:.*/,"",k); if (k ~ /[Ii]nject/ && k != "craftkitInject") print k}' "$AGENTS_DIR/$a.md")"
+    if [[ -n "$_bad_key" ]]; then
+        fail "agents/$a.md frontmatter key '$_bad_key' looks like craftkitInject but is not, so the inject is skipped silently"
+        _inj=1
+    fi
     _list="$(awk 'NR==1&&$0=="---"{fm=1;next} fm&&$0=="---"{exit} fm&&/^craftkitInject:/{sub(/^craftkitInject:[[:space:]]*/,"");print;exit}' "$AGENTS_DIR/$a.md")"
     [[ -z "$_list" ]] && continue
     for n in $(echo "$_list" | tr ',' ' '); do
@@ -432,7 +445,6 @@ _em="$(grep -rn "$_emdash" \
     "$REPO_DIR"/LICENSE "$REPO_DIR"/check.sh "$REPO_DIR"/sync.sh "$REPO_DIR"/install.sh \
     "$REPO_DIR"/.github/workflows/release.yml 2>/dev/null \
     | grep -v 'CHANGELOG' \
-    | grep -v 'BEGIN AGENTIC-SKILLS' \
     | grep -v 'CRAFTKIT-INJECTED-RULES' || true)"
 if [[ -n "$_em" ]]; then
     fail "em-dash in prose, so use a comma, colon, semicolon, period, or parentheses:"
@@ -498,7 +510,7 @@ printf -- '---\nname: probe-rule\n---\n\n## Probe section\n- probe constraint\n'
 {
     printf '# CLAUDE.md\n\n## my own notes\nkeep me\n\n'
     printf '## Layer constraints\n- stale rule text\n'
-    printf '<!-- END AGENTIC-SKILLS -->\n'
+    printf '<!-- END CRAFTKIT -->\n'
 } > "$_fx/CLAUDE.md"
 (
     set +u
@@ -509,8 +521,8 @@ printf -- '---\nname: probe-rule\n---\n\n## Probe section\n- probe constraint\n'
     CLAUDE_RULES_DIR="$_fx/rules"
     _rebuild_claude_md
 ) >/dev/null 2>&1
-_begins="$(grep -cF '<!-- BEGIN AGENTIC-SKILLS' "$_fx/CLAUDE.md" 2>/dev/null || echo 0)"
-_ends="$(grep -cF '<!-- END AGENTIC-SKILLS -->' "$_fx/CLAUDE.md" 2>/dev/null || echo 0)"
+_begins="$(grep -cF '<!-- BEGIN CRAFTKIT (' "$_fx/CLAUDE.md" 2>/dev/null || echo 0)"
+_ends="$(grep -cF '<!-- END CRAFTKIT -->' "$_fx/CLAUDE.md" 2>/dev/null || echo 0)"
 [[ "$_begins" -eq 1 ]] || { fail "expected exactly 1 BEGIN marker after recovery, got $_begins"; _rb=1; }
 [[ "$_ends" -eq 1 ]] || { fail "orphaned END marker survived, so the block is duplicated ($_ends END markers)"; _rb=1; }
 grep -qF 'keep me' "$_fx/CLAUDE.md" \
@@ -519,6 +531,24 @@ grep -qF 'probe constraint' "$_fx/CLAUDE.md" \
     || { fail "fresh rule body missing after recovery"; _rb=1; }
 rm -rf "$_fx"
 [[ $_rb -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 22. No adapter still carries the retired AGENTIC-SKILLS marker. The rename to
+#     CRAFTKIT was applied per adapter, and a partial application is worse than
+#     none: the migration in sync.sh renames the block already on disk, so an
+#     adapter left pointing at the old literal cannot find its marker, takes the
+#     append branch, and writes a SECOND block. That happened during this very
+#     change (two of three adapters silently no-op'd), producing duplicate blocks
+#     in CLAUDE.md and AGENTS.md. Cheap grep, so the half-done state cannot ship.
+# ---------------------------------------------------------------------------
+check "no adapter carries the retired managed-block marker"
+_legacy="$(grep -rn 'AGENTIC-SKILLS' "$REPO_DIR"/adapters 2>/dev/null || true)"
+if [[ -n "$_legacy" ]]; then
+    fail "adapter still references the retired AGENTIC-SKILLS marker, so it will append a duplicate block:"
+    echo "$_legacy" | sed 's/^/      /'
+else
+    pass
+fi
 
 echo
 if [[ $FAILURES -eq 0 ]]; then
