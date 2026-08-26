@@ -7,8 +7,8 @@
 
 CODEX_STAGING_DIR="$HOME/.craftkit/codex"
 CODEX_AGENTS_MD="$HOME/.codex/AGENTS.md"
-_CODEX_SECTION_START="<!-- BEGIN AGENTIC-SKILLS (managed — do not edit manually) -->"
-_CODEX_SECTION_END="<!-- END AGENTIC-SKILLS -->"
+_CODEX_SECTION_START="<!-- BEGIN CRAFTKIT (managed: do not edit manually) -->"
+_CODEX_SECTION_END="<!-- END CRAFTKIT -->"
 
 _rebuild_codex_agents_md() {
     local tmp_section
@@ -42,7 +42,7 @@ with open(md_path) as f:
 with open(section_path) as f:
     replacement = f.read().strip()
 new_content = re.sub(
-    r'<!-- BEGIN AGENTIC-SKILLS.*?<!-- END AGENTIC-SKILLS -->',
+    r'<!-- BEGIN CRAFTKIT .*?<!-- END CRAFTKIT -->',
     lambda _: replacement,
     content,
     flags=re.DOTALL,
@@ -67,7 +67,7 @@ md_path = sys.argv[1]
 with open(md_path) as f:
     content = f.read()
 new_content = re.sub(
-    r'\n?<!-- BEGIN AGENTIC-SKILLS.*?<!-- END AGENTIC-SKILLS -->\n?',
+    r'\n?<!-- BEGIN CRAFTKIT .*?<!-- END CRAFTKIT -->\n?',
     '',
     content,
     flags=re.DOTALL,

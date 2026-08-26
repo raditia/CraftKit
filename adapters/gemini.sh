@@ -4,8 +4,8 @@
 
 GEMINI_SKILLS_DIR="$HOME/.craftkit/gemini"
 GEMINI_MD="$HOME/GEMINI.md"
-_SECTION_START="<!-- BEGIN AGENTIC-SKILLS (managed — do not edit manually) -->"
-_SECTION_END="<!-- END AGENTIC-SKILLS -->"
+_SECTION_START="<!-- BEGIN CRAFTKIT (managed: do not edit manually) -->"
+_SECTION_END="<!-- END CRAFTKIT -->"
 
 # Rebuilds the managed section in ~/GEMINI.md from all installed skill files
 _rebuild_gemini_md() {
@@ -42,7 +42,7 @@ with open(section_path) as f:
     replacement = f.read().strip()
 
 new_content = re.sub(
-    r'<!-- BEGIN AGENTIC-SKILLS.*?<!-- END AGENTIC-SKILLS -->',
+    r'<!-- BEGIN CRAFTKIT .*?<!-- END CRAFTKIT -->',
     lambda _: replacement,
     content,
     flags=re.DOTALL,
@@ -72,7 +72,7 @@ with open(md_path) as f:
     content = f.read()
 
 new_content = re.sub(
-    r'\n?<!-- BEGIN AGENTIC-SKILLS.*?<!-- END AGENTIC-SKILLS -->\n?',
+    r'\n?<!-- BEGIN CRAFTKIT .*?<!-- END CRAFTKIT -->\n?',
     '',
     content,
     flags=re.DOTALL,
