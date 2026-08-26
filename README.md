@@ -207,7 +207,25 @@ Natural language routes to the right command automatically. No slash commands re
 "hand this session off" →  /handoff   (also: "summarize for the next agent")
 ```
 
-Platform is not inferred. On every prompt `hooks/craftkit-routing.js` walks up from `cwd` for `settings.gradle` (Android), `Podfile` / `Package.swift` / `*.xcodeproj` (iOS), or `package.json` (RN/web), where the nearest ancestor wins and several markers at one level report as mixed, then injects the answer. So `"write tests for this"` in an Android repo resolves to `/android-test`, never `/fe-test`.
+Platform is not inferred. On every prompt `hooks/craftkit-routing.js` resolves it from `cwd` and injects the answer:
+
+```mermaid
+flowchart TD
+    S["every prompt"] --> W["walk up from cwd"]
+    W --> C{"marker at this level?"}
+    C -->|"none"| U["parent directory"]
+    U --> W
+    C -->|"settings.gradle"| A["Android · MVP"]
+    C -->|"Podfile · Package.swift · *.xcodeproj"| I["iOS · MVVM-C"]
+    C -->|"package.json"| R["RN / web · EVPMR"]
+    C -->|"two or more at one level"| M["mixed · union both agent sets"]
+    A --> INJ["inject platform into the prompt"]
+    I --> INJ
+    R --> INJ
+    M --> INJ
+```
+
+Nearest ancestor wins, so `"write tests for this"` in an Android repo resolves to `/android-test`, never `/fe-test`.
 
 ---
 
@@ -370,7 +388,19 @@ When you want a lightweight, single-pass run, use the explicit slash command.
 | [`/ship`](commands/ship.md) | Simple pre-merge gate, tests already passing |
 | [`/build`](commands/build.md) | Scaffold-only, no parallel validation needed |
 
-**These are also the automatic substitute where subagents can't be spawned.** A `parallel-*` command exists to spawn agents, so a context that can't (a subagent, which gets no Agent tool, or a session whose instructions disable spawning) takes the twin instead: `/parallel-build`→`/build`, `/parallel-review`→`/review`, `/parallel-ship`→`/ship`, `/team-build`→`/build`. It announces the command it actually ran and names the substitution once if a validation axis is lost, rather than re-deriving the constraint on every turn. `check.sh` verifies each twin exists and is mapped in both the rule and the routing hook.
+**These are also the automatic substitute where subagents can't be spawned.** A `parallel-*` command exists to spawn agents, so a context that cannot spawn them cannot run one:
+
+```mermaid
+flowchart TD
+    N["build / review / ship intent"] --> Q{"can this context<br/>spawn subagents?"}
+    Q -->|"yes"| P["/parallel-build<br/>/parallel-review<br/>/parallel-ship"]
+    Q -->|"no: you are a subagent<br/>(no Agent tool), or a session<br/>instruction disables spawning"| T["twin<br/>/build · /review · /ship<br/>/team-build also to /build"]
+    T --> S2["announce the command actually run;<br/>name the lost validation axis once"]
+    P --> RUN["execute"]
+    S2 --> RUN
+```
+
+`check.sh` verifies each twin exists and is mapped in both the rule and the routing hook.
 
 ---
 
