@@ -377,7 +377,7 @@ Steps:
 
 **Never silently skip the classification step.** Skipping = wasting user tokens on work a skill would have done better. Every skipped skill check is a token waste the user pays for.
 
-A `PreToolUse` hook backs this on Claude Code: editing source with no `Skill` call in the turn raises a permission prompt naming the skills that fit the file. Announcing a skill is not invoking it, so call the Skill tool. One prompt per turn, and a subagent's own edits pass, since routing is the parent's job.
+A `PreToolUse` hook backs this on Claude Code: editing source with no `Skill` call in the turn raises a permission prompt naming the skills that fit the file. Announcing a skill is not invoking it, so call the Skill tool. One prompt per turn, and a subagent's own edits pass, since routing is the parent's job. A `Stop` hook backs the other half: a turn ending with an announcement it never invoked, or with no declaration at all, is blocked until it carries one.
 
 Ambiguous between two skills → name both, ask user which applies.
 

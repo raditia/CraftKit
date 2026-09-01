@@ -609,9 +609,15 @@ REAL = "zzz-fixture-skill"
 announce_cases = {
     "announce-lied": announced("Running /%s [cheapest]: generate it.\nHere is the message." % REAL),
     "announce-kept": announced("Running /%s [cheapest]: generate it." % REAL, invoke=REAL),
-    "announce-inline": announced("The format is `Running /%s [cheapest]` with no block under it." % REAL),
-    "announce-fenced": announced("Example:\n```\nRunning /%s [cheapest]: reason.\n```\nThat is documentation." % REAL),
+    "announce-inline": announced("No skill matched for this request. Responding directly.\nThe format is `Running /%s [cheapest]` with no block under it." % REAL),
+    "announce-fenced": announced("No skill matched for this request. Responding directly.\nExample:\n```\nRunning /%s [cheapest]: reason.\n```\nThat is documentation." % REAL),
     "announce-unknown": announced("Running /zzz-not-installed [cheapest]: generate it."),
+    # Check 2: the turn claimed nothing at all, which is how check 1 gets defeated.
+    "declare-silent": announced("Here is the PR message you asked for."),
+    "declare-nomatch": announced("No skill matched for this request. Responding directly.\nHere it is."),
+    "declare-bold": announced("**No skill matched for this request.** Responding directly."),
+    "declare-empty": announced(""),
+    "declare-by-invoking": announced("Here it is, no announcement line.", invoke=REAL),
 }
 for name, lines in announce_cases.items():
     with open("%s/%s.jsonl" % (gx, name), "w") as f:
@@ -720,6 +726,20 @@ PYEOF
         && { fail "announce gate re-blocks while already active, so the agent cannot ever stop"; _gd=1; }
     _announcegate /nope/missing.jsonl | grep -q '"decision"' \
         && { fail "announce gate blocks on an unreadable transcript instead of failing open"; _gd=1; }
+    # Check 2. Without it, check 1 is defeated by dropping the announcement, which trades
+    # the lie for a silent skip and loses the tell entirely.
+    _announcegate "$_gx/declare-silent.jsonl" | grep -q '"decision":"block"' \
+        || { fail "announce gate lets a turn end with no routing declaration, so silently skipping the line beats the gate"; _gd=1; }
+    _announcegate "$_gx/declare-nomatch.jsonl" | grep -q '"decision"' \
+        && { fail "announce gate blocks a declared no-match, which is the sanctioned way to route nothing"; _gd=1; }
+    _announcegate "$_gx/declare-bold.jsonl" | grep -q '"decision"' \
+        && { fail "announce gate blocks a bolded no-match line, so formatting the declaration breaks it"; _gd=1; }
+    # A Skill call IS the declaration; requiring prose on top would block every honest turn
+    # that just invoked the thing.
+    _announcegate "$_gx/declare-by-invoking.jsonl" | grep -q '"decision"' \
+        && { fail "announce gate demands prose from a turn that invoked a skill, so invoking is not enough"; _gd=1; }
+    _announcegate "$_gx/declare-empty.jsonl" | grep -q '"decision"' \
+        && { fail "announce gate blocks an empty reply, which is an interrupted turn, not an unrouted one"; _gd=1; }
 
     for _g in gate-skill-first.js gate-verify-on-stop.js gate-announce-honored.js; do
         echo 'not json' | node "$REPO_DIR/hooks/$_g" >/dev/null 2>&1 \

@@ -7,6 +7,17 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.32.0 — 2026-09-01
+
+**The announce gate was defeatable by not announcing, so a declaration is now mandatory.** v1.31.0 held announcements honest: say `Running /pr-message` and the Stop gate checks a `Skill` call actually happened. It never asked whether a turn claimed anything at all, and a prose-only turn arms neither of the other two gates. So the cheapest way past it was silence, which is a downgrade rather than a workaround: the lie becomes a silent skip, and the announcement that made the skip checkable is gone. A gate whose evasion is easier than compliance teaches evasion.
+
+- **`gate-announce-honored.js` gained a second refusal.** In order: HONEST (an announced skill was invoked), then PRESENT (the turn declared something). A `Skill` call or a slash command the user typed is a declaration on its own; otherwise the reply carries `Running /<skill>` or `No skill matched for this request.`. The no-match match is a lenient line-start prefix and tolerates bolding, because blocking on punctuation teaches nothing. An empty reply passes: an interrupted turn claimed nothing to hold it to. Worst case on a forgotten line is one extra round trip, since `stop_hook_active` lets the retry through.
+- **Both refusals live in one hook, not two.** They decide on the same question (is this turn's routing claim present and honest), read the same transcript once, and a second Stop gate could disagree with the first about where the turn began. That is the same reasoning that put `craftkit-transcript.js` in one file.
+- **`check.sh` 23 covers the second refusal in five more cases:** a silent turn blocks, a declared no-match does not, a bolded no-match does not, a turn that invoked without prose does not, and an empty reply does not. Writing them exposed that two v1.31.0 fixtures passed only because nothing checked for a declaration; both now carry one, which is what a real turn discussing the announce format would do.
+- **`rules/using-agent-skills.md` names the Stop half** alongside the `PreToolUse` half it already documented. The hook text and the rule have to agree, or the rule describes a gate that no longer behaves that way.
+
+Known limit, unchanged: an announcement naming a skill that resolves to nothing satisfies the declaration while check 1 skips it as unverifiable. Gaming it means inventing a skill name in plain sight, which is louder than silence, so it stays open.
+
 ## v1.31.0 — 2026-09-01
 
 **A third gate, because the first two only watched code edits.** `gate-skill-first.js` fires on `Edit|Write|MultiEdit|NotebookEdit`; `gate-verify-on-stop.js` arms only once a turn has written source. A turn whose whole output is prose satisfies neither. So an agent announced `Running /pr-message [cheapest]`, never called the Skill tool, and wrote the PR message freehand: wrong template, and the `/humanizer` pass that skill runs at its own Step 3.5 never happened either. Both gates returned `{}`, correctly, and nothing else was looking. Announcing without invoking is the worse half of the failure, because the announcement reads as evidence the skill ran, which is exactly the signal a reader has no way to check.
