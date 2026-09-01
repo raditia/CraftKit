@@ -1,6 +1,7 @@
 ---
 name: parallel-review
 description: Dynamic parallel code review. The classifier reads the diff, detects the platform (RN/web, Android, iOS), selects only relevant agents, spawns them concurrently. Adapts to what actually changed.
+craftkitInject: parallel-classifier
 ---
 
 **Commands:** `rtk git diff`, plus the platform's type/lint/test tooling (see Phase 1)

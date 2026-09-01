@@ -25,7 +25,7 @@ _CRAFTKIT_HOOKS=(
 )
 _CLAUDE_SECTION_START="<!-- BEGIN CRAFTKIT (managed: do not edit manually) -->"
 _CLAUDE_SECTION_END="<!-- END CRAFTKIT -->"
-_CLAUDE_AGENT_RULES_START="<!-- BEGIN CRAFTKIT-INJECTED-RULES (managed — regenerated on sync from rules/ or skills/) -->"
+_CLAUDE_AGENT_RULES_START="<!-- BEGIN CRAFTKIT-INJECTED-RULES (managed — regenerated on sync from partials/, rules/ or skills/) -->"
 _CLAUDE_AGENT_RULES_END="<!-- END CRAFTKIT-INJECTED-RULES -->"
 
 # Returns 0 if the skill's SKILL.md has alwaysApply: true
@@ -152,7 +152,7 @@ install_claude_command() {
     local name="$1"
     local source_file="$2"
     mkdir -p "$CLAUDE_COMMANDS_DIR"
-    cp "$source_file" "$CLAUDE_COMMANDS_DIR/${name}.md"
+    _claude_render_injected "$source_file" "$CLAUDE_COMMANDS_DIR/${name}.md"
 }
 
 uninstall_claude_command() {
@@ -398,9 +398,9 @@ get_claude_agent_dest() {
     echo "$CLAUDE_AGENTS_DIR/${1}.md"
 }
 
-# Reads the comma-separated source names from an agent's `craftkitInject:` frontmatter
-# line (only inside the leading --- block). Empty output = no injection requested.
-_claude_agent_inject_list() {
+# Reads the comma-separated source names from a `craftkitInject:` frontmatter line
+# (only inside the leading --- block). Empty output = no injection requested.
+_claude_inject_list() {
     awk '
         NR==1 && $0=="---" { infm=1; next }
         infm && $0=="---" { exit }
@@ -417,15 +417,16 @@ _claude_strip_frontmatter() {
     ' "$1"
 }
 
-# Renders an agent source file into $out. If the agent opts in via
-# `craftkitInject: ruleA, skillB`, the bodies of rules/<ruleA>.md /
-# skills/<skillB>/SKILL.md ... are spliced in as a managed block right after the
-# agent's frontmatter, so cold agents carry the live text instead of a
-# hand-maintained copy. No opt-in → plain copy.
-_claude_render_agent() {
+# Renders a source file into $out. If it opts in via `craftkitInject: a, b`, the
+# bodies of partials/<a>.md / rules/<a>.md / skills/<a>/SKILL.md ... are spliced in as a
+# managed block right after its own frontmatter, so the installed copy carries the live
+# text instead of a hand-maintained duplicate. No opt-in → plain copy.
+# Used for agents (a cold agent inherits no rules) and for commands (content shared by
+# several orchestrators that must not sit always-on in a rule to be shared).
+_claude_render_injected() {
     local src="$1" out="$2"
     local list
-    list="$(_claude_agent_inject_list "$src")"
+    list="$(_claude_inject_list "$src")"
     if [[ -z "$list" ]]; then
         cp "$src" "$out"
         return
@@ -438,15 +439,19 @@ _claude_render_agent() {
         echo "$list" | tr ',' '\n' | while IFS= read -r r; do
             r="$(echo "$r" | tr -d '[:space:]')"
             [[ -z "$r" ]] && continue
-            # rules/ wins over skills/ when a name exists in both
-            if [[ -f "$RULES_DIR/${r}.md" ]]; then
+            # partials/ first: it exists only to be spliced, so a name there is
+            # unambiguous. rules/ then wins over skills/ when a name is in both.
+            if [[ -f "$PARTIALS_DIR/${r}.md" ]]; then
+                echo ""
+                _claude_strip_frontmatter "$PARTIALS_DIR/${r}.md"
+            elif [[ -f "$RULES_DIR/${r}.md" ]]; then
                 echo ""
                 _claude_strip_frontmatter "$RULES_DIR/${r}.md"
             elif [[ -f "$SKILLS_DIR/${r}/SKILL.md" ]]; then
                 echo ""
                 _claude_strip_frontmatter "$SKILLS_DIR/${r}/SKILL.md"
             else
-                echo "    ! craftkitInject: '$r' not found in rules/ or skills/, skipped" >&2
+                echo "    ! craftkitInject: '$r' not found in partials/, rules/ or skills/, skipped" >&2
             fi
         done
         echo ""
@@ -469,7 +474,17 @@ effective_claude_agent_source() {
     local source_file="$2"
     local tmp
     tmp="$(mktemp)"
-    _claude_render_agent "$source_file" "$tmp"
+    _claude_render_injected "$source_file" "$tmp"
+    echo "$tmp"
+}
+
+# Same hook for commands: without it, an unchanged command whose injected partial moved on
+# would never re-sync, and the installed copy would silently keep the old text.
+effective_claude_command_source() {
+    local source_file="$2"
+    local tmp
+    tmp="$(mktemp)"
+    _claude_render_injected "$source_file" "$tmp"
     echo "$tmp"
 }
 
@@ -477,7 +492,7 @@ install_claude_agent() {
     local name="$1"
     local source_file="$2"
     mkdir -p "$CLAUDE_AGENTS_DIR"
-    _claude_render_agent "$source_file" "$CLAUDE_AGENTS_DIR/${name}.md"
+    _claude_render_injected "$source_file" "$CLAUDE_AGENTS_DIR/${name}.md"
 }
 
 uninstall_claude_agent() {

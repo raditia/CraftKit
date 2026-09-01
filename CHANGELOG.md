@@ -7,6 +7,16 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.33.0 — 2026-09-01
+
+**`partials/`: content several commands share, that no session needs resident.** A `/doctor` pass measured the always-on block at 11.5k est. tokens in every project, 8.2k of it `rules/using-agent-skills.md`, and 1.4k of THAT was the dynamic classifier: a procedure only `/parallel-review`, `/parallel-ship`, and `/parallel-build` ever run. It sat always-on for one reason, that three commands share it and authoring rule 2 forbids duplicating it into each. The mechanism to have both already existed for agents.
+
+- **`craftkitInject` now works on commands, not just agents.** `_claude_render_agent` became `_claude_render_injected` and resolution gained a first stop: `partials/<name>.md`, then `rules/`, then `skills/`. `install_claude_command` renders instead of copying, and `sync_commands_adapter` consults a new `effective_<a>_command_source` exactly as the agent pass does. Without that hook a command whose partial moved on diffs as unchanged and never re-syncs, which is the same currency bug the agent pass was given its hook to avoid.
+- **`partials/parallel-classifier.md`** holds the 110 lines cut from the rule, replaced there by a 4-line pointer. One source in the repo, spliced into three commands at install, zero resident cost. `rules/using-agent-skills.md` drops from 32,935 to 27,172 chars (8,233 to 6,793 est. tokens), so every session in every project pays ~1.4k less.
+- **`check.sh` check 5 covers commands and partials.** The agent scan became a shared `_inj_scan`, run over `commands/*.md` too, so a command that loses its procedure fails the gate the way an agent that loses its checklist already did. Plus a new direction: a partial nothing injects fails, because it syncs to no tool on its own and no sync run would ever mention it. Both new failures were confirmed to fire before being made to pass.
+
+**Two migration candidates were rejected on inspection, and the reasoning is the useful part.** The `## Model routing` per-AI tables looked inert from inside a Claude Code session, which is exactly the wrong frame: craftkit ships those rules to Cursor, Gemini CLI, and Codex CLI as well, where each row is the operative one. `## Standard context loading` has 30-odd skill consumers, so injecting it would duplicate at install into every one of them, trading a 366-token resident cost for a much larger distributed one. Both stay always-on. The honest saving is ~1.4k est. tokens, not the ~2.5-3.2k first estimated.
+
 ## v1.32.0 — 2026-09-01
 
 **The announce gate was defeatable by not announcing, so a declaration is now mandatory.** v1.31.0 held announcements honest: say `Running /pr-message` and the Stop gate checks a `Skill` call actually happened. It never asked whether a turn claimed anything at all, and a prose-only turn arms neither of the other two gates. So the cheapest way past it was silence, which is a downgrade rather than a workaround: the lie becomes a silent skip, and the announcement that made the skip checkable is gone. A gate whose evasion is easier than compliance teaches evasion.

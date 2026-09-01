@@ -1,4 +1,4 @@
-# craftkit `v1.32.0`
+# craftkit `v1.33.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -163,9 +163,10 @@ flowchart TD
     C --> S["skills/*/SKILL.md\non-demand slash commands"]
     C --> M["commands/*.md\nworkflow orchestrators"]
     C --> G["agents/*.md\ncold sub-agents · Claude only"]
+    C --> P["partials/*.md\nspliced into commands/agents\nnever loaded on its own"]
 ```
 
-Four namespaces, one source of truth:
+Five namespaces, one source of truth:
 
 | Directory | Loaded | Invoked |
 |-----------|--------|---------|
@@ -173,6 +174,7 @@ Four namespaces, one source of truth:
 | `skills/` | On demand | Slash command or natural language |
 | `commands/` | On demand | Slash command or natural language |
 | `agents/` | Spawned by an orchestrator | `subagent_type:`, never directly (Claude only) |
+| `partials/` | Only as a splice into a command or agent | Never, since it ships inside its host file (Claude only) |
 
 ### Where files land per AI tool
 
@@ -666,7 +668,9 @@ The parallel workflows detect the platform first, then spawn that platform's rev
 
 > **Agent system prompts are cold copies.** Agents don't inherit rules, skills, or session context, so anything the agent needs must be in `agents/<name>.md`.
 >
-> **`craftkitInject` avoids the hand-maintained duplicate.** Add `craftkitInject: <name>` to an agent's frontmatter and the sync splices that body in as a managed block at install time, regenerated on every pull. Each name resolves `rules/<name>.md` first, then `skills/<name>/SKILL.md`, so an agent can carry a live rule (`fe-review` ← `fe-rules`) or a live skill checklist (`android-review` ← `skills/android-review`). Prefer it over copying text into the agent; a copy silently rots when the source changes. Claude Code only.
+> **`craftkitInject` avoids the hand-maintained duplicate.** Add `craftkitInject: <name>` to an **agent's or command's** frontmatter and the sync splices that body in as a managed block at install time, regenerated on every pull. Each name resolves `partials/<name>.md` first, then `rules/<name>.md`, then `skills/<name>/SKILL.md`, so a file can carry a live partial (`parallel-review` ← `partials/parallel-classifier`), a live rule (`fe-review` ← `fe-rules`), or a live skill checklist (`android-review` ← `skills/android-review`). Prefer it over copying text; a copy silently rots when the source changes. Claude Code only.
+>
+> **`partials/` is the lazy-shared namespace.** A procedure several commands run, but that nothing needs resident, goes here: it syncs to no tool on its own and only ever arrives spliced. That is how the parallel classifier stopped costing ~1.4k est. tokens in every session while staying a single source of truth. A partial nothing injects fails `check.sh` check 5, since no sync would otherwise report it.
 
 ### Add an agent
 

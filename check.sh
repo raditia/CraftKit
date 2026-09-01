@@ -12,6 +12,7 @@ fi
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RULES_DIR="$REPO_DIR/rules"
+PARTIALS_DIR="$REPO_DIR/partials"
 SKILLS_DIR="$REPO_DIR/skills"
 COMMANDS_DIR="$REPO_DIR/commands"
 AGENTS_DIR="$REPO_DIR/agents"
@@ -113,8 +114,12 @@ done
 
 # ---------------------------------------------------------------------------
 # 5. Every craftkitInject name resolves, and the field itself is spelled right.
-#    An injecting agent whose source is renamed loses its whole checklist and
-#    still installs: a review agent with nothing to review by.
+#    Covers agents AND commands: both are rendered by the same splice, so both
+#    fail the same way. An injecting agent whose source is renamed loses its whole
+#    checklist and still installs: a review agent with nothing to review by. An
+#    injecting command loses its procedure and still installs, so an orchestrator
+#    reaches Phase 2 with no classifier. Also flags a partial nothing injects,
+#    which is dead weight that no sync would ever surface.
 #    The target half of this check greps `^craftkitInject:`, so a misspelled
 #    FIELD passes vacuously: awk finds no list, the loop is skipped, and the
 #    agent installs with no injected body at all. fe-review would then review
@@ -124,22 +129,40 @@ done
 # ---------------------------------------------------------------------------
 check "craftkitInject sources resolve"
 _inj=0
-for a in $(agent_names); do
-    # Ordered before the empty-list skip on purpose: a misspelled field is exactly
-    # what leaves _list empty, so checking after the skip is never reached.
-    _bad_key="$(awk 'NR==1&&$0=="---"{fm=1;next} fm&&$0=="---"{exit} fm&&/^[A-Za-z_-]+:/{k=$0; sub(/:.*/,"",k); if (k ~ /[Ii]nject/ && k != "craftkitInject") print k}' "$AGENTS_DIR/$a.md")"
-    if [[ -n "$_bad_key" ]]; then
-        fail "agents/$a.md frontmatter key '$_bad_key' looks like craftkitInject but is not, so the inject is skipped silently"
+_inj_used=""
+_inj_scan() {
+    # $1 = label for failures, $2 = file
+    local label="$1" f="$2" bad list n
+    bad="$(awk 'NR==1&&$0=="---"{fm=1;next} fm&&$0=="---"{exit} fm&&/^[A-Za-z_-]+:/{k=$0; sub(/:.*/,"",k); if (k ~ /[Ii]nject/ && k != "craftkitInject") print k}' "$f")"
+    if [[ -n "$bad" ]]; then
+        fail "$label frontmatter key '$bad' looks like craftkitInject but is not, so the inject is skipped silently"
         _inj=1
     fi
-    _list="$(awk 'NR==1&&$0=="---"{fm=1;next} fm&&$0=="---"{exit} fm&&/^craftkitInject:/{sub(/^craftkitInject:[[:space:]]*/,"");print;exit}' "$AGENTS_DIR/$a.md")"
-    [[ -z "$_list" ]] && continue
-    for n in $(echo "$_list" | tr ',' ' '); do
-        if [[ ! -f "$RULES_DIR/${n}.md" && ! -f "$SKILLS_DIR/${n}/SKILL.md" ]]; then
-            fail "agents/$a.md injects '$n', which is not in rules/ or skills/"
+    list="$(awk 'NR==1&&$0=="---"{fm=1;next} fm&&$0=="---"{exit} fm&&/^craftkitInject:/{sub(/^craftkitInject:[[:space:]]*/,"");print;exit}' "$f")"
+    [[ -z "$list" ]] && return
+    for n in $(echo "$list" | tr ',' ' '); do
+        _inj_used="$_inj_used $n"
+        if [[ ! -f "$PARTIALS_DIR/${n}.md" && ! -f "$RULES_DIR/${n}.md" && ! -f "$SKILLS_DIR/${n}/SKILL.md" ]]; then
+            fail "$label injects '$n', which is not in partials/, rules/ or skills/"
             _inj=1
         fi
     done
+}
+for c in "$REPO_DIR"/commands/*.md; do
+    [[ -f "$c" ]] && _inj_scan "commands/$(basename "$c")" "$c"
+done
+for _p in "$PARTIALS_DIR"/*.md; do
+    [[ -f "$_p" ]] || continue
+    _pn="$(basename "$_p" .md)"
+    case " $_inj_used " in
+        *" $_pn "*) ;;
+        *) fail "partials/$_pn.md is injected by nothing, so it ships to no tool and no sync reports it"; _inj=1 ;;
+    esac
+done
+for a in $(agent_names); do
+    # The scanner checks the misspelled-field case BEFORE the empty-list skip on
+    # purpose: a misspelled field is exactly what leaves the list empty.
+    _inj_scan "agents/$a.md" "$AGENTS_DIR/$a.md"
 done
 [[ $_inj -eq 0 ]] && pass
 

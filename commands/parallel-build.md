@@ -1,6 +1,7 @@
 ---
 name: parallel-build
 description: Dynamic parallel build workflow with platform-routed context + scaffold + implement, then classifier-selected validation agents running concurrently. Supports RN/web (EVPMR), Android (MVP), and iOS (MVVM-C).
+craftkitInject: parallel-classifier
 ---
 
 **Commands:** `rtk git diff`, plus the platform's type/lint/test tooling (see Step 0)
