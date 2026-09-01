@@ -550,6 +550,156 @@ else
     pass
 fi
 
+# ---------------------------------------------------------------------------
+# 23. The enforcement gates actually refuse. The routing hook only injects text,
+#     and an agent can read text and hand-roll the work anyway, which is the
+#     failure this pair exists to stop: an edit with no skill invoked, and a turn
+#     that reports done having skipped the verification command. Behavioral,
+#     because a gate that silently returns {} is indistinguishable from no gate,
+#     and both gates fail OPEN by design, so a broken one looks fine in use.
+# ---------------------------------------------------------------------------
+check "enforcement gates refuse and fail open"
+if ! command -v node >/dev/null 2>&1; then
+    echo "    skipped (node not on PATH)"
+else
+    _gx="$(mktemp -d)"
+    mkdir -p "$_gx/proj" && echo '{}' > "$_gx/proj/package.json"
+    python3 - "$_gx" << 'PYEOF'
+import json, sys
+gx = sys.argv[1]
+
+
+def assistant(items):
+    return {"type": "assistant", "message": {"role": "assistant", "content": items}}
+
+
+def use(name, inp):
+    return {"type": "tool_use", "name": name, "input": inp}
+
+
+def build(mode):
+    lines = [{"type": "user", "message": {"role": "user", "content": "edit foo"}}]
+    if mode == "skill":
+        lines.append(assistant([use("Skill", {"skill": "fe-test"})]))
+    lines.append(assistant([use("Edit", {"file_path": "/x/ViewFoo.tsx"})]))
+    # A tool_result also has role user, and must not be read as a new turn.
+    lines.append({"type": "user", "message": {"role": "user",
+                  "content": [{"type": "tool_result", "content": "ok"}]}})
+    if mode == "verified":
+        lines.append(assistant([use("Bash", {"command": "rtk tsc --noEmit && rtk lint ViewFoo.tsx"})]))
+    return lines
+
+
+for mode in ("bare", "skill", "verified"):
+    with open("%s/%s.jsonl" % (gx, mode), "w") as f:
+        f.write("\n".join(json.dumps(x) for x in build(mode)) + "\n")
+
+# A subagent's transcript is its own file and every entry carries isSidechain.
+side = build("bare")
+for entry in side:
+    entry["isSidechain"] = True
+with open("%s/sidechain.jsonl" % gx, "w") as f:
+    f.write("\n".join(json.dumps(x) for x in side) + "\n")
+PYEOF
+    # TMPDIR is redirected into the fixture so the gate's one-ask-per-turn stamps land
+    # there and vanish with it, instead of leaking between check runs.
+    _skillgate() {
+        printf '{"session_id":"%s","transcript_path":"%s","tool_input":{"file_path":"%s"}}' "$1" "$2" "$3" \
+            | TMPDIR="$_gx" node "$REPO_DIR/hooks/gate-skill-first.js" 2>/dev/null
+    }
+    _stopgate() {
+        printf '{"session_id":"s","transcript_path":"%s","cwd":"%s"%s}' "$1" "$_gx/proj" "${2:-}" \
+            | node "$REPO_DIR/hooks/gate-verify-on-stop.js" 2>/dev/null
+    }
+    _gd=0
+    _skillgate s1 "$_gx/bare.jsonl" /x/ViewFoo.tsx | grep -q '"permissionDecision":"ask"' \
+        || { fail "skill gate let an unrouted source edit through, so the routing gate is advisory again"; _gd=1; }
+    _skillgate s2 "$_gx/skill.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "skill gate still asks after a Skill call, so every routed edit costs a prompt"; _gd=1; }
+    _skillgate s3 "$_gx/bare.jsonl" /x/notes.md | grep -q 'permissionDecision' \
+        && { fail "skill gate asks on a non-source file, which gates prose edits for no reason"; _gd=1; }
+    _skillgate s4 /nope/missing.jsonl /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "skill gate blocks on an unreadable transcript instead of failing open"; _gd=1; }
+    # One interruption per unrouted turn. Per edit, a ten-edit turn costs ten prompts,
+    # which trains the human to click through the gate, which is the gate not existing.
+    _skillgate s5 "$_gx/bare.jsonl" /x/ViewFoo.tsx >/dev/null
+    _skillgate s5 "$_gx/bare.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "skill gate asks twice in one turn, so a multi-edit turn is a wall of prompts"; _gd=1; }
+    _skillgate s6 "$_gx/bare.jsonl" /x/ViewFoo.tsx | grep -q '"permissionDecision":"ask"' \
+        || { fail "skill gate stamp leaks across sessions, so a new session inherits an ask it never made"; _gd=1; }
+    # A subagent has its own transcript, so the parent's Skill call is not in it. Gating it
+    # would prompt on every edit a /parallel-build implementer makes, at a point where a
+    # background agent may have nobody able to answer.
+    _skillgate s7 "$_gx/sidechain.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "skill gate asks inside a subagent, so every parallel-build implementer stalls on a prompt"; _gd=1; }
+    _stopgate "$_gx/bare.jsonl" | grep -q '"decision":"block"' \
+        || { fail "stop gate let a turn end with edits and no verification command"; _gd=1; }
+    _stopgate "$_gx/verified.jsonl" | grep -q '"decision"' \
+        && { fail "stop gate blocks after the gates ran, which makes ending any turn impossible"; _gd=1; }
+    _stopgate "$_gx/bare.jsonl" ',"stop_hook_active":true' | grep -q '"decision"' \
+        && { fail "stop gate re-blocks while already active, so the agent cannot ever stop"; _gd=1; }
+    # Editing through the shell leaves no Edit tool call, so the turn's file list cannot
+    # come from tool calls alone. Caught during this change: both gates were blind to it,
+    # which is the route an agent bypassing a skill is most likely to take.
+    if command -v git >/dev/null 2>&1; then
+        (cd "$_gx/proj" && git init -q . && git add -A && git commit -qm init >/dev/null 2>&1) || true
+        echo x > "$_gx/proj/ViewX.tsx"
+        python3 - "$_gx" << 'PYEOF'
+import json, sys
+gx = sys.argv[1]
+
+
+def turn(prompt, command):
+    return [{"type": "user", "message": {"role": "user", "content": prompt}},
+            {"type": "assistant", "message": {"role": "assistant", "content": [
+                {"type": "tool_use", "name": "Bash", "input": {"command": command}}]}}]
+
+
+cases = {"shell": turn("edit", "sed -i '' s/a/b/ ViewX.tsx"),
+         "readonly": turn("what is this", "cat ViewX.tsx"),
+         "delegated": [{"type": "user", "message": {"role": "user", "content": "build it"}},
+                       {"type": "assistant", "message": {"role": "assistant", "content": [
+                           {"type": "tool_use", "name": "Agent", "input": {"prompt": "implement"}}]}}]}
+for name, lines in cases.items():
+    with open("%s/%s.jsonl" % (gx, name), "w") as f:
+        f.write("\n".join(json.dumps(x) for x in lines) + "\n")
+PYEOF
+        _stopgate "$_gx/shell.jsonl" | grep -q '"decision":"block"' \
+            || { fail "stop gate misses a shell-route edit (sed -i), the bypass most likely to skip a skill"; _gd=1; }
+        _stopgate "$_gx/readonly.jsonl" | grep -q '"decision"' \
+            && { fail "stop gate blocks a read-only turn on a dirty tree, so pre-existing dirt gates every turn"; _gd=1; }
+        # Delegating the edits hides them the same way the shell does: a subagent's writes
+        # land in ITS transcript, so the parent's turn shows no edits at all.
+        _stopgate "$_gx/delegated.jsonl" | grep -q '"decision":"block"' \
+            || { fail "stop gate misses edits made by a spawned agent, so delegating skips verification"; _gd=1; }
+    fi
+    for _g in gate-skill-first.js gate-verify-on-stop.js; do
+        echo 'not json' | node "$REPO_DIR/hooks/$_g" >/dev/null 2>&1 \
+            || { fail "$_g exits non-zero on malformed stdin, which surfaces as a tool error every call"; _gd=1; }
+    done
+    rm -rf "$_gx"
+    [[ $_gd -eq 0 ]] && pass
+fi
+
+# ---------------------------------------------------------------------------
+# 24. The hook table and hooks/ agree in both directions, same invariant as
+#     check 13 holds for adapters. A script in hooks/ that no table entry names
+#     is never installed, and a table entry with no script installs nothing while
+#     registering a command that fails on every event it fires for.
+# ---------------------------------------------------------------------------
+check "hook table matches hooks/"
+_ht=0
+_table="$(bash -c ". '$REPO_DIR/adapters/claude.sh' >/dev/null 2>&1; printf '%s\n' \"\${_CRAFTKIT_HOOKS[@]}\"" | cut -d'%' -f1 | sort)"
+for _f in "$REPO_DIR"/hooks/*.js; do
+    _b="$(basename "$_f")"
+    echo "$_table" | grep -qx "$_b" || { fail "hooks/$_b is in no _CRAFTKIT_HOOKS entry, so sync never installs it"; _ht=1; }
+done
+for _b in $_table; do
+    [[ -f "$REPO_DIR/hooks/$_b" ]] || { fail "_CRAFTKIT_HOOKS names $_b, but hooks/$_b does not exist"; _ht=1; }
+    grep -q "$_b" "$README" || { fail "$_b is installed but undocumented in README"; _ht=1; }
+done
+[[ $_ht -eq 0 ]] && pass
+
 echo
 if [[ $FAILURES -eq 0 ]]; then
     echo "All checks passed."

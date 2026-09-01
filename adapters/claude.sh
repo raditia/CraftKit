@@ -10,7 +10,18 @@ CLAUDE_HOOKS_DIR="$HOME/.claude/hooks"
 CLAUDE_SETTINGS="$HOME/.claude/settings.json"
 CLAUDE_RULES_DIR="$HOME/.craftkit/claude-rules"
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
-_CRAFTKIT_HOOK_SCRIPT="craftkit-routing.js"
+# Hooks craftkit installs, as script%event%matcher%statusMessage (% because a PreToolUse
+# matcher is a regex alternation and owns the pipe). Empty matcher = the event takes none.
+# Event "-" = support file, copied next to the hooks but never registered.
+# Division of labour: the routing hook injects text, which an agent can read and then
+# ignore, and the two gates are the enforcement half, because PreToolUse and Stop are the
+# only events that can refuse a call rather than describe one.
+_CRAFTKIT_HOOKS=(
+    "craftkit-routing.js%UserPromptSubmit%%CraftKit routing..."
+    "gate-skill-first.js%PreToolUse%Edit|Write|MultiEdit|NotebookEdit%CraftKit skill gate..."
+    "gate-verify-on-stop.js%Stop%%CraftKit verify gate..."
+    "craftkit-transcript.js%-%%"
+)
 _CLAUDE_SECTION_START="<!-- BEGIN CRAFTKIT (managed: do not edit manually) -->"
 _CLAUDE_SECTION_END="<!-- END CRAFTKIT -->"
 _CLAUDE_AGENT_RULES_START="<!-- BEGIN CRAFTKIT-INJECTED-RULES (managed — regenerated on sync from rules/ or skills/) -->"
@@ -205,30 +216,35 @@ _resolve_node_bin() {
     command -v node 2>/dev/null || echo "node"
 }
 
-_craftkit_hook_wire_settings() {
-    local hook_dest="$1"
-    local node_bin
+# The table as JSON, one object per registered hook, for the python3 wiring pass.
+# No field can contain a quote or backslash (script names and matchers are literals),
+# so printf is enough and a serializer would be ceremony.
+_craftkit_hook_spec_json() {
+    local node_bin h script event matcher statusmsg sep=""
     node_bin="$(_resolve_node_bin)"
-    local hook_cmd="\"${node_bin}\" \"${hook_dest}\""
+    printf '['
+    for h in "${_CRAFTKIT_HOOKS[@]}"; do
+        script="$(echo "$h" | cut -d'%' -f1)"
+        event="$(echo "$h" | cut -d'%' -f2)"
+        matcher="$(echo "$h" | cut -d'%' -f3)"
+        statusmsg="$(echo "$h" | cut -d'%' -f4)"
+        [[ "$event" == "-" ]] && continue
+        printf '%s{"script":"%s","event":"%s","matcher":"%s","status":"%s","command":"\\\"%s\\\" \\\"%s/%s\\\""}' \
+            "$sep" "$script" "$event" "$matcher" "$statusmsg" "$node_bin" "$CLAUDE_HOOKS_DIR" "$script"
+        sep=","
+    done
+    printf ']'
+}
 
+_craftkit_hook_wire_settings() {
     mkdir -p "$(dirname "$CLAUDE_SETTINGS")"
+    [[ -f "$CLAUDE_SETTINGS" ]] || echo '{}' > "$CLAUDE_SETTINGS"
 
-    if [[ ! -f "$CLAUDE_SETTINGS" ]]; then
-        python3 -c "
-import json
-hook = {'type':'command','command':'${hook_cmd}','timeout':5,'statusMessage':'CraftKit routing...'}
-print(json.dumps({'hooks':{'UserPromptSubmit':[{'hooks':[hook]}]}},indent=2))
-" > "$CLAUDE_SETTINGS"
-        return
-    fi
-
-    python3 - "$CLAUDE_SETTINGS" "$hook_cmd" << 'PYEOF'
+    python3 - "$CLAUDE_SETTINGS" "$(_craftkit_hook_spec_json)" << 'PYEOF'
 import json, os, re, sys
-settings_path, hook_cmd = sys.argv[1], sys.argv[2]
+settings_path, spec = sys.argv[1], json.loads(sys.argv[2])
 with open(settings_path) as f:
     settings = json.load(f)
-hook = {'type': 'command', 'command': hook_cmd, 'timeout': 5, 'statusMessage': 'CraftKit routing...'}
-ups = settings.setdefault('hooks', {}).setdefault('UserPromptSubmit', [])
 
 
 def interpreter(cmd):
@@ -238,47 +254,81 @@ def interpreter(cmd):
 
 # Registration used to be write-once, which meant the interpreter path was frozen at
 # whatever existed on install day. Two ways that goes wrong, both re-pointed here:
-# the path stopped existing (dead hook, no routing gate, no error the user would notice),
+# the path stopped existing (dead hook, no gate, no error the user would notice),
 # or it is a version-pinned fnm path that is one `fnm uninstall` away from becoming the
 # first case. A working non-pinned command is left alone, since it may be deliberate.
-for entry in ups:
-    for h in entry.get('hooks', []):
-        cmd = h.get('command', '')
-        if 'craftkit-routing' not in cmd:
-            continue
-        current = interpreter(cmd)
-        alive = os.path.isfile(current) and os.access(current, os.X_OK)
-        pinned = 'fnm/node-versions' in current or 'fnm_multishells' in current
-        if alive and not pinned:
-            sys.exit(0)
-        h['command'] = hook_cmd
-        with open(settings_path, 'w') as f:
-            json.dump(settings, f, indent=2)
-            f.write('\n')
-        print('    routing hook interpreter re-pointed: %s -> %s'
-              % (current, interpreter(hook_cmd)))
-        sys.exit(0)
-if ups:
-    ups[0].setdefault('hooks', []).append(hook)
-else:
-    ups.append({'hooks': [hook]})
-with open(settings_path, 'w') as f:
-    json.dump(settings, f, indent=2)
-    f.write('\n')
+def repair(entries, script, hook_cmd):
+    for entry in entries:
+        for h in entry.get('hooks', []):
+            cmd = h.get('command', '')
+            if script not in cmd:
+                continue
+            current = interpreter(cmd)
+            alive = os.path.isfile(current) and os.access(current, os.X_OK)
+            pinned = 'fnm/node-versions' in current or 'fnm_multishells' in current
+            if not (alive and not pinned):
+                h['command'] = hook_cmd
+                print('    %s interpreter re-pointed: %s -> %s'
+                      % (script, current, interpreter(hook_cmd)))
+            return True
+    return False
+
+
+changed = False
+for item in spec:
+    entries = settings.setdefault('hooks', {}).setdefault(item['event'], [])
+    before = json.dumps(entries, sort_keys=True)
+    if not repair(entries, item['script'], item['command']):
+        hook = {'type': 'command', 'command': item['command'], 'timeout': 10}
+        if item['status']:
+            hook['statusMessage'] = item['status']
+        # A matcher belongs to the entry, not the hook, so an entry with the wrong
+        # matcher cannot be reused: sharing one would silently widen or narrow which
+        # tools the gate sees.
+        target = None
+        for entry in entries:
+            if entry.get('matcher', '') == item['matcher']:
+                target = entry
+                break
+        if target is None:
+            target = {'hooks': []}
+            if item['matcher']:
+                target['matcher'] = item['matcher']
+            entries.append(target)
+        target.setdefault('hooks', []).append(hook)
+    if json.dumps(entries, sort_keys=True) != before:
+        changed = True
+
+if changed:
+    with open(settings_path, 'w') as f:
+        json.dump(settings, f, indent=2)
+        f.write('\n')
 PYEOF
 }
 
 _craftkit_hook_unwire_settings() {
     [[ ! -f "$CLAUDE_SETTINGS" ]] && return
-    python3 - "$CLAUDE_SETTINGS" << 'PYEOF'
+    local scripts h
+    scripts=""
+    for h in "${_CRAFTKIT_HOOKS[@]}"; do
+        scripts="$scripts$(echo "$h" | cut -d'%' -f1) "
+    done
+    python3 - "$CLAUDE_SETTINGS" "$scripts" << 'PYEOF'
 import json, sys
-settings_path = sys.argv[1]
+settings_path, scripts = sys.argv[1], sys.argv[2].split()
 with open(settings_path) as f:
     settings = json.load(f)
-ups = settings.get('hooks', {}).get('UserPromptSubmit', [])
-for entry in ups:
-    entry['hooks'] = [h for h in entry.get('hooks', []) if 'craftkit-routing' not in h.get('command', '')]
-settings['hooks']['UserPromptSubmit'] = [e for e in ups if e.get('hooks')]
+hooks = settings.get('hooks', {})
+for event in list(hooks):
+    entries = hooks.get(event) or []
+    for entry in entries:
+        entry['hooks'] = [h for h in entry.get('hooks', [])
+                          if not any(s in h.get('command', '') for s in scripts)]
+    # Only our own leftovers are collapsed: an entry emptied by us goes, an event array
+    # holding someone else's hooks stays exactly as it was.
+    hooks[event] = [e for e in entries if e.get('hooks')]
+    if not hooks[event]:
+        del hooks[event]
 with open(settings_path, 'w') as f:
     json.dump(settings, f, indent=2)
     f.write('\n')
@@ -286,29 +336,38 @@ PYEOF
 }
 
 install_claude_craftkit_hook() {
-    local src="$REPO_DIR/hooks/$_CRAFTKIT_HOOK_SCRIPT"
-    local dest="$CLAUDE_HOOKS_DIR/$_CRAFTKIT_HOOK_SCRIPT"
-    [[ ! -f "$src" ]] && return
     mkdir -p "$CLAUDE_HOOKS_DIR"
-    if [[ ! -f "$dest" ]] || ! diff -q "$src" "$dest" &>/dev/null; then
-        cp "$src" "$dest"
-        chmod +x "$dest"
-        echo "    + hook: craftkit-routing"
-    fi
-    # Wired on every sync, not only when the script content changed. Registration is
-    # idempotent and now repairs a stale interpreter, so gating it on the copy meant the
-    # repair could never reach a machine whose hook script was already up to date,
-    # which is every machine that had synced once.
-    _craftkit_hook_wire_settings "$dest"
+    local h script src dest
+    for h in "${_CRAFTKIT_HOOKS[@]}"; do
+        script="$(echo "$h" | cut -d'%' -f1)"
+        src="$REPO_DIR/hooks/$script"
+        dest="$CLAUDE_HOOKS_DIR/$script"
+        [[ ! -f "$src" ]] && continue
+        if [[ ! -f "$dest" ]] || ! diff -q "$src" "$dest" &>/dev/null; then
+            cp "$src" "$dest"
+            chmod +x "$dest"
+            echo "    + hook: ${script%.js}"
+        fi
+    done
+    # Wired on every sync, not only when a script changed. Registration is idempotent and
+    # repairs a stale interpreter, so gating it on the copy meant the repair could never
+    # reach a machine whose hook scripts were already up to date, which is every machine
+    # that had synced once.
+    _craftkit_hook_wire_settings
 }
 
 uninstall_claude_craftkit_hook() {
-    local dest="$CLAUDE_HOOKS_DIR/$_CRAFTKIT_HOOK_SCRIPT"
-    if [[ -f "$dest" ]]; then
-        rm -f "$dest"
-        _craftkit_hook_unwire_settings
-        echo "    - hook: craftkit-routing"
-    fi
+    local h script dest removed=0
+    for h in "${_CRAFTKIT_HOOKS[@]}"; do
+        script="$(echo "$h" | cut -d'%' -f1)"
+        dest="$CLAUDE_HOOKS_DIR/$script"
+        if [[ -f "$dest" ]]; then
+            rm -f "$dest"
+            echo "    - hook: ${script%.js}"
+            removed=1
+        fi
+    done
+    [[ $removed -eq 1 ]] && _craftkit_hook_unwire_settings
 }
 
 # Called after every sync pass. Rebuilds CLAUDE.md if the managed section is

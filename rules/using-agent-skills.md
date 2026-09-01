@@ -328,6 +328,8 @@ Every skill has a verification step. "Seems right" is never sufficient; there mu
 
 All three must be clean. Common type misses: spread arg types (TS2556), missing required props (TS2322), incompatible types in mocks.
 
+On Claude Code a `Stop` hook checks this: a turn that edited source and ran no verification command is blocked from ending, and told which command the project requires. Read that block as the gate working. Run the command, report its real output, and if one genuinely cannot run here, say which and that the change is unverified.
+
 ### 7. Use the model for judgment, not mechanics
 
 Use Claude for: classification, drafting, summarization, extraction, tradeoff evaluation.
@@ -374,6 +376,8 @@ Steps:
    Then respond.
 
 **Never silently skip the classification step.** Skipping = wasting user tokens on work a skill would have done better. Every skipped skill check is a token waste the user pays for.
+
+A `PreToolUse` hook backs this on Claude Code: editing source with no `Skill` call in the turn raises a permission prompt naming the skills that fit the file. Announcing a skill is not invoking it, so call the Skill tool. One prompt per turn, and a subagent's own edits pass, since routing is the parent's job.
 
 Ambiguous between two skills → name both, ask user which applies.
 

@@ -1,4 +1,4 @@
-# craftkit `v1.29.1`
+# craftkit `v1.30.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -11,6 +11,7 @@ One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**,
 - [How it works](#how-it-works)
 - [Using the workflows](#using-the-workflows)
   - [Just say what you want](#just-say-what-you-want)
+  - [Enforcement gates](#enforcement-gates-hooks-that-refuse) · the hooks that stop an unrouted edit
   - [Dynamic workflows](#dynamic-workflows-default) · `/parallel-review`, `/parallel-ship`, `/parallel-build`
   - [How the classifier picks agents](#how-the-classifier-picks-agents)
   - [Sequential fallback](#sequential-fallback) · `/review`, `/ship`, `/build`
@@ -226,6 +227,31 @@ flowchart TD
 ```
 
 Nearest ancestor wins, so `"write tests for this"` in an Android repo resolves to `/android-test`, never `/fe-test`.
+
+---
+
+### Enforcement gates: hooks that refuse
+
+Routing context is text, and an agent can read text, announce the right skill, and then hand-roll the work anyway. Three hooks close that gap, and only the last two can actually stop a call:
+
+| Hook | Event | What it does |
+|------|-------|--------------|
+| [`craftkit-routing.js`](hooks/craftkit-routing.js) | `UserPromptSubmit` | Injects the routing table, platform, and model tiers. Advisory: it describes the rule |
+| [`gate-skill-first.js`](hooks/gate-skill-first.js) | `PreToolUse` on `Edit\|Write\|MultiEdit\|NotebookEdit` | An edit to source code with no `Skill` call in this turn returns `ask`, naming the skills that fit the file |
+| [`gate-verify-on-stop.js`](hooks/gate-verify-on-stop.js) | `Stop` | A turn that edited source and ran no verification command is blocked from ending, and told which command to run |
+
+[`craftkit-transcript.js`](hooks/craftkit-transcript.js) is the shared scanner both gates read the current turn through, so they can never disagree about where the turn started.
+
+Design notes worth knowing before you trust them:
+
+- **Per turn, not per session.** One skill call early on buys no session-long pass; the gate re-arms every time you speak. A slash command you typed yourself arms it too.
+- **`ask`, never `deny`.** The human keeps the override, the agent does not.
+- **One prompt per unrouted turn.** The gate fires per tool call, so a ten-edit turn would have cost ten prompts, which trains you to click through it. The first ask stamps the turn and the rest of it passes. Denying the first edit therefore lets the remainder of that turn through, on the assumption the denial already redirected the agent.
+- **Fail open.** An unreadable transcript, malformed stdin, or a project with no gate command passes. A gate that guesses is worse than one that abstains, so both abstain.
+- **Subagents are enforced at the parent, not inside.** A subagent gets its own transcript under `<session>/subagents/`, so the parent's `Skill` call is not in it and the skill gate would prompt on every edit a `/parallel-build` implementer makes, where a background agent may have nobody able to answer. Sidechain turns therefore pass. What closes the loop is the Stop gate: a parent turn that spawned an agent takes its file list from `git status`, because the subagent's writes are invisible in the parent's transcript exactly as shell writes are.
+- **Shell-route edits.** `sed -i`, a heredoc, or `tee` writes a file with no `Edit` tool call, so the skill gate never sees it (`PreToolUse` fires per tool, and the tool was `Bash`). The Stop gate closes that: a turn whose commands look write-ish, or which spawned an agent, has its file list taken from `git status` instead. A read-only turn on an already-dirty tree still passes, because the turn has to have written something first.
+- **The Stop gate reads your project.** `check.sh` at the root means that is the required command; otherwise a `package.json` requires a typecheck and a lint. Neither present means no gate.
+- **Escape hatch:** `CRAFTKIT_GATE=off` disables both gates for the session.
 
 ---
 
@@ -813,6 +839,10 @@ git add commands/my-command.md && git commit -m "feat: add my-command" && git pu
 git add agents/my-agent.md && git commit -m "feat: add my-agent agent" && git push
 # users: git pull → auto-installed to ~/.claude/agents/
 ```
+
+### Add a hook (Claude Code enforcement)
+
+Drop the script in `hooks/`, add a `script%event%matcher%statusMessage` row to `_CRAFTKIT_HOOKS` in `adapters/claude.sh`, and document it in [Enforcement gates](#enforcement-gates-hooks-that-refuse). `check.sh` check 24 fails if any of the three is missing, in either direction. A gate must fail open and survive malformed stdin: check 23 asserts both, behaviorally.
 
 ### Remove a skill, command, or agent
 

@@ -147,6 +147,7 @@ Adapted from [mattpocock/skills](https://github.com/mattpocock/skills) `writing-
 | New rule added | Add row to the Rules table |
 | New command added | Add row to the Orchestrators table |
 | New agent added | Add row to the Agents reference table (name, role, spawned-by, model) |
+| New hook added | Add a `_CRAFTKIT_HOOKS` row in `adapters/claude.sh` + document it under Enforcement gates (check 24 fails otherwise) |
 | Agent removed / renamed | Remove row / update name + all `subagent_type:` references in commands |
 | Skill discovery tree changed | Update the tree in `using-agent-skills.md` AND README |
 | Version bumped | Update `# craftkit \`vX.Y.Z\`` header + add a `## vX.Y.Z — date` section atop `CHANGELOG.md` (GH Action creates the release on push) |
