@@ -1,4 +1,4 @@
-# craftkit `v1.30.0`
+# craftkit `v1.31.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -232,15 +232,16 @@ Nearest ancestor wins, so `"write tests for this"` in an Android repo resolves t
 
 ### Enforcement gates: hooks that refuse
 
-Routing context is text, and an agent can read text, announce the right skill, and then hand-roll the work anyway. Three hooks close that gap, and only the last two can actually stop a call:
+Routing context is text, and an agent can read text, announce the right skill, and then hand-roll the work anyway. Four hooks close that gap, and only the last three can actually stop a call:
 
 | Hook | Event | What it does |
 |------|-------|--------------|
 | [`craftkit-routing.js`](hooks/craftkit-routing.js) | `UserPromptSubmit` | Injects the routing table, platform, and model tiers. Advisory: it describes the rule |
 | [`gate-skill-first.js`](hooks/gate-skill-first.js) | `PreToolUse` on `Edit\|Write\|MultiEdit\|NotebookEdit` | An edit to source code with no `Skill` call in this turn returns `ask`, naming the skills that fit the file |
 | [`gate-verify-on-stop.js`](hooks/gate-verify-on-stop.js) | `Stop` | A turn that edited source and ran no verification command is blocked from ending, and told which command to run |
+| [`gate-announce-honored.js`](hooks/gate-announce-honored.js) | `Stop` | A turn whose reply says `Running /<skill>` with no `Skill` call behind it is blocked from ending, and told to invoke it or retract the claim |
 
-[`craftkit-transcript.js`](hooks/craftkit-transcript.js) is the shared scanner both gates read the current turn through, so they can never disagree about where the turn started.
+[`craftkit-transcript.js`](hooks/craftkit-transcript.js) is the shared scanner all three gates read the current turn through, so they can never disagree about where the turn started.
 
 Design notes worth knowing before you trust them:
 
@@ -250,8 +251,10 @@ Design notes worth knowing before you trust them:
 - **Fail open.** An unreadable transcript, malformed stdin, or a project with no gate command passes. A gate that guesses is worse than one that abstains, so both abstain.
 - **Subagents are enforced at the parent, not inside.** A subagent gets its own transcript under `<session>/subagents/`, so the parent's `Skill` call is not in it and the skill gate would prompt on every edit a `/parallel-build` implementer makes, where a background agent may have nobody able to answer. Sidechain turns therefore pass. What closes the loop is the Stop gate: a parent turn that spawned an agent takes its file list from `git status`, because the subagent's writes are invisible in the parent's transcript exactly as shell writes are.
 - **Shell-route edits.** `sed -i`, a heredoc, or `tee` writes a file with no `Edit` tool call, so the skill gate never sees it (`PreToolUse` fires per tool, and the tool was `Bash`). The Stop gate closes that: a turn whose commands look write-ish, or which spawned an agent, has its file list taken from `git status` instead. A read-only turn on an already-dirty tree still passes, because the turn has to have written something first.
+- **Announcing is not invoking, and only one gate sees that.** The other two key on code edits, so a turn producing only prose (a PR message, a humanized draft) passes both while the agent writes freehand under a skill's name. That is the worse half of the failure, because the announcement reads as evidence the skill ran. `gate-announce-honored.js` matches `Running /<name>` at line start against the `Skill` calls actually recorded in the turn. Line-anchored, fence-stripped, and limited to names that resolve to something installed, so documenting the format does not trip it. Known limit: plugin skills (`<plugin>:<name>`) are not enumerated and fail open.
+- **Locally installed skills are routed too.** Anything under `~/.claude/skills/` or `<project>/.claude/skills/` is not craftkit's and cannot be hardcoded into the table, so `craftkit-routing.js` enumerates those directories per prompt and appends whatever the table did not already name. `/humanizer` sat outside the classification set entirely until this existed. Enumeration stats through symlinks, which is how marketplace installers place a skill.
 - **The Stop gate reads your project.** `check.sh` at the root means that is the required command; otherwise a `package.json` requires a typecheck and a lint. Neither present means no gate.
-- **Escape hatch:** `CRAFTKIT_GATE=off` disables both gates for the session.
+- **Escape hatch:** `CRAFTKIT_GATE=off` disables all three gates for the session.
 
 ---
 

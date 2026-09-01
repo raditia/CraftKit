@@ -117,6 +117,28 @@ function detectPlatform(startDir) {
   return null;
 }
 
+// Skills installed outside craftkit (~/.claude/skills, <project>/.claude/skills) are absent
+// from the table above, so they never enter the classification set and never get routed to.
+// /humanizer sat unrouted this way. Enumerated at runtime because craftkit does not own them.
+function localSkills(cwd, advertised) {
+  const names = [];
+  for (const root of [path.join(os.homedir(), '.claude'), path.join(cwd, '.claude')]) {
+    const dir = path.join(root, 'skills');
+    let items;
+    try { items = fs.readdirSync(dir); } catch (e) { continue; }
+    for (const name of items) {
+      // statSync, not withFileTypes: a skill installed by symlink (which is how the
+      // marketplace installers do it) reports as a link, never as a directory.
+      let isDir = false;
+      try { isDir = fs.statSync(path.join(dir, name)).isDirectory(); } catch (e) { continue; }
+      if (!isDir) continue;
+      if (advertised.includes('/' + name)) continue;
+      if (!names.includes(name)) names.push(name);
+    }
+  }
+  return names;
+}
+
 let input = '';
 process.stdin.on('data', chunk => { input += chunk; });
 process.stdin.on('end', () => {
@@ -130,10 +152,7 @@ process.stdin.on('end', () => {
   const platformLine = platform
     ? `Platform (detected from cwd, authoritative): ${platform}. Route to this platform's skills, agents, and gates.\n\n`
     : '';
-  process.stdout.write(JSON.stringify({
-    hookSpecificOutput: {
-      hookEventName: "UserPromptSubmit",
-      additionalContext:
+  const context =
         "CraftKit skill-first gate. Classify every prompt against skills BEFORE responding; on match output 'Running /skill [tier]: reason.' then invoke, else output exactly 'No skill matched for this request. Responding directly.' Do NOT respond before invoking. Silent bypass = violation. Full routing table + tiebreakers: rules/using-agent-skills.md.\n\n" +
         platformLine +
         "Orchestrators: build/implement feature→/parallel-build · review/check changes→/parallel-review · ship/merge→/parallel-ship · broken/bug/crash→/fix · tests/coverage→platform test skill (/fe-test RN-web · /android-test · /ios-test) · PR message→/pr-message · scaffold only→/build\n" +
@@ -144,7 +163,14 @@ process.stdin.on('end', () => {
         "Android (*.kt/*.java, MVP): /android-patterns /android-scaffold /android-review /android-test /android-a11y /android-performance /android-context\n" +
         "iOS (*.swift/*.m, MVVM-C): /ios-patterns /ios-scaffold /ios-review /ios-test /ios-a11y /ios-performance /ios-context\n" +
         "Every orchestrator is platform-routed: /parallel-build /parallel-review /parallel-ship /build /fix /ship /pr-message detect RN-web vs Android vs iOS at Step 0 and swap in that platform's gates, skills, and agents. Native single-screen work uses no EVPMR and no docs/context.md, so read a real sibling screen instead; standard context loading does not apply there. Announcing a /fe-* skill on a .kt or .swift task is a routing error.\n\n" +
-        `Model tiers (${tier.plan} plan, ids resolved from ~/.claude.json entitlements): cheapest=${tier.cheapest}, everyday=${tier.everyday}, escalate=${tier.escalate}${tier.resolved ? '' : ' (entitlements unreadable, family aliases only)'}. These are authoritative: use them wherever a skill names a tier, and spawn agents with the family alias (haiku/sonnet/opus/fable), which tracks the newest model in that family on its own.`
+        `Model tiers (${tier.plan} plan, ids resolved from ~/.claude.json entitlements): cheapest=${tier.cheapest}, everyday=${tier.everyday}, escalate=${tier.escalate}${tier.resolved ? '' : ' (entitlements unreadable, family aliases only)'}. These are authoritative: use them wherever a skill names a tier, and spawn agents with the family alias (haiku/sonnet/opus/fable), which tracks the newest model in that family on its own.`;
+  const local = localSkills(cwd, context);
+  process.stdout.write(JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: "UserPromptSubmit",
+      additionalContext: context + (local.length
+        ? `\n\nLocally installed skills (not craftkit's, classify against these too): ${local.map(n => '/' + n).join(' ')}.`
+        : '')
     }
   }));
 });

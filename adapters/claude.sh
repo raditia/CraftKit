@@ -20,6 +20,7 @@ _CRAFTKIT_HOOKS=(
     "craftkit-routing.js%UserPromptSubmit%%CraftKit routing..."
     "gate-skill-first.js%PreToolUse%Edit|Write|MultiEdit|NotebookEdit%CraftKit skill gate..."
     "gate-verify-on-stop.js%Stop%%CraftKit verify gate..."
+    "gate-announce-honored.js%Stop%%CraftKit announce gate..."
     "craftkit-transcript.js%-%%"
 )
 _CLAUDE_SECTION_START="<!-- BEGIN CRAFTKIT (managed: do not edit manually) -->"

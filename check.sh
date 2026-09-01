@@ -553,10 +553,11 @@ fi
 # ---------------------------------------------------------------------------
 # 23. The enforcement gates actually refuse. The routing hook only injects text,
 #     and an agent can read text and hand-roll the work anyway, which is the
-#     failure this pair exists to stop: an edit with no skill invoked, and a turn
-#     that reports done having skipped the verification command. Behavioral,
-#     because a gate that silently returns {} is indistinguishable from no gate,
-#     and both gates fail OPEN by design, so a broken one looks fine in use.
+#     failure this trio exists to stop: an edit with no skill invoked, a turn
+#     that reports done having skipped the verification command, and a turn that
+#     announced a skill and then hand-rolled the work. Behavioral, because a gate
+#     that silently returns {} is indistinguishable from no gate, and all three
+#     fail OPEN by design, so a broken one looks fine in use.
 # ---------------------------------------------------------------------------
 check "enforcement gates refuse and fail open"
 if ! command -v node >/dev/null 2>&1; then
@@ -593,6 +594,28 @@ def build(mode):
 for mode in ("bare", "skill", "verified"):
     with open("%s/%s.jsonl" % (gx, mode), "w") as f:
         f.write("\n".join(json.dumps(x) for x in build(mode)) + "\n")
+
+# Announce-gate fixtures. The skill name is fixture-local (resolved from the cwd's own
+# .claude/) so the case does not depend on what this machine happens to have installed.
+def announced(text, invoke=None):
+    lines = [{"type": "user", "message": {"role": "user", "content": "write the PR message"}}]
+    if invoke:
+        lines.append(assistant([use("Skill", {"skill": invoke})]))
+    lines.append(assistant([{"type": "text", "text": text}]))
+    return lines
+
+
+REAL = "zzz-fixture-skill"
+announce_cases = {
+    "announce-lied": announced("Running /%s [cheapest]: generate it.\nHere is the message." % REAL),
+    "announce-kept": announced("Running /%s [cheapest]: generate it." % REAL, invoke=REAL),
+    "announce-inline": announced("The format is `Running /%s [cheapest]` with no block under it." % REAL),
+    "announce-fenced": announced("Example:\n```\nRunning /%s [cheapest]: reason.\n```\nThat is documentation." % REAL),
+    "announce-unknown": announced("Running /zzz-not-installed [cheapest]: generate it."),
+}
+for name, lines in announce_cases.items():
+    with open("%s/%s.jsonl" % (gx, name), "w") as f:
+        f.write("\n".join(json.dumps(x) for x in lines) + "\n")
 
 # A subagent's transcript is its own file and every entry carries isSidechain.
 side = build("bare")
@@ -673,7 +696,32 @@ PYEOF
         _stopgate "$_gx/delegated.jsonl" | grep -q '"decision":"block"' \
             || { fail "stop gate misses edits made by a spawned agent, so delegating skips verification"; _gd=1; }
     fi
-    for _g in gate-skill-first.js gate-verify-on-stop.js; do
+    mkdir -p "$_gx/proj/.claude/skills/zzz-fixture-skill"
+    _announcegate() {
+        printf '{"session_id":"s","transcript_path":"%s","cwd":"%s"%s}' "$1" "$_gx/proj" "${2:-}" \
+            | node "$REPO_DIR/hooks/gate-announce-honored.js" 2>/dev/null
+    }
+    # The lie the other two gates cannot see: prose-only turn, zero edits, so neither the
+    # PreToolUse matcher nor the verify gate ever arms.
+    _announcegate "$_gx/announce-lied.jsonl" | grep -q '"decision":"block"' \
+        || { fail "announce gate let a turn end having announced a skill it never invoked"; _gd=1; }
+    _announcegate "$_gx/announce-kept.jsonl" | grep -q '"decision"' \
+        && { fail "announce gate blocks after the skill actually ran, so honest turns cannot end"; _gd=1; }
+    # Meta-discussion about the gate must not trip the gate, or documenting it is impossible.
+    _announcegate "$_gx/announce-inline.jsonl" | grep -q '"decision"' \
+        && { fail "announce gate trips on a backticked mid-sentence mention, so prose about it blocks"; _gd=1; }
+    _announcegate "$_gx/announce-fenced.jsonl" | grep -q '"decision"' \
+        && { fail "announce gate trips on a fenced example, which blocks every doc that shows the format"; _gd=1; }
+    # A name resolving to nothing installed is prose or a typo, and a gate that guesses is
+    # worse than one that abstains.
+    _announcegate "$_gx/announce-unknown.jsonl" | grep -q '"decision"' \
+        && { fail "announce gate blocks on a skill that is not installed, so any /word in prose blocks"; _gd=1; }
+    _announcegate "$_gx/announce-lied.jsonl" ',"stop_hook_active":true' | grep -q '"decision"' \
+        && { fail "announce gate re-blocks while already active, so the agent cannot ever stop"; _gd=1; }
+    _announcegate /nope/missing.jsonl | grep -q '"decision"' \
+        && { fail "announce gate blocks on an unreadable transcript instead of failing open"; _gd=1; }
+
+    for _g in gate-skill-first.js gate-verify-on-stop.js gate-announce-honored.js; do
         echo 'not json' | node "$REPO_DIR/hooks/$_g" >/dev/null 2>&1 \
             || { fail "$_g exits non-zero on malformed stdin, which surfaces as a tool error every call"; _gd=1; }
     done

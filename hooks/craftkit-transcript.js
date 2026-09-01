@@ -60,11 +60,15 @@ function turnIdOf(entry, text) {
 // (bash command strings), skills (Skill tool invocations), slashCommand (the user
 // typed /<skill> themselves, which arms the gate just as a Skill call does), turnId
 // (stable identity of this turn), sidechain (this transcript belongs to a subagent, which
-// gets its own file under <session>/subagents/), and delegated (the turn spawned an agent,
-// so files may have been written where this transcript cannot see them).
+// gets its own file under <session>/subagents/), delegated (the turn spawned an agent,
+// so files may have been written where this transcript cannot see them), slashCommands
+// (the names the user typed, so a gate can match an announcement against them), and
+// assistantText (everything the agent said this turn, which is where an announcement of a
+// skill lives when no Skill call followed it).
 function currentTurn(transcriptPath) {
   const out = { edits: [], commands: [], skills: [], slashCommand: false, readable: false,
-                turnId: '', sidechain: false, delegated: false };
+                turnId: '', sidechain: false, delegated: false, slashCommands: [],
+                assistantText: '' };
   const lines = readTailLines(transcriptPath);
   if (!lines.length) return out;
   out.readable = true;
@@ -86,14 +90,20 @@ function currentTurn(transcriptPath) {
   if (entries[start] && isUserTurn(entries[start])) {
     const text = userText(entries[start]);
     out.slashCommand = /<command-name>/.test(text);
+    let sc;
+    const scRe = /<command-name>\s*\/?([A-Za-z0-9:_-]+)/g;
+    while ((sc = scRe.exec(text)) !== null) out.slashCommands.push(sc[1]);
     out.turnId = turnIdOf(entries[start], text);
     out.sidechain = entries[start].isSidechain === true;
   }
 
+  const said = [];
   for (let i = start; i < entries.length; i++) {
     const content = entries[i].message && entries[i].message.content;
     if (!Array.isArray(content)) continue;
+    const isAssistant = entries[i].type === 'assistant';
     for (const item of content) {
+      if (isAssistant && item && item.type === 'text' && item.text) said.push(String(item.text));
       if (!item || item.type !== 'tool_use') continue;
       const input = item.input || {};
       if (item.name === 'Skill') out.skills.push(input.skill || 'unknown');
@@ -105,6 +115,7 @@ function currentTurn(transcriptPath) {
       }
     }
   }
+  out.assistantText = said.join('\n');
   return out;
 }
 
