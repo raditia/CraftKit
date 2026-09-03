@@ -7,6 +7,18 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.34.0 — 2026-09-01
+
+**`fe-rules` stopped teaching EVPMR to Kotlin sessions.** The managed CLAUDE.md block loads in every project, so a React/React Native layer contract shipped at user scope was resident during Android and iOS work, where it is wrong by definition, and during work in repos with no frontend at all. This was the last open finding from the `/doctor` pass, and it needed a mechanism rather than a config change: Claude Code has no user-scope path-scoped rule. `.claude/rules/*.md` with `paths:` is project-scoped and checked in, while craftkit ships at user scope.
+
+- **`platform:` frontmatter on a rule** (`fe`, `android`, `ios`, or a comma-separated set) makes it conditional. `rules/fe-rules.md` declares `platform: fe`.
+- **Claude: excluded from the block, injected at `SessionStart`.** `adapters/claude.sh` skips a scoped rule when rebuilding the managed block, leaving it staged in `~/.craftkit/claude-rules`, and `hooks/craftkit-platform-rules.js` loads it only when the cwd's markers match. `SessionStart` rather than `UserPromptSubmit`: the body is ~1k tokens, and re-injecting that per prompt costs far more than the always-on copy it replaced. `SessionStart` fires on resume, clear, and compact as well, so the rules come back after a context reset instead of silently vanishing mid-session.
+- **Cursor: native `globs`.** It is the one tool with real path scoping, so a scoped rule renders as `alwaysApply: false` with a per-platform glob set rather than always-on. Gemini CLI and Codex CLI have no conditional mechanism and keep the rule always-on, which is a stated limitation rather than an oversight.
+- **`hooks/craftkit-platform.js`** now owns detection, shared by the routing hook and the new one. Two copies drifting would route the prompt to one platform's skills while loading another platform's rules, which is worse than either being wrong alone. The marker rows gained a short `key` beside the prose `label` so both consumers read one table.
+- **`check.sh` 23b** holds both halves behaviorally: the scoped rule must be staged and absent from the block, the hook must inject on a `package.json` fixture and stay silent on a Gradle one and on a bare directory, and Cursor must render globs for a scoped rule while leaving unscoped rules always-on. It also fails when NO rule uses the mechanism, so the machinery cannot sit unexercised. Confirmed to fail before passing by removing `platform: fe` and re-running.
+
+Always-on block: 40,243 to 36,251 chars, roughly 10,060 to 9,062 est. tokens, in every session of every project. Combined with v1.33.0, the `/doctor` pass took it from 46,006 chars.
+
 ## v1.33.0 — 2026-09-01
 
 **`partials/`: content several commands share, that no session needs resident.** A `/doctor` pass measured the always-on block at 11.5k est. tokens in every project, 8.2k of it `rules/using-agent-skills.md`, and 1.4k of THAT was the dynamic classifier: a procedure only `/parallel-review`, `/parallel-ship`, and `/parallel-build` ever run. It sat always-on for one reason, that three commands share it and authoring rule 2 forbids duplicating it into each. The mechanism to have both already existed for agents.

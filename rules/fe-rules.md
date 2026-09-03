@@ -1,6 +1,7 @@
 ---
 name: fe-rules
 description: Always-active EVPMR constraints for React/React Native/Next.js. Enforced on every frontend task without invocation.
+platform: fe
 ---
 
 Hard constraints for the Entry/View/Presenter/Model/Resource architecture. These are laws, not suggestions. For the full review workflow, use `/fe-review`.

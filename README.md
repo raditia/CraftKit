@@ -1,4 +1,4 @@
-# craftkit `v1.33.0`
+# craftkit `v1.34.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -234,7 +234,7 @@ Nearest ancestor wins, so `"write tests for this"` in an Android repo resolves t
 
 ### Enforcement gates: hooks that refuse
 
-Routing context is text, and an agent can read text, announce the right skill, and then hand-roll the work anyway. Four hooks close that gap, and only the last three can actually stop a call:
+Routing context is text, and an agent can read text, announce the right skill, and then hand-roll the work anyway. Five hooks close that gap, and only the three gates can actually stop a call:
 
 | Hook | Event | What it does |
 |------|-------|--------------|
@@ -242,8 +242,9 @@ Routing context is text, and an agent can read text, announce the right skill, a
 | [`gate-skill-first.js`](hooks/gate-skill-first.js) | `PreToolUse` on `Edit\|Write\|MultiEdit\|NotebookEdit` | An edit to source code with no `Skill` call in this turn returns `ask`, naming the skills that fit the file |
 | [`gate-verify-on-stop.js`](hooks/gate-verify-on-stop.js) | `Stop` | A turn that edited source and ran no verification command is blocked from ending, and told which command to run |
 | [`gate-announce-honored.js`](hooks/gate-announce-honored.js) | `Stop` | Two refusals: a reply saying `Running /<skill>` with no `Skill` call behind it, and a reply carrying no routing declaration at all |
+| [`craftkit-platform-rules.js`](hooks/craftkit-platform-rules.js) | `SessionStart` | Loads a `platform:`-scoped rule only where the cwd matches, so EVPMR laws stay out of Kotlin and Swift sessions |
 
-[`craftkit-transcript.js`](hooks/craftkit-transcript.js) is the shared scanner all three gates read the current turn through, so they can never disagree about where the turn started.
+[`craftkit-transcript.js`](hooks/craftkit-transcript.js) is the shared scanner all three gates read the current turn through, so they can never disagree about where the turn started. [`craftkit-platform.js`](hooks/craftkit-platform.js) plays the same role for the platform question, shared by the routing hook and the platform-rules hook: two copies drifting would route the prompt to one platform's skills while loading another's rules.
 
 Design notes worth knowing before you trust them:
 
@@ -257,7 +258,8 @@ Design notes worth knowing before you trust them:
 - **A declaration is mandatory, which is what makes the check above stick.** Holding announcements honest is defeated by never announcing, and that trade is a downgrade: the lie becomes a silent skip, and the tell you could have checked is gone. So the same gate also refuses a turn that claimed nothing: every turn ends carrying either `Running /<skill>` or `No skill matched for this request.`, and a `Skill` call or a slash command you typed counts as the declaration on its own. An empty reply passes, because an interrupted turn claimed nothing to hold it to. Worst case on a forgotten line is one extra round trip, since `stop_hook_active` lets the retry through.
 - **Locally installed skills are routed too.** Anything under `~/.claude/skills/` or `<project>/.claude/skills/` is not craftkit's and cannot be hardcoded into the table, so `craftkit-routing.js` enumerates those directories per prompt and appends whatever the table did not already name. `/humanizer` sat outside the classification set entirely until this existed. Enumeration stats through symlinks, which is how marketplace installers place a skill.
 - **The Stop gate reads your project.** `check.sh` at the root means that is the required command; otherwise a `package.json` requires a typecheck and a lint. Neither present means no gate.
-- **Escape hatch:** `CRAFTKIT_GATE=off` disables all three gates for the session.
+- **Path-scoped rules, per tool.** A rule whose frontmatter declares `platform: fe` (or `android`, `ios`, or a comma-separated set) is no longer always-on. Claude Code has no user-scope path-scoped rule mechanism: `.claude/rules/*.md` with `paths:` is project-scoped and checked in, while craftkit ships at user scope, so anything in the managed block loads in **every** project. `fe-rules` therefore taught EVPMR laws during Kotlin work. The scoped rule is now left out of the block and injected by `craftkit-platform-rules.js` at `SessionStart` only where the cwd matches. `SessionStart` rather than per-prompt because the body is ~1k tokens, and it fires on resume, clear, and compact too, so the rules survive a context reset. Cursor is the one tool with native scoping and gets `alwaysApply: false` plus real `globs` instead. Gemini CLI and Codex CLI have no conditional mechanism, so the rule stays always-on there; that is a stated limitation, not an oversight.
+- **Escape hatch:** `CRAFTKIT_GATE=off` disables all three gates and the platform-rules injection for the session.
 
 ---
 

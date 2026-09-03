@@ -21,7 +21,9 @@ _CRAFTKIT_HOOKS=(
     "gate-skill-first.js%PreToolUse%Edit|Write|MultiEdit|NotebookEdit%CraftKit skill gate..."
     "gate-verify-on-stop.js%Stop%%CraftKit verify gate..."
     "gate-announce-honored.js%Stop%%CraftKit announce gate..."
+    "craftkit-platform-rules.js%SessionStart%%CraftKit platform rules..."
     "craftkit-transcript.js%-%%"
+    "craftkit-platform.js%-%%"
 )
 _CLAUDE_SECTION_START="<!-- BEGIN CRAFTKIT (managed: do not edit manually) -->"
 _CLAUDE_SECTION_END="<!-- END CRAFTKIT -->"
@@ -36,6 +38,17 @@ _claude_is_rule() {
 }
 
 # Rebuilds the managed section in ~/.claude/CLAUDE.md from all staged rule files
+# Returns 0 when a rule declares `platform:` frontmatter, non-zero otherwise. Success means
+# "platform-scoped", so callers branch on the exit status alone.
+_claude_rule_platform() {
+    awk '
+        NR==1 && $0=="---" { infm=1; next }
+        infm && $0=="---" { exit }
+        infm && /^platform:/ { found=1; exit }
+        END { exit(found ? 0 : 1) }
+    ' "$1"
+}
+
 _rebuild_claude_md() {
     local tmp_section
     tmp_section="$(mktemp)"
@@ -44,6 +57,11 @@ _rebuild_claude_md() {
         echo "$_CLAUDE_SECTION_START"
         for f in "$CLAUDE_RULES_DIR"/*.md; do
             [[ -f "$f" ]] || continue
+            # A rule declaring `platform:` is NOT always-on: the managed block loads in every
+            # project, so fe-rules taught EVPMR laws during Kotlin work. It stays staged and
+            # hooks/craftkit-platform-rules.js injects it at SessionStart only where the cwd
+            # matches. Skipping it here is what makes that hook the single loader.
+            _claude_rule_platform "$f" >/dev/null && continue
             echo ""
             cat "$f"
             echo ""

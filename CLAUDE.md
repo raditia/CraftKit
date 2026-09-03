@@ -29,7 +29,7 @@ The whole system is a **fan-out from four content directories into per-tool dest
 
 | Dir | Loaded by AI | Invoked | Format |
 |-----|--------------|---------|--------|
-| `rules/*.md` | Every session, always-on | Never | frontmatter + body |
+| `rules/*.md` | Every session, always-on, unless frontmatter declares `platform:` | Never | frontmatter + body |
 | `skills/<name>/SKILL.md` | On demand | `/<name>` or natural language | `alwaysApply` flag in frontmatter decides rule vs command |
 | `commands/*.md` | On demand | `/<name>` or natural language | orchestrator workflows that spawn agents |
 | `agents/*.md` | Spawned by commands | `subagent_type:` in a command | cold sub-agent: frontmatter (name, description, tools, model) + system prompt |
@@ -63,6 +63,16 @@ Each `adapters/<tool>.sh` implements a fixed set of function names that `sync.sh
 **Agents are Claude-only.** Only `adapters/claude.sh` defines `install_<a>_agent`: the other three tools have no cold sub-agent concept, so `sync.sh` skips the agent pass for them (guarded on `declare -f install_${adapter}_agent`). Agent-related contract functions are therefore Claude-specific in practice.
 
 **Optional `effective_<a>_agent_source` / `effective_<a>_command_source` hooks.** An adapter that *transforms* an agent or command on install (rather than plain-copying) can define `effective_<a>_agent_source <name> <source>` / `effective_<a>_command_source <name> <source>` returning a path to the rendered output. `sync_agents_adapter` diffs the dest against that rendered file (and removes it after) instead of the raw source, so the skip-unchanged check stays honest and a transformed agent doesn't re-sync every run. Only Claude defines it today (for `craftkitInject`).
+
+**Platform-scoped rules (`platform:` frontmatter).** A rule declaring `platform: fe` (or `android`, `ios`, or a comma-separated set) is not always-on. Each adapter honors it with the best mechanism that tool has, and the divergence is the point:
+
+| Tool | Mechanism | Where |
+|------|-----------|-------|
+| Claude | left out of the managed block, injected at `SessionStart` when the cwd matches | `claude.sh:_claude_rule_platform` + `hooks/craftkit-platform-rules.js` |
+| Cursor | `alwaysApply: false` plus native `globs` | `cursor.sh:_cursor_rule_globs` |
+| Gemini, Codex | stays always-on, since neither has a conditional mechanism | unchanged |
+
+Claude Code has no user-scope path-scoped rule mechanism, which is why this takes a hook: `.claude/rules/*.md` with `paths:` is project-scoped and checked in, while craftkit ships at user scope. `SessionStart` rather than `UserPromptSubmit` because a ~1k-token body re-injected per prompt costs far more than the always-on copy it replaced; `SessionStart` also fires on resume, clear, and compact, so the rules return after a context reset. Detection is shared with the routing hook via `hooks/craftkit-platform.js`, because two copies drifting would route to one platform while loading another's rules. `check.sh` 23b holds both halves behaviorally, plus the invariant that at least one rule still uses the mechanism, so it cannot rot untested.
 
 **Managed-block pattern (Claude, Gemini, Codex):** rules are concatenated into a delimited block (`<!-- BEGIN CRAFTKIT ... END CRAFTKIT -->`) inside a shared file like `~/.claude/CLAUDE.md`, edited in place with a Python regex sub. Everything outside the markers is the user's own content and must be preserved. `claude.sh:_rebuild_claude_md` / `_remove_claude_md_section` are the reference implementation.
 

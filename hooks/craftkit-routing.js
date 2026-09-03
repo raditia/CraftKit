@@ -93,29 +93,9 @@ function resolveModelTiers() {
 // from filenames. Nearest ancestor holding a marker wins: from an RN root only package.json
 // matches; from inside its android/ subdir build.gradle matches first, which is the right
 // answer for native work there. Several markers at one level = mixed, report all.
-const PLATFORM_MARKERS = [
-  { label: 'Android (MVP)', match: n => /^(settings|build)\.gradle(\.kts)?$/.test(n) },
-  { label: 'iOS (MVVM-C)', match: n => n === 'Package.swift' || n === 'Podfile' || /\.xc(odeproj|workspace)$/.test(n) },
-  { label: 'React Native / web (EVPMR)', match: n => n === 'package.json' },
-];
-
-function detectPlatform(startDir) {
-  let dir = startDir;
-  for (let depth = 0; depth < 12; depth++) {
-    let entries;
-    try {
-      entries = fs.readdirSync(dir);
-    } catch (e) {
-      return null;
-    }
-    const hits = PLATFORM_MARKERS.filter(p => entries.some(n => p.match(n))).map(p => p.label);
-    if (hits.length) return hits.join(' + ');
-    const parent = path.dirname(dir);
-    if (parent === dir) return null;
-    dir = parent;
-  }
-  return null;
-}
+// Detection lives in craftkit-platform.js: the platform-rules hook decides on the same
+// question, and two copies drifting would route to one platform while loading another's rules.
+const { detectPlatform } = require(path.join(__dirname, 'craftkit-platform.js'));
 
 // Skills installed outside craftkit (~/.claude/skills, <project>/.claude/skills) are absent
 // from the table above, so they never enter the classification set and never get routed to.
@@ -148,7 +128,7 @@ process.stdin.on('end', () => {
     const payload = JSON.parse(input);
     if (payload && typeof payload.cwd === 'string') cwd = payload.cwd;
   } catch (e) { /* no cwd in payload; process.cwd() stands */ }
-  const platform = detectPlatform(cwd);
+  const platform = detectPlatform(cwd).label;
   const platformLine = platform
     ? `Platform (detected from cwd, authoritative): ${platform}. Route to this platform's skills, agents, and gates.\n\n`
     : '';
