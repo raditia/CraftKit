@@ -773,6 +773,94 @@ PYEOF
 fi
 
 # ---------------------------------------------------------------------------
+# 23b. Platform-scoped rules load ONLY where they apply. A rule declaring
+#      `platform:` must be absent from the always-on managed block and present in
+#      the staging dir the SessionStart hook reads, because the block loads in
+#      every project: fe-rules taught EVPMR laws during Kotlin work for exactly
+#      as long as nothing checked this. Behavioral on both halves, since the
+#      shell half failing open puts the rule back in every session silently, and
+#      the hook half failing open loads it on Android.
+# ---------------------------------------------------------------------------
+check "platform-scoped rules load only on their platform"
+if ! command -v node >/dev/null 2>&1; then
+    echo "    skipped (node not on PATH)"
+else
+    _px=0
+    _pf="$(mktemp -d)"
+    # A rule is platform-scoped exactly when the adapter's own parser says so, so the
+    # check uses that function rather than re-deriving the frontmatter read.
+    ( . "$REPO_DIR/adapters/claude.sh" >/dev/null 2>&1
+      for _r in "$REPO_DIR"/rules/*.md; do
+          if _claude_rule_platform "$_r" >/dev/null; then echo "scoped $(basename "$_r" .md)"; fi
+      done ) > "$_pf/scoped"
+    if [[ ! -s "$_pf/scoped" ]]; then
+        fail "no rule declares platform:, so the scoping mechanism ships with nothing using it and rots untested"
+        _px=1
+    fi
+    # Build the block + staging in a sandbox from the adapter's OWN installer, so the
+    # assertion depends on this diff, not on whatever a prior sync left in $HOME. Reading
+    # real ~/.craftkit and ~/.claude made the gate fail on a machine that never ran sync.
+    mkdir -p "$_pf/stage" "$_pf/cmds"
+    ( . "$REPO_DIR/adapters/claude.sh" >/dev/null 2>&1
+      CLAUDE_RULES_DIR="$_pf/stage"; CLAUDE_MD="$_pf/CLAUDE.md"; CLAUDE_COMMANDS_DIR="$_pf/cmds"
+      for _r in "$REPO_DIR"/rules/*.md; do
+          install_claude_rule "$(basename "$_r" .md)" "$_r" >/dev/null 2>&1
+      done )
+    while read -r _tag _rn; do
+        [[ "$_tag" == "scoped" ]] || continue
+        # The staged copy is what the hook reads; the block is what every project loads.
+        if ! grep -q "^name: $_rn\$" "$_pf/stage/${_rn}.md" 2>/dev/null; then
+            fail "rules/$_rn.md is platform-scoped but not staged, so the SessionStart hook has nothing to load"
+            _px=1
+        fi
+        if grep -q "^name: $_rn\$" "$_pf/CLAUDE.md" 2>/dev/null; then
+            fail "rules/$_rn.md is platform-scoped yet still in the always-on block, so it loads on every platform"
+            _px=1
+        fi
+    done < "$_pf/scoped"
+    # Positive control: an unscoped rule MUST be in the block, else the absence check above
+    # passes vacuously against an empty or unbuilt block.
+    if ! grep -q "^name: karpathy-guidelines\$" "$_pf/CLAUDE.md" 2>/dev/null; then
+        fail "sandbox managed block lacks an always-on rule, so the scoped-absence check proves nothing"
+        _px=1
+    fi
+
+    _phook() { printf '{"cwd":"%s"}' "$1" | node "$REPO_DIR/hooks/craftkit-platform-rules.js" 2>/dev/null; }
+    mkdir -p "$_pf/fe" "$_pf/android" "$_pf/bare"
+    echo '{}' > "$_pf/fe/package.json"
+    : > "$_pf/android/settings.gradle"
+    _phook "$_pf/fe" | grep -q 'additionalContext' \
+        || { fail "platform-rules hook injects nothing on a package.json project, so fe-rules never loads at all"; _px=1; }
+    _phook "$_pf/android" | grep -q 'additionalContext' \
+        && { fail "platform-rules hook injects fe rules on a Gradle project, which is the bug the scoping exists to fix"; _px=1; }
+    _phook "$_pf/bare" | grep -q 'additionalContext' \
+        && { fail "platform-rules hook injects on a directory with no platform marker"; _px=1; }
+    echo 'not json' | node "$REPO_DIR/hooks/craftkit-platform-rules.js" >/dev/null 2>&1 \
+        || { fail "platform-rules hook exits non-zero on malformed stdin, which surfaces as an error every session"; _px=1; }
+
+    # Cursor is the one tool with native path scoping, so its render must USE it: an
+    # alwaysApply:true fe-rules there is the same always-on bug in a different file.
+    # Every scoped rule, not just fe-rules: a new platform's rule with no glob row in
+    # cursor.sh falls back to alwaysApply and is always-on there, silently.
+    while read -r _tag _rn; do
+        [[ "$_tag" == "scoped" ]] || continue
+        ( . "$REPO_DIR/adapters/cursor.sh" >/dev/null 2>&1
+          _cursor_render_rule "$REPO_DIR/rules/${_rn}.md" "$_pf/${_rn}.mdc" ) 2>/dev/null
+        grep -q '^globs: ' "$_pf/${_rn}.mdc" 2>/dev/null \
+            || { fail "cursor renders scoped rule $_rn without globs (no glob row in cursor.sh), so it stays always-on there"; _px=1; }
+        grep -q '^alwaysApply: false$' "$_pf/${_rn}.mdc" 2>/dev/null \
+            || { fail "cursor renders scoped rule $_rn as alwaysApply, so its globs never take effect"; _px=1; }
+    done < "$_pf/scoped"
+    ( . "$REPO_DIR/adapters/cursor.sh" >/dev/null 2>&1
+      _cursor_render_rule "$REPO_DIR/rules/karpathy-guidelines.md" "$_pf/k.mdc" ) 2>/dev/null
+    grep -q '^alwaysApply: true$' "$_pf/k.mdc" 2>/dev/null \
+        || { fail "cursor stopped rendering an unscoped rule as alwaysApply, so the always-on rules went conditional"; _px=1; }
+
+    rm -rf "$_pf"
+    [[ $_px -eq 0 ]] && pass
+fi
+
+# ---------------------------------------------------------------------------
 # 24. The hook table and hooks/ agree in both directions, same invariant as
 #     check 13 holds for adapters. A script in hooks/ that no table entry names
 #     is never installed, and a table entry with no script installs nothing while

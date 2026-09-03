@@ -23,8 +23,37 @@ uninstall_cursor_skill() {
 get_cursor_rule_dest() { echo "$CURSOR_RULES_DIR/${1}.mdc"; }
 
 # Rules are always-apply; inject alwaysApply: true after the opening ---
+# Cursor is the one tool with NATIVE path scoping, so a `platform:` rule becomes a
+# glob-scoped rule rather than an always-on one: Cursor loads it only when the open file
+# matches. Claude Code has no user-scope equivalent and uses a SessionStart hook instead.
+# One row per platform that actually has a scoped rule. A scoped rule with no row here
+# falls back to alwaysApply, so check.sh 23b fails rather than letting it go always-on.
+_CURSOR_PLATFORM_GLOBS_fe="**/*.ts,**/*.tsx,**/*.js,**/*.jsx"
+
+_cursor_rule_globs() {
+    local plat k globs all="" keys
+    plat="$(awk 'NR==1&&$0=="---"{fm=1;next} fm&&$0=="---"{exit} fm&&/^platform:/{sub(/^platform:[[:space:]]*/,"");print;exit}' "$1")"
+    [[ -z "$plat" ]] && return 1
+    local IFS=', '
+    read -ra keys <<< "$plat"
+    for k in "${keys[@]}"; do
+        case "$k" in
+            fe) globs=$_CURSOR_PLATFORM_GLOBS_fe ;;
+            *)  globs="" ;;
+        esac
+        [[ -n "$globs" ]] && all="${all:+$all,}$globs"
+    done
+    [[ -z "$all" ]] && return 1
+    echo "$all"
+}
+
 _cursor_render_rule() {
-    awk 'NR==1 && /^---$/{print; print "alwaysApply: true"; next} {print}' "$1" > "$2"
+    local globs
+    if globs="$(_cursor_rule_globs "$1")"; then
+        awk -v g="$globs" 'NR==1 && /^---$/{print; print "alwaysApply: false"; print "globs: " g; next} {print}' "$1" > "$2"
+    else
+        awk 'NR==1 && /^---$/{print; print "alwaysApply: true"; next} {print}' "$1" > "$2"
+    fi
 }
 
 install_cursor_rule() {
