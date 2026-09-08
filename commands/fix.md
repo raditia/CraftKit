@@ -55,7 +55,7 @@ rtk test --testPathPattern="path/to/feature" --coverage
 
 All tests pass. Coverage ≥ 93%. Add a regression test; the failing scenario must be permanently covered.
 
-**Gate:** All tests pass. Coverage ≥ 93%. Regression test exists.
+**Gate:** All tests pass. Coverage ≥ 93%. Regression test exists. If the fix lands inside or beside a flag branch, `flag-safety` applies: the OFF path is verified too, since a fix that only holds with the flag ON leaves the rollback broken.
 
 ---
 

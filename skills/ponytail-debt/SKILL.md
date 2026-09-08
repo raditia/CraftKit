@@ -1,26 +1,26 @@
 ---
 name: ponytail-debt
-description: Read-only ledger of all ponytail: comment markers in the repo. Shows what was simplified, the ceiling, and the upgrade trigger. Flags deferrals with no upgrade condition.
+description: Read-only ledger of every ponytail: and flag: marker in the repo. Shows what was simplified or gated, the ceiling or OFF behavior, and the upgrade or removal trigger. Flags deferrals with no exit condition.
 alwaysApply: false
 ---
 
-**Commands:** `rtk grep "ponytail:" . --include="*.ts" --include="*.tsx" --include="*.js"`
+**Commands:** `rtk grep -E "ponytail:|flag:" . --include="*.ts" --include="*.tsx" --include="*.js"`
 **Model:** cheapest tier (see the plan-aware Model routing table in `using-agent-skills`). No escalation, since the task is pure extraction.
 
 ---
 
 ## Trigger
 
-User says: "show ponytail debt", "list deliberate shortcuts", "what did we defer", or invokes `/ponytail-debt`.
+User says: "show ponytail debt", "list deliberate shortcuts", "what did we defer", "list feature flags", "what flags can we remove", or invokes `/ponytail-debt`.
 
 ---
 
 ## Process
 
-1. Grep repo for `ponytail:` markers, excluding `node_modules/`, `.git/`, build dirs.
-2. Parse each marker and extract: what was simplified, ceiling, upgrade trigger.
-3. Group by file.
-4. Flag entries missing an upgrade trigger with `[no-trigger]`.
+1. Grep repo for `ponytail:` and `flag:` markers, excluding `node_modules/`, `.git/`, build dirs.
+2. Parse each marker. `ponytail:` yields what was simplified, ceiling, upgrade trigger. `flag:` (see `flag-safety`) yields the flag key, OFF behavior, removal condition.
+3. Group by file, `ponytail:` and `flag:` in separate sections.
+4. Flag entries missing an exit condition with `[no-trigger]`. A flag whose removal condition already holds is `[removable]`, since a shipped flag nobody deletes is permanent branching.
 
 ---
 
@@ -28,6 +28,7 @@ User says: "show ponytail debt", "list deliberate shortcuts", "what did we defer
 
 ```
 <file>:<line> · <what was simplified>. ceiling: <limit>. upgrade: <trigger>.
+<file>:<line> · flag <key>. off: <behavior>. remove: <condition>.
 ```
 
 Flag missing upgrade trigger:
@@ -35,7 +36,7 @@ Flag missing upgrade trigger:
 <file>:<line> · <what>. [no-trigger] deferral may become permanent.
 ```
 
-End with count: `N shortcuts tracked, M with no upgrade trigger.`
+End with count: `N shortcuts tracked, M with no upgrade trigger. K flags live, J removable.`
 
 ---
 
