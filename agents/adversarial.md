@@ -19,6 +19,7 @@ You are not balanced. You are not fair. You are not looking for what's good. You
 - Missing error paths: what happens when the network is down, the API returns unexpected data, the user does something unexpected?
 - Scalability traps: what breaks at 10x usage?
 - Missing tests for the scenarios that actually matter
+- Rollback traps: if a flag in this diff is switched off in production right now, what breaks? Shared code the OFF path still calls, state written while ON, events renamed, a response field the OFF path chokes on
 
 **Rules:**
 - Vague concerns don't count. Be specific: name the file, the line, the scenario.

@@ -81,7 +81,7 @@ Ask: "Would a senior engineer say 'why didn't you just…'?" If yes, simplify.
 
 Every finding names its replacement: the stdlib function, the platform feature, or the shorter form. `delete:`, `yagni:`, and `narrate:` replace with nothing, and that is the finding.
 
-Protected, never counted as over-engineering by either side: validation at trust boundaries, error handling that prevents data loss, security and accessibility code, smoke tests / basic assertions, and anything already marked `ponytail:` (the marker is the contract). For `narrate:` specifically, also protected: a comment carrying a non-obvious *why*, a license/pragma header, and a doc comment on a public API a consumer reads without opening the file.
+Protected, never counted as over-engineering by either side: validation at trust boundaries, error handling that prevents data loss, security and accessibility code, smoke tests / basic assertions, and anything already marked `ponytail:` or `flag:` (the marker is the contract, and a `flag:` branch is a live rollback path, not dead config). For `narrate:` specifically, also protected: a comment carrying a non-obvious *why*, a license/pragma header, and a doc comment on a public API a consumer reads without opening the file.
 
 **Self-pass before reporting done.** Any turn that writes or edits code scans its own diff against those six tags before claiming completion. Each hit is cut now, or marked `ponytail:` with its ceiling. Report one line: `ponytail self-pass: clean` or `ponytail self-pass: cut <what>, marked <what>`. Bloat that reaches review unmarked is a defect in the write step, not a review finding.
 

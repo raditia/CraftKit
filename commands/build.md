@@ -53,7 +53,7 @@ Follow the `/fe-scaffold` workflow: surface assumptions first, then create the 5
 
 Apply `/fe-patterns` (state location, hooks discipline, data fetching) and `/fe-performance` (waterfall elimination, bundle size, RN specifics) continuously as you build, not as a post-pass. `fe-rules` (always active) enforces layer constraints and React correctness throughout.
 
-**Gate:** `rtk tsc --noEmit` passes after every logical chunk, and the ponytail self-pass (`karpathy-guidelines` rule 2) runs on the written files before review, so you cut or mark `ponytail:` while the code is still yours.
+**Gate:** `rtk tsc --noEmit` passes after every logical chunk, and the ponytail self-pass (`karpathy-guidelines` rule 2) runs on the written files before review, so you cut or mark `ponytail:` while the code is still yours. A flag-gated feature also runs the flag self-pass from `flag-safety` (always active): OFF path verified, `flag:` marker present, both states tested.
 
 ---
 

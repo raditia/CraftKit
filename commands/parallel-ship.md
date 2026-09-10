@@ -99,6 +99,7 @@ Spawn the set the classifier selected:
 **`code-quality` prompt additions**, prepended when applicable:
 - security-sensitive paths (`auth/*`, `payment/*`, `*credential*`, `*token*`): `"Security-sensitive code present. Emphasize security axis."`
 - manifest changed (`package.json`, `*.gradle`, `Podfile`/`Package.swift`): `"<file> changed. Audit new dependencies for bundle/binary impact, maintenance status, and known vulnerabilities."`
+- a feature flag, remote config, toggle, or experiment is read in the diff: `"Flag-gated diff. Check the OFF path: shared code both paths call, state written while ON, renamed events, and response fields the OFF path must tolerate. An OFF path whose behavior changed is an [ERROR]."`
 
 ---
 
@@ -116,6 +117,8 @@ This is a pre-merge code review → apply **Track B** (structured synthesis). De
 
 Adversarial findings are **blind spots**: what all review agents missed. Surface them as a separate block.
 
+**Rollback gate.** A diff that reads a flag reports its rollback state. An OFF path that nobody verified, or a missing `flag:` marker, is a blocker, not a suggestion, because it is the difference between a one-click rollback and a hotfix.
+
 Sort within each tier: `[CONSENSUS]` first, then standard, then `[UNIQUE]`.
 
 ```
@@ -125,6 +128,7 @@ Platform:  <RN/web | Android | iOS>
 Phase 1:   type/build PASS | lint PASS | test PASS (N tests)
            Coverage: Lines N% / Branches N% / Functions N% / Statements N%  (native: actual, or "not measured")
 Agents:    ran [list] | skipped [agent + reason, if any]
+Rollback:  <flag key>: OFF path verified <how> | n-a (no flag in diff)
 
 FINDINGS
 [ERROR][CONSENSUS]   file:line: description  (caught by: agent-a + agent-b)

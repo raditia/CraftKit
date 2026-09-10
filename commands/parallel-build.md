@@ -55,6 +55,8 @@ Build the feature. Apply the platform's patterns + performance skills continuous
 
 **Gate:** The platform's type/build gate passes after every logical chunk, and the ponytail self-pass (`karpathy-guidelines` rule 2) runs on the built files before Phase 3, so you cut or mark `ponytail:` now, while the code is still yours. The `ponytail-review` agent in Phase 5 is the backstop, not the first pass; findings there mean this gate was skipped.
 
+If the feature is gated by a flag, remote config, or experiment, the flag self-pass from `flag-safety` (always active) runs here as well: OFF path verified, `flag:` marker present, both states tested.
+
 ---
 
 ## Phase 3: Fast gates (parallel)

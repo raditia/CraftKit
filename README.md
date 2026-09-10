@@ -1,4 +1,4 @@
-# craftkit `v1.34.0`
+# craftkit `v1.35.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -100,7 +100,9 @@ const withRetry = (fn, n = 3) => fn().catch(e => n > 0 ? withRetry(fn, n-1) : Pr
 
 The **ponytail rubric** (six tags: `delete:` `stdlib:` `native:` `yagni:` `shrink:` `narrate:`, plus a protected list) lives in `karpathy-guidelines` (always active), so the writing side authors under the exact list the reviewing side scores by. Every turn that writes code runs a self-pass against it before reporting done, and findings are applied as deletion at the named `file:line`, never as a restructure. That is what keeps a later `/ponytail-review` from turning into a rewrite loop.
 
-**80–94% code reduction** on over-engineered solutions. Pairs with `/ponytail-review` (audit a diff), `/ponytail-audit` (scan the whole repo), `/ponytail-debt` (track deferred shortcuts).
+**80–94% code reduction** on over-engineered solutions. Pairs with `/ponytail-review` (audit a diff), `/ponytail-audit` (scan the whole repo), `/ponytail-debt` (track deferred shortcuts and removable flags).
+
+`flag-safety` reuses the same marker-is-the-contract shape for a different axis. Code behind a feature flag, remote config, or experiment must leave the OFF path observably identical, across four surfaces: code paths and shared helpers, persisted and cached state, API request/response contracts, and analytics events. Each branch carries a `flag:` comment naming the key, the OFF behavior, and the removal condition, which is what makes the flag a real rollback instead of a switch nobody dares flip. Enforced at write time by the self-pass in `/build` and `/parallel-build`, and at read time by the platform review agents plus the rollback gate in `/parallel-ship`.
 
 ### Combined impact
 
@@ -555,6 +557,7 @@ Loaded automatically on every session. Never invoke these; they're always presen
 | Rule | Enforces |
 |------|---------|
 | [`fe-rules`](rules/fe-rules.md) | EVPMR layer constraints, TypeScript strict, module-over-barrel imports, styling tokens, React correctness, tracking |
+| [`flag-safety`](rules/flag-safety.md) | Flag OFF stays behavior-identical: code paths, persisted state, API contracts, analytics. `flag:` marker, both states tested |
 | [`karpathy-guidelines`](rules/karpathy-guidelines.md) | Think before coding, simplicity, surgical changes, goal-driven, read before write, tests verify intent, checkpoint after steps |
 | [`using-agent-skills`](rules/using-agent-skills.md) | Skill routing (mandatory gate: classify before every response, announce match or "No skill matched."), model selection, severity labels, parallel classifier, model for judgment only, surface conflicts |
 
@@ -614,7 +617,7 @@ The `*-review`, `*-a11y`, and `*-performance` skills below double as the source 
 | [`handoff`](skills/handoff/SKILL.md) | Compact the session into a handoff doc for a fresh agent: state, decisions, next steps, suggested skills | n/a |
 | [`ponytail-review`](skills/ponytail-review/SKILL.md) | Over-engineering audit on a diff or file: what to delete/shrink | Correctness or security concerns → use `code-quality` |
 | [`ponytail-audit`](skills/ponytail-audit/SKILL.md) | Whole-repo bloat scan: ranked list of removals | n/a |
-| [`ponytail-debt`](skills/ponytail-debt/SKILL.md) | Ledger of all `ponytail:` shortcuts, surfacing deferred simplifications | n/a |
+| [`ponytail-debt`](skills/ponytail-debt/SKILL.md) | Ledger of every `ponytail:` shortcut and `flag:` branch, surfacing deferred simplifications and removable flags | n/a |
 
 ### Planning & docs skills, on demand
 
