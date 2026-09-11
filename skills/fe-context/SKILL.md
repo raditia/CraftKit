@@ -120,12 +120,8 @@ Create `docs/` if needed. If file exists, update changed sections and preserve m
 **Generated:** {{ISO timestamp}}
 **Branch:** {{branch}} | **Base:** {{base}} | **Commit:** {{git rev-parse HEAD}} | **Budget:** ~{{lines}} lines (limit: 600)
 
-**Baseline:** the `**Commit:**` field is the doc's baseline, and the only thing later
-freshness checks have to compare against. Record the real `git rev-parse HEAD`, never a
-branch name or a short sha, because `hooks/craftkit-drift.js` resolves it with
-`cat-file -e <sha>^{commit}` and reports `cannot-verify` for anything it cannot reach.
-Uncommitted work at generation time is already covered by the sections below, so the
-baseline describes where the branch was, not what the worktree held.
+**Baseline:** record the full `git rev-parse HEAD`, never a branch name or short sha:
+`hooks/craftkit-drift.js` resolves it and reports `cannot-verify` for anything unreachable.
 
 
 ---

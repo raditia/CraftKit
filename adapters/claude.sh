@@ -21,7 +21,6 @@ _CRAFTKIT_HOOKS=(
     "gate-skill-first.js%PreToolUse%Edit|Write|MultiEdit|NotebookEdit%CraftKit skill gate..."
     "gate-verify-on-stop.js%Stop%%CraftKit verify gate..."
     "gate-announce-honored.js%Stop%%CraftKit announce gate..."
-    "gate-stale-context.js%PreToolUse%Edit|Write|MultiEdit|NotebookEdit%CraftKit stale-context gate..."
     "craftkit-platform-rules.js%SessionStart%%CraftKit platform rules..."
     "craftkit-transcript.js%-%%"
     "craftkit-platform.js%-%%"
@@ -356,8 +355,63 @@ with open(settings_path, 'w') as f:
 PYEOF
 }
 
+# Removes a hook this adapter installed that is no longer in _CRAFTKIT_HOOKS. Without this,
+# dropping an entry orphaned the installed copy AND its settings.json registration, so the
+# machine kept firing a gate whose source was gone: the same shape CLAUDE.md documents for
+# adapter retirement, and it happened the first time a hook was actually retired. The state
+# file is the record of what was installed, mirroring the rules/skills/commands passes.
+_claude_prune_hooks() {
+    local state="$STATE_DIR/claude-hooks" current script old
+    current=""
+    local h
+    for h in "${_CRAFTKIT_HOOKS[@]}"; do
+        current="$current $(echo "$h" | cut -d'%' -f1)"
+    done
+    if [[ -f "$state" ]]; then
+        while read -r old; do
+            [[ -z "$old" ]] && continue
+            case " $current " in *" $old "*) continue ;; esac
+            rm -f "$CLAUDE_HOOKS_DIR/$old"
+            _craftkit_hook_unregister "$old"
+            echo "    - removing hook: ${old%.js}"
+        done < "$state"
+    fi
+    printf '%s\n' $current > "$state"
+}
+
+# Drops every settings.json entry whose command names this script, and any hook group left
+# empty by that removal.
+_craftkit_hook_unregister() {
+    [[ -f "$CLAUDE_SETTINGS" ]] || return 0
+    python3 - "$CLAUDE_SETTINGS" "$1" << 'PYEOF'
+import json, sys
+path, script = sys.argv[1], sys.argv[2]
+try:
+    with open(path) as f:
+        data = json.load(f)
+except Exception:
+    sys.exit(0)
+hooks = data.get("hooks") or {}
+for event, groups in list(hooks.items()):
+    kept = []
+    for g in groups:
+        entries = g.get("hooks")
+        if entries is None:
+            kept.append(g)
+            continue
+        remaining = [h for h in entries if script not in h.get("command", "")]
+        if remaining:
+            g["hooks"] = remaining
+            kept.append(g)
+    hooks[event] = kept
+with open(path, "w") as f:
+    json.dump(data, f, indent=2)
+PYEOF
+}
+
 install_claude_craftkit_hook() {
     mkdir -p "$CLAUDE_HOOKS_DIR"
+    _claude_prune_hooks
     local h script src dest
     for h in "${_CRAFTKIT_HOOKS[@]}"; do
         script="$(echo "$h" | cut -d'%' -f1)"
