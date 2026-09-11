@@ -955,16 +955,20 @@ else
     # Build the block + staging in a sandbox from the adapter's OWN installer, so the
     # assertion depends on this diff, not on whatever a prior sync left in $HOME. Reading
     # real ~/.craftkit and ~/.claude made the gate fail on a machine that never ran sync.
-    mkdir -p "$_pf/stage" "$_pf/cmds"
+    # Staged where the hook actually looks: os.homedir()/.craftkit/claude-rules. Staging
+    # elsewhere and then running the hook with the real HOME meant the hook read whatever a
+    # prior sync had left there, so this check passed only on a machine that had synced and
+    # could never pass on a fresh checkout. CI found it on the first run.
+    mkdir -p "$_pf/home/.craftkit/claude-rules" "$_pf/cmds"
     ( . "$REPO_DIR/adapters/claude.sh" >/dev/null 2>&1
-      CLAUDE_RULES_DIR="$_pf/stage"; CLAUDE_MD="$_pf/CLAUDE.md"; CLAUDE_COMMANDS_DIR="$_pf/cmds"
+      CLAUDE_RULES_DIR="$_pf/home/.craftkit/claude-rules"; CLAUDE_MD="$_pf/CLAUDE.md"; CLAUDE_COMMANDS_DIR="$_pf/cmds"
       for _r in "$REPO_DIR"/rules/*.md; do
           install_claude_rule "$(basename "$_r" .md)" "$_r" >/dev/null 2>&1
       done )
     while read -r _tag _rn; do
         [[ "$_tag" == "scoped" ]] || continue
         # The staged copy is what the hook reads; the block is what every project loads.
-        if ! grep -q "^name: $_rn\$" "$_pf/stage/${_rn}.md" 2>/dev/null; then
+        if ! grep -q "^name: $_rn\$" "$_pf/home/.craftkit/claude-rules/${_rn}.md" 2>/dev/null; then
             fail "rules/$_rn.md is platform-scoped but not staged, so the SessionStart hook has nothing to load"
             _px=1
         fi
@@ -980,7 +984,7 @@ else
         _px=1
     fi
 
-    _phook() { printf '{"cwd":"%s"}' "$1" | node "$REPO_DIR/hooks/craftkit-platform-rules.js" 2>/dev/null; }
+    _phook() { printf '{"cwd":"%s"}' "$1" | HOME="$_pf/home" node "$REPO_DIR/hooks/craftkit-platform-rules.js" 2>/dev/null; }
     mkdir -p "$_pf/fe" "$_pf/android" "$_pf/bare"
     echo '{}' > "$_pf/fe/package.json"
     : > "$_pf/android/settings.gradle"
