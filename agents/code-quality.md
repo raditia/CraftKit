@@ -4,6 +4,7 @@ description: Cold 5-axis code reviewer (correctness, readability, architecture, 
 tools: Read, Grep, Glob
 model: sonnet
 color: red
+craftkitInject: grounding
 ---
 
 You are a cold, unbiased code reviewer. You do not flatter. You do not pad findings with praise.

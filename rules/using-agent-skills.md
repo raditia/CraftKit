@@ -156,6 +156,13 @@ Where it does apply, every skill follows this on start, not repeated per skill:
    - If `docs/context.md` missing → run that skill, then continue
    - If branch mismatch OR commit mismatch → regenerate with that skill, then continue
    - If both match → context is fresh, proceed
+
+   **A commit match is not proof the doc still holds.** The recorded commit can be unreachable, which happens as soon as the branch it named is squash-merged, rebased or amended. Ask `hooks/craftkit-drift.js` rather than assuming, because it separates the three answers the header alone cannot:
+   ```bash
+   node -e 'const {drift}=require(process.env.HOME+"/.claude/hooks/craftkit-drift.js");
+   const r=drift(process.cwd(), "<recorded commit>", []); console.log(r.state, r.reason)'
+   ```
+   `clean` → proceed · `drifted` → the named files are suspect, so regenerate · `cannot-verify` → say so and treat the doc as unverified, never as fresh. Per `grounding`, a claim resting on a cannot-verify doc is `[UNVERIFIED]` and cannot back an `[ERROR]` finding or a code edit.
 3. **Read `docs/context.md`**, required wherever this procedure applies. Read only the sections the skill specifies (see each skill's **Context:** line); at minimum: Summary + Key Changes
 4. If context conflicts with code → `CONFUSION: docs/context.md says X but code shows Y. Options: A) ... B) ... → Which?`
 
