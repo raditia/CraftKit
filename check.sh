@@ -601,10 +601,26 @@ def use(name, inp):
     return {"type": "tool_use", "name": name, "input": inp}
 
 
+# The other role-user impostor, and the one a tool_result fixture does not cover: an
+# injected entry carries text, so only isMeta separates it from a real prompt. A Skill body
+# (isMeta + turnCompanion + sourceToolUseID) and stop-hook feedback (isMeta + session_id)
+# both land mid-turn, and reading either as a turn start truncates the turn.
+def injected(text, **extra):
+    entry = {"type": "user", "isMeta": True,
+             "message": {"role": "user", "content": [{"type": "text", "text": text}]}}
+    entry.update(extra)
+    return entry
+
+
+BODY = "**Model:** everyday. ...skill instructions..."
+
+
 def build(mode):
     lines = [{"type": "user", "message": {"role": "user", "content": "edit foo"}}]
-    if mode == "skill":
+    if mode in ("skill", "skill-injected"):
         lines.append(assistant([use("Skill", {"skill": "fe-test"})]))
+    if mode in ("skill-injected", "injected-only"):
+        lines.append(injected(BODY, turnCompanion=True, sourceToolUseID="tu_1"))
     lines.append(assistant([use("Edit", {"file_path": "/x/ViewFoo.tsx"})]))
     # A tool_result also has role user, and must not be read as a new turn.
     lines.append({"type": "user", "message": {"role": "user",
@@ -614,7 +630,7 @@ def build(mode):
     return lines
 
 
-for mode in ("bare", "skill", "verified"):
+for mode in ("bare", "skill", "verified", "skill-injected", "injected-only"):
     with open("%s/%s.jsonl" % (gx, mode), "w") as f:
         f.write("\n".join(json.dumps(x) for x in build(mode)) + "\n")
 
@@ -642,6 +658,32 @@ announce_cases = {
     "declare-empty": announced(""),
     "declare-by-invoking": announced("Here it is, no announcement line.", invoke=REAL),
 }
+
+# The real order of a skill-driven turn: announce, invoke, skill body arrives, agent keeps
+# working. The body is where the turn used to restart, discarding both the announcement and
+# the Skill call, so an honest turn could not end.
+announce_cases["announce-across-injection"] = [
+    {"type": "user", "message": {"role": "user", "content": "write the PR message"}},
+    assistant([{"type": "text", "text": "Running /%s [cheapest]: generate it." % REAL}]),
+    assistant([use("Skill", {"skill": REAL})]),
+    injected(BODY, turnCompanion=True, sourceToolUseID="tu_1"),
+    assistant([{"type": "text", "text": "Here is the message."}]),
+]
+# Stop feedback is the other injected class, and it erased the declaration the retry had
+# just added, so the block repeated instead of clearing.
+announce_cases["declare-across-stop-feedback"] = [
+    {"type": "user", "message": {"role": "user", "content": "write the PR message"}},
+    assistant([{"type": "text", "text": "No skill matched for this request. Responding directly."}]),
+    injected("Stop hook feedback: No routing declaration this turn.", session_id="s"),
+    assistant([{"type": "text", "text": "Here is the message."}]),
+]
+# Negative control: widening the turn must not make an undeclared turn look declared.
+announce_cases["declare-silent-across-injection"] = [
+    {"type": "user", "message": {"role": "user", "content": "write the PR message"}},
+    injected(BODY, turnCompanion=True, sourceToolUseID="tu_1"),
+    assistant([{"type": "text", "text": "Here is the PR message you asked for."}]),
+]
+
 for name, lines in announce_cases.items():
     with open("%s/%s.jsonl" % (gx, name), "w") as f:
         f.write("\n".join(json.dumps(x) for x in lines) + "\n")
@@ -684,6 +726,14 @@ PYEOF
     # background agent may have nobody able to answer.
     _skillgate s7 "$_gx/sidechain.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
         && { fail "skill gate asks inside a subagent, so every parallel-build implementer stalls on a prompt"; _gd=1; }
+    # The skill body lands between the Skill call and the edits the skill prescribes, which
+    # is where every routed turn does its work. Truncating there gated the routed case.
+    _skillgate s8 "$_gx/skill-injected.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "skill gate asks after a Skill call once the skill body arrives, so every routed edit costs a prompt"; _gd=1; }
+    # Negative control: the same injected entry with no Skill call anywhere must still ask,
+    # or widening the turn has disarmed the gate rather than fixed it.
+    _skillgate s9 "$_gx/injected-only.jsonl" /x/ViewFoo.tsx | grep -q '"permissionDecision":"ask"' \
+        || { fail "skill gate stopped asking on an unrouted turn containing an injected entry, so the turn fix disarmed the gate"; _gd=1; }
     _stopgate "$_gx/bare.jsonl" | grep -q '"decision":"block"' \
         || { fail "stop gate let a turn end with edits and no verification command"; _gd=1; }
     _stopgate "$_gx/verified.jsonl" | grep -q '"decision"' \
@@ -763,6 +813,15 @@ PYEOF
         && { fail "announce gate demands prose from a turn that invoked a skill, so invoking is not enough"; _gd=1; }
     _announcegate "$_gx/declare-empty.jsonl" | grep -q '"decision"' \
         && { fail "announce gate blocks an empty reply, which is an interrupted turn, not an unrouted one"; _gd=1; }
+    # Every skill-driven turn has a body injected mid-turn, so this is the common case, not
+    # an edge one: the gate blocked turns that had both announced and invoked.
+    _announcegate "$_gx/announce-across-injection.jsonl" | grep -q '"decision"' \
+        && { fail "announce gate blocks a turn that announced and invoked, because the skill body reset the turn"; _gd=1; }
+    _announcegate "$_gx/declare-across-stop-feedback.jsonl" | grep -q '"decision"' \
+        && { fail "announce gate loses a declaration to its own stop feedback, so the block repeats instead of clearing"; _gd=1; }
+    # Negative control for check 2, mirroring s9.
+    _announcegate "$_gx/declare-silent-across-injection.jsonl" | grep -q '"decision":"block"' \
+        || { fail "announce gate stopped seeing an undeclared turn once an injected entry appeared, so the turn fix disarmed check 2"; _gd=1; }
 
     for _g in gate-skill-first.js gate-verify-on-stop.js gate-announce-honored.js; do
         echo 'not json' | node "$REPO_DIR/hooks/$_g" >/dev/null 2>&1 \

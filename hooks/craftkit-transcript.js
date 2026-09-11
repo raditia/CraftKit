@@ -33,8 +33,19 @@ function readTailLines(transcriptPath) {
 
 // A real user turn, as opposed to a tool_result, which the transcript also records
 // with role user and which would otherwise reset the turn after every tool call.
+// Injected entries are the other role-user impostor, and they carry text rather than a
+// tool_result, so they need their own exclusion: a Skill body (isMeta + turnCompanion +
+// sourceToolUseID) and stop-hook feedback (isMeta + session_id) both land mid-turn. Read
+// as turn starts they truncate the turn, which made both gates fire on turns that HAD
+// routed and let post-skill edits through unseen. Keyed negatively on isMeta rather than
+// positively on promptSource, which a real prompt carries, because the local command echo
+// (<command-name>) lacks promptSource and must still arm slashCommand below.
+// ponytail: isMeta is an undocumented transcript field. ceiling: a format change reverts
+// both gates to reading a truncated turn. upgrade: the check.sh fixtures pin the shape, so
+// the gate fails loudly instead of degrading quietly.
 function isUserTurn(entry) {
   if (!entry || entry.type !== 'user') return false;
+  if (entry.isMeta === true) return false;
   const content = entry.message && entry.message.content;
   if (typeof content === 'string') return true;
   if (!Array.isArray(content)) return false;
