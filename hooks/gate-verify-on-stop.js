@@ -82,7 +82,13 @@ process.stdin.on('end', () => {
 
   // Deduped because turn.edits holds one entry per Edit call, so four edits to one file
   // reported "4 file(s)" and listed it four times. Caught by this gate firing on itself.
-  let touched = turn.edits;
+  // Scratchpad and temp files are throwaway by design, so they cannot be the reason a turn
+  // owes a verification run. gate-skill-first has always excluded them; this gate did not,
+  // and in a repo where check.sh makes every path count, drafting a PR body in the
+  // scratchpad demanded a full gate run. A gate that fires on throwaway files is the
+  // click-through trainer these gates are written to avoid.
+  const THROWAWAY = /\/scratchpad\/|^\/tmp\/|^\/private\/tmp\/|^\/var\/folders\//;
+  let touched = turn.edits.filter(f => !THROWAWAY.test(f));
   if (wroteViaShell(turn.commands) || turn.delegated) touched = touched.concat(gitDirty(cwd));
   touched = touched.filter((f, i) => touched.indexOf(f) === i);
   const edited = gate.gatesEveryFile ? touched : touched.filter(f => CODE_EXT.test(f));

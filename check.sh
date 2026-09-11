@@ -820,6 +820,10 @@ def turn(prompt, command):
 
 
 cases = {"shell": turn("edit", "sed -i '' s/a/b/ ViewX.tsx"),
+         "scratch": [{"type": "user", "message": {"role": "user", "content": "draft it"}},
+                     {"type": "assistant", "message": {"role": "assistant", "content": [
+                         {"type": "tool_use", "name": "Write",
+                          "input": {"file_path": "/private/tmp/claude-1/x/scratchpad/probe.ts"}}]}}],
          "readonly": turn("what is this", "cat ViewX.tsx"),
          "delegated": [{"type": "user", "message": {"role": "user", "content": "build it"}},
                        {"type": "assistant", "message": {"role": "assistant", "content": [
@@ -832,6 +836,10 @@ PYEOF
             || { fail "stop gate misses a shell-route edit (sed -i), the bypass most likely to skip a skill"; _gd=1; }
         _stopgate "$_gx/readonly.jsonl" | grep -q '"decision"' \
             && { fail "stop gate blocks a read-only turn on a dirty tree, so pre-existing dirt gates every turn"; _gd=1; }
+        # A throwaway file cannot be the reason a turn owes a verification run. This gate
+        # fired on a PR body drafted in the session scratchpad until it excluded them.
+        _stopgate "$_gx/scratch.jsonl" | grep -q '"decision"' \
+            && { fail "stop gate demands verification for a scratchpad-only turn, firing on throwaway files"; _gd=1; }
         # Delegating the edits hides them the same way the shell does: a subagent's writes
         # land in ITS transcript, so the parent's turn shows no edits at all.
         _stopgate "$_gx/delegated.jsonl" | grep -q '"decision":"block"' \
