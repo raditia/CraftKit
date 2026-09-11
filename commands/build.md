@@ -1,6 +1,6 @@
 ---
 name: build
-description: Full feature build workflow: orchestrates fe-context, fe-scaffold, fe-patterns, fe-performance, fe-review, fe-test in sequence. Use when building a new feature or screen.
+description: Sequential feature build workflow, platform-routed at Step 0: context, scaffold, patterns, performance, review and tests for RN/web (EVPMR), Android (MVP) or iOS (MVVM-C). Use when building a new feature or screen without parallel validation.
 ---
 
 **Commands:** `rtk git diff`, `rtk tsc`, `rtk jest`, `rtk lint`

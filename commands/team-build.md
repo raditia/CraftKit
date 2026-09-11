@@ -122,7 +122,7 @@ Reviewer: findings only, severity labels per `using-agent-skills`, never edits f
 
 - **Do not poll.** Act on teammate idle notifications and mailbox messages.
 - **Task-status lag** (known caveat): a teammate can finish work but fail to mark the task complete, blocking dependents. Idle teammate + in-progress task → nudge it; still stale → verify the files yourself and mark the task complete or reassign.
-- **Dead teammate** (infra error): apply Step 5 of `using-agent-skills` in spirit, since its axis is a coverage gap, never silently clean. Reassign its tasks to the surviving implementer or take them inline; if the reviewer died and no re-review ran, the verdict is `INCOMPLETE`.
+- **Dead teammate** (infra error): apply **Step 5: Handle agent failures** from `partials/parallel-classifier.md` in spirit, since its axis is a coverage gap, never silently clean. Reassign its tasks to the surviving implementer or take them inline; if the reviewer died and no re-review ran, the verdict is `INCOMPLETE`.
 - **Contradictions** (reviewer vs implementer, or impl-a vs impl-b on a contract): lead adjudicates per core behavior #9 (`using-agent-skills`).
 
 ---

@@ -9,7 +9,7 @@ alwaysApply: false
 
 **Context:** `docs/context.md`, reading Summary, Key Changes, Architecture Patterns in Use. Standard load procedure in `using-agent-skills`.
 
-> For day-to-day reviews use the `/review` command, which runs this + fe-review automatically.
+> For day-to-day reviews use `/parallel-review`, which runs this plus the platform's pattern review concurrently. `/review` is its sequential twin, for a small diff or where agents cannot be spawned.
 
 ---
 

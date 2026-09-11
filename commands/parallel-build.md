@@ -76,7 +76,7 @@ lint:       PASS / FAIL
 
 ## Phase 4: Classify what was built
 
-Apply the parallel workflow classifier from `using-agent-skills`, but scan the **newly created/modified files** (not just the diff), reading their actual content to determine which layers exist and what they do.
+Apply the parallel workflow classifier injected above, but scan the **newly created/modified files** (not just the diff), reading their actual content to determine which layers exist and what they do.
 
 Additional build-specific rules, where the a11y/performance rows resolve to the detected platform's agent (`fe-*`, `android-*`, or `ios-*`):
 
@@ -134,7 +134,7 @@ Spawn the set Phase 4 selected:
 
 Native has no `*-patterns` cold agent, because the platform's patterns skill already ran continuously in Phase 2, and its review agent covers the layer contract. That is a deliberate gap, not an omission to fill.
 
-**Synthesize Phase 5 findings.** First apply **Step 5: Handle agent failures** (`using-agent-skills`): any selected agent that returned no findings is a coverage gap, not a clean axis, so surface it, mark it skipped, gate verdict to `INCOMPLETE`. Then apply **Track B** (structured synthesis):
+**Synthesize Phase 5 findings.** First apply **Step 5: Handle agent failures** from the injected classifier: any selected agent that returned no findings is a coverage gap, not a clean axis, so surface it, mark it skipped, gate verdict to `INCOMPLETE`. Then apply **Track B** (structured synthesis):
 - `[CONSENSUS]`: flagged by 2+ agents independently → fix before proceeding
 - Standard: flagged by one agent
 - `[UNIQUE]`: notable finding from one agent only → preserve, note lower confidence

@@ -3,7 +3,7 @@ name: karpathy-guidelines
 description: Behavioral rules to reduce common LLM coding mistakes. Always active, applying to every skill and task.
 ---
 
-> Derived from Andrej Karpathy's observations on LLM coding pitfalls. Adapted for this project's EVPMR architecture and tooling.
+> Derived from Andrej Karpathy's observations on LLM coding pitfalls. Platform-agnostic: this rule loads on every platform, so architecture-specific laws live in the platform's own rule.
 >
 > **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
@@ -87,7 +87,7 @@ Protected, never counted as over-engineering by either side: validation at trust
 
 **Applying ponytail findings is deletion, not rewrite.** A finding names `file:line` plus a tag, so act on exactly those lines: remove them, or swap in the named stdlib/native call. Never restructure surrounding code, rename, reorder, or tidy while in there. If a finding looks like it needs a rewrite, say so and stop; file churn costs more than the complexity does.
 
-**EVPMR corollary:** don't pre-split a View into sub-components until it exceeds ~80 lines. Don't pre-split a Presenter until it exceeds ~100 lines. Split when complex, not speculatively.
+**Don't pre-split.** Extract a sub-component or split a hook when it is actually complex, not in anticipation. Each platform's rules set the line thresholds; this one only says not to split ahead of need.
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: review
-description: Full code review workflow: orchestrates fe-context, code-quality (5-axis), and fe-review (EVPMR). Use when reviewing any frontend change before merge.
+description: Sequential code review workflow, platform-routed at Step 0: context, code-quality (5-axis), and the platform's pattern review. Use when reviewing a change before merge without parallel agents.
 ---
 
 **Commands:** `rtk git diff`, `rtk tsc`, `rtk lint`

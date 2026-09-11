@@ -94,7 +94,7 @@ Announce the command you actually ran (`Running /build …`), not the one you co
 ```
 Frontend (React Native / web, EVPMR)
   ├── Need context only? ──────────────────────────→ /fe-context
-  ├── Scaffold only (existing context)? ────────────→ /fe-scaffold
+  ├── Write the 5 EVPMR files, context already done? → /fe-scaffold
   ├── EVPMR pattern review only? ──────────────────→ /fe-review
   ├── Designing component / hook structure? ────────→ /fe-patterns
   ├── Performance bottleneck (waterfall, bundle)? ──→ /fe-performance

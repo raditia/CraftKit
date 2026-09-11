@@ -1131,7 +1131,44 @@ done
 [[ $_rb -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
-# 27. A hook dropped from _CRAFTKIT_HOOKS is uninstalled, file AND settings.json
+# 27. Two drifts that only surface much later.
+#     (a) A pointer to content that moved into partials/. Seven call sites named
+#         using-agent-skills for the classifier after v1.33.0 moved it, and
+#         team-build's reference resolved in neither file because it splices
+#         nothing. A wrong pointer reads as a real instruction and sends the
+#         agent to a section that is not there.
+#     (b) EVPMR in an always-on rule. fe-rules is platform: fe precisely so
+#         EVPMR stays out of Kotlin and Swift sessions; karpathy-guidelines
+#         carried the same thresholds always-on and undid it.
+# ---------------------------------------------------------------------------
+check "no stale partial pointers, no EVPMR in always-on rules"
+_sp=0
+# (a) The classifier and its Step 5 live in the partial now.
+if grep -rn 'classifier from `using-agent-skills`' "$REPO_DIR/commands" "$REPO_DIR/rules" "$REPO_DIR/skills" >/dev/null 2>&1; then
+    fail "a file points at using-agent-skills for the parallel classifier, which moved to partials/parallel-classifier.md"
+    _sp=1
+fi
+if grep -rn 'Step 5.*(`using-agent-skills`)' "$REPO_DIR/commands" >/dev/null 2>&1; then
+    fail "a command points at using-agent-skills for Step 5, which moved to partials/parallel-classifier.md"
+    _sp=1
+fi
+# (b) An always-on rule is one with no platform: frontmatter. EVPMR belongs only in a
+#     platform-scoped rule, or the scoping mechanism is decorative.
+for _r in "$RULES_DIR"/*.md; do
+    _claude_rule_platform_probe() {
+        awk 'NR==1&&$0=="---"{fm=1;next} fm&&$0=="---"{exit} fm&&/^platform:/{found=1;exit} END{exit(found?0:1)}' "$1"
+    }
+    if ! _claude_rule_platform_probe "$_r"; then
+        if grep -qE "Presenter\*?\.ts|View\*\.tsx|usePresenter" "$_r"; then
+            fail "$(basename "$_r") is always-on yet prescribes EVPMR layer artifacts, so those laws load on Android and iOS and defeat fe-rules' platform scoping"
+            _sp=1
+        fi
+    fi
+done
+[[ $_sp -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 28. A hook dropped from _CRAFTKIT_HOOKS is uninstalled, file AND settings.json
 #     registration. Without a prune pass, retiring a hook orphaned both: the
 #     machine kept firing a gate whose source was deleted, with no signal. Same
 #     shape CLAUDE.md documents for adapter retirement, and it bit on the first
@@ -1152,7 +1189,7 @@ grep -q 'STATE_DIR/claude-hooks' "$REPO_DIR/adapters/claude.sh" \
 [[ $_ph -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
-# 28. Drift detector distinguishes clean, drifted and cannot-verify. The third
+# 29. Drift detector distinguishes clean, drifted and cannot-verify. The third
 #     is the point: a context doc records a baseline commit, and this repo
 #     squash-merges, so that commit leaves reachable history as soon as its
 #     branch merges. A detector that answered "clean" when it cannot see would
