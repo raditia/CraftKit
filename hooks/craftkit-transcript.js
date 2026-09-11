@@ -7,6 +7,8 @@
 
 const crypto = require('crypto');
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 // Only the tail is read: a turn is at the end by definition, and a long session
 // transcript reaches tens of MB, which is not worth re-reading on every Edit.
@@ -183,4 +185,22 @@ function currentTurn(transcriptPath) {
   return out;
 }
 
-module.exports = { currentTurn };
+// One interruption per turn, shared by the PreToolUse gates. Each fires per tool call, so
+// a ten-edit turn would otherwise cost ten prompts, which trains clicking through. Lives
+// here because every caller already requires this module for currentTurn.
+// Consequence worth knowing: DENY the first prompt and the rest of that turn passes
+// silently, on the assumption the denial itself redirected the agent.
+function onceInTurn(session, turnId, key) {
+  const dir = path.join(os.tmpdir(), 'craftkit-gate');
+  const stamp = path.join(dir, session + '.' + key);
+  try {
+    if (fs.readFileSync(stamp, 'utf8').trim() === turnId) return false;
+  } catch (e) { /* no stamp yet, so this is the turn's first ask */ }
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(stamp, turnId);
+  } catch (e) { /* an unwritable tmpdir costs a repeat prompt, not a broken gate */ }
+  return true;
+}
+
+module.exports = { currentTurn, onceInTurn };

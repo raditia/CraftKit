@@ -234,6 +234,13 @@ done
 for s in $(skill_names); do
     grep -q "skills/$s/SKILL.md" "$README" || { fail "skills/$s/ has no README row"; _doc=1; }
 done
+# Rules were never covered here, so a rule could ship, or lose its row, unnoticed. Found
+# when an acceptance criterion claiming "check.sh covers it" turned out to be false: the
+# rule had a row by luck, not because anything held it there.
+for r in "$RULES_DIR"/*.md; do
+    _r="$(basename "$r" .md)"
+    grep -q "rules/$_r.md" "$README" || { fail "rules/$_r.md has no README row"; _doc=1; }
+done
 [[ $_doc -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
@@ -884,43 +891,7 @@ PYEOF
     _stopgate "$_gx/bare.jsonl" | grep -q 'CRAFTKIT_GATE=off' \
         || { fail "stop gate refusal never names its own escape hatch, unlike the skill gate"; _gd=1; }
 
-    # Stale-context gate. The failure that kills it is firing on files a context doc
-    # already described, so the fixtures pin both directions: a file older than the doc
-    # passes even though git would call it dirty, and a file touched after it asks.
-    mkdir -p "$_gx/proj/docs"
-    printf '# Context\n\nDescribes ViewStale.tsx and ViewFresh.tsx.\n' > "$_gx/proj/docs/context.md"
-    printf 'x\n' > "$_gx/proj/ViewStale.tsx"
-    printf 'x\n' > "$_gx/proj/ViewFresh.tsx"
-    printf 'x\n' > "$_gx/proj/ViewUnmentioned.tsx"
-    # mtimes set explicitly rather than with sleeps: the gate compares timestamps, so the
-    # fixture should state them instead of racing a 1s grace window.
-    node -e '
-const fs = require("fs"), d = process.argv[1];
-const doc = d + "/docs/context.md";
-const t = fs.statSync(doc).mtimeMs / 1000;
-fs.utimesSync(d + "/ViewStale.tsx", t - 60, t - 60);
-fs.utimesSync(d + "/ViewFresh.tsx", t + 60, t + 60);
-fs.utimesSync(d + "/ViewUnmentioned.tsx", t + 60, t + 60);' "$_gx/proj"
-    _stalegate() {
-        printf '{"session_id":"%s","transcript_path":"%s","cwd":"%s","tool_input":{"file_path":"%s"}}' \
-            "$1" "$_gx/bare.jsonl" "$_gx/proj" "$2" \
-            | TMPDIR="$_gx" node "$REPO_DIR/hooks/gate-stale-context.js" 2>/dev/null
-    }
-    _stalegate t1 "$_gx/proj/ViewFresh.tsx" | grep -q '"permissionDecision":"ask"' \
-        || { fail "stale gate misses a file changed after the context doc was written, which is the whole session-belief gap"; _gd=1; }
-    _stalegate t2 "$_gx/proj/ViewStale.tsx" | grep -q 'permissionDecision' \
-        && { fail "stale gate asks about a file older than the doc, so every file the doc already summarized would fire"; _gd=1; }
-    _stalegate t3 "$_gx/proj/ViewUnmentioned.tsx" | grep -q 'permissionDecision' \
-        && { fail "stale gate asks about a file the doc never mentions, which cannot be described stalely"; _gd=1; }
-    _stalegate t4 "$_gx/proj/ViewMissing.tsx" | grep -q 'permissionDecision' \
-        && { fail "stale gate asks about a file being created, which has nothing to be stale against"; _gd=1; }
-    _stalegate t5 "$_gx/proj/ViewFresh.tsx" >/dev/null
-    _stalegate t5 "$_gx/proj/ViewFresh.tsx" | grep -q 'permissionDecision' \
-        && { fail "stale gate asks twice in one turn, so a multi-edit turn is a wall of prompts"; _gd=1; }
-    echo 'not json' | node "$REPO_DIR/hooks/gate-stale-context.js" >/dev/null 2>&1 \
-        || { fail "gate-stale-context.js exits non-zero on malformed stdin"; _gd=1; }
-
-    for _g in gate-skill-first.js gate-verify-on-stop.js gate-announce-honored.js gate-stale-context.js; do
+    for _g in gate-skill-first.js gate-verify-on-stop.js gate-announce-honored.js; do
         echo 'not json' | node "$REPO_DIR/hooks/$_g" >/dev/null 2>&1 \
             || { fail "$_g exits non-zero on malformed stdin, which surfaces as a tool error every call"; _gd=1; }
     done
@@ -1096,7 +1067,28 @@ fi
 
 
 # ---------------------------------------------------------------------------
-# 26. Drift detector distinguishes clean, drifted and cannot-verify. The third
+# 26. A hook dropped from _CRAFTKIT_HOOKS is uninstalled, file AND settings.json
+#     registration. Without a prune pass, retiring a hook orphaned both: the
+#     machine kept firing a gate whose source was deleted, with no signal. Same
+#     shape CLAUDE.md documents for adapter retirement, and it bit on the first
+#     real hook retirement. Static, because a behavioral run means a full sync
+#     into a fixture HOME at ~75s; the prune logic is asserted by wiring plus a
+#     state file whose absence would make the pass a no-op.
+# ---------------------------------------------------------------------------
+check "a retired hook is pruned, not orphaned"
+_ph=0
+grep -q "_claude_prune_hooks" "$REPO_DIR/adapters/claude.sh" \
+    || { fail "adapters/claude.sh has no hook prune pass, so a retired hook stays installed and registered forever"; _ph=1; }
+grep -q "_claude_prune_hooks" <(sed -n '/^install_claude_craftkit_hook()/,/^}/p' "$REPO_DIR/adapters/claude.sh") \
+    || { fail "the prune pass is never called from install_claude_craftkit_hook, so it can never run"; _ph=1; }
+grep -q "_craftkit_hook_unregister" "$REPO_DIR/adapters/claude.sh" \
+    || { fail "pruning deletes the hook file but leaves its settings.json entry, which points at a missing script"; _ph=1; }
+grep -q 'STATE_DIR/claude-hooks' "$REPO_DIR/adapters/claude.sh" \
+    || { fail "no hook state file, so the prune pass has no record of what was installed and removes nothing"; _ph=1; }
+[[ $_ph -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 27. Drift detector distinguishes clean, drifted and cannot-verify. The third
 #     is the point: a context doc records a baseline commit, and this repo
 #     squash-merges, so that commit leaves reachable history as soon as its
 #     branch merges. A detector that answered "clean" when it cannot see would
