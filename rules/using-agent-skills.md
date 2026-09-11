@@ -14,8 +14,10 @@ description: Skill routing, model selection, core operating behaviors, and failu
 
 Loaded from `rules/` automatically on every session:
 - `karpathy-guidelines`: think before coding, simplicity, surgical changes, goal-driven
-- `fe-rules`: EVPMR layer constraints, TypeScript, styling, React correctness, tracking
+- `flag-safety`: flag OFF stays behavior-identical, `flag:` marker, both states tested
+- `grounding`: provenance on claims that drive action, staleness as a reported state
 - `using-agent-skills`: this file, covering routing, behaviors, severity labels
+- `fe-rules`: EVPMR layer constraints and React correctness, on RN/web cwds only (`platform: fe`)
 
 Output compression (caveman) is delivered by the caveman plugin's hooks, not a synced rule. One channel, no duplicate.
 
@@ -92,7 +94,7 @@ Announce the command you actually ran (`Running /build …`), not the one you co
 ```
 Frontend (React Native / web, EVPMR)
   ├── Need context only? ──────────────────────────→ /fe-context
-  ├── Scaffold only (existing context)? ────────────→ /fe-scaffold
+  ├── Write the 5 EVPMR files, context already done? → /fe-scaffold
   ├── EVPMR pattern review only? ──────────────────→ /fe-review
   ├── Designing component / hook structure? ────────→ /fe-patterns
   ├── Performance bottleneck (waterfall, bundle)? ──→ /fe-performance
@@ -156,6 +158,15 @@ Where it does apply, every skill follows this on start, not repeated per skill:
    - If `docs/context.md` missing → run that skill, then continue
    - If branch mismatch OR commit mismatch → regenerate with that skill, then continue
    - If both match → context is fresh, proceed
+
+   **A commit match is not proof the doc still holds.** The recorded commit goes unreachable the moment its branch is squash-merged, rebased or amended, and a doc pinned to a commit nobody can resolve is not fresh. Claude Code installs a detector that separates the three answers; the other three tools install no hooks, so the check is conditional:
+   ```bash
+   D="$HOME/.claude/hooks/craftkit-drift.js"
+   [ -f "$D" ] && node -e 'const {drift}=require(process.argv[1]);
+   const r=drift(process.cwd(), process.argv[2], []); console.log(r.state, "|", r.reason)' "$D" "<recorded commit>" \
+     || echo "cannot-verify | no drift detector on this tool"
+   ```
+   `clean` → proceed · `drifted` → the named files are suspect, so regenerate · `cannot-verify` → say so and treat the doc as unverified, never as fresh. Per `grounding`, a claim resting on a cannot-verify doc is `[UNVERIFIED]` and cannot back an `[ERROR]` finding or a code edit.
 3. **Read `docs/context.md`**, required wherever this procedure applies. Read only the sections the skill specifies (see each skill's **Context:** line); at minimum: Summary + Key Changes
 4. If context conflicts with code → `CONFUSION: docs/context.md says X but code shows Y. Options: A) ... B) ... → Which?`
 

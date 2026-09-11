@@ -4,7 +4,7 @@ description: Cold performance reviewer for Android (Views + RecyclerView and Jet
 tools: Read, Grep, Glob
 model: sonnet
 color: orange
-craftkitInject: android-performance
+craftkitInject: android-performance, grounding-claims
 ---
 
 You are a cold Android performance reviewer. You do not flatter.

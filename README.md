@@ -1,4 +1,4 @@
-# craftkit `v1.35.0`
+# craftkit `v1.36.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -245,6 +245,8 @@ Routing context is text, and an agent can read text, announce the right skill, a
 | [`gate-verify-on-stop.js`](hooks/gate-verify-on-stop.js) | `Stop` | A turn that edited source and ran no verification command is blocked from ending, and told which command to run |
 | [`gate-announce-honored.js`](hooks/gate-announce-honored.js) | `Stop` | Two refusals: a reply saying `Running /<skill>` with no `Skill` call behind it, and a reply carrying no routing declaration at all |
 | [`craftkit-platform-rules.js`](hooks/craftkit-platform-rules.js) | `SessionStart` | Loads a `platform:`-scoped rule only where the cwd matches, so EVPMR laws stay out of Kotlin and Swift sessions |
+
+A hook dropped from `_CRAFTKIT_HOOKS` is uninstalled on the next sync, both the installed file and its `settings.json` registration, and the hook state file in `~/.craftkit-state/claude-hooks` is what makes that possible. Retiring a hook without that pass left the machine firing a gate whose source had been deleted, which is the same orphaning shape adapter retirement has.
 
 [`craftkit-drift.js`](hooks/craftkit-drift.js) is the shared staleness answer: one `git diff --name-only <baseline> -- <paths>` per question, which honors `.gitattributes` clean filters, covers staged and worktree states together, and reports a rename instead of dying on the old path. It returns clean, drifted, or cannot-verify, and cannot-verify is never clean, because this repo squash-merges and a context doc's baseline commit leaves reachable history the moment its branch lands.
 
@@ -677,8 +679,14 @@ The parallel workflows detect the platform first, then spawn that platform's rev
 
 > **Agent system prompts are cold copies.** Agents don't inherit rules, skills, or session context, so anything the agent needs must be in `agents/<name>.md`.
 >
+> **CI runs the gate.** `.github/workflows/check.yml` runs `check.sh` on every pull request and every push to `main`, on two legs: `macos-latest` with `/bin/bash` 3.2, which is the compatibility target and the only place a bash 4+ feature actually fails, and `ubuntu-latest` with bash 5 and GNU coreutils, where a BSD-only idiom shows up instead. Before this, the only gate the repo has ran solely on the author's machine and was self-reported.
+
 > **`craftkitInject` avoids the hand-maintained duplicate.** Add `craftkitInject: <name>` to an **agent's or command's** frontmatter and the sync splices that body in as a managed block at install time, regenerated on every pull. Each name resolves `partials/<name>.md` first, then `rules/<name>.md`, then `skills/<name>/SKILL.md`, so a file can carry a live partial (`parallel-review` ← `partials/parallel-classifier`), a live rule (`fe-review` ← `fe-rules`), or a live skill checklist (`android-review` ← `skills/android-review`). Prefer it over copying text; a copy silently rots when the source changes. Claude Code only.
 >
+> **The ponytail rubric ships in two sizes too**, for the same reason and with a stronger guard. `rules/karpathy-guidelines.md` keeps the full rule, because the writing side needs the whole ladder; the `ponytail-review` agent injects `partials/ponytail-rubric.md`, which is the six-tag table and the protected list only. The agent is read-only, so the write-side rules (assumptions, surgical edits, run tests, checkpoint, the self-pass) were ~167 lines it could never act on, every spawn. `check.sh` diffs the two byte for byte, because "author under the exact list review scores by" stops being true the moment one is paraphrased.
+
+> **A rule can ship in two sizes.** `rules/grounding.md` is the always-on version, carrying the full provenance discipline for the session that reads it. Cold agents inject `partials/grounding-claims.md` instead, which keeps only the clauses an agent can act on (label findings, do not let an `[UNVERIFIED]` claim back an `[ERROR]`, review handed content). Measured at ~245 tokens per agent spawn against ~769 for the whole rule, which is ~1.5k saved on a six-agent build. Two files stay aligned by hand, and that is the cost of the split.
+
 > **`partials/` is the lazy-shared namespace.** A procedure several commands run, but that nothing needs resident, goes here: it syncs to no tool on its own and only ever arrives spliced. That is how the parallel classifier stopped costing ~1.4k est. tokens in every session while staying a single source of truth. A partial nothing injects fails `check.sh` check 5, since no sync would otherwise report it.
 
 ### Add an agent

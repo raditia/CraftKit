@@ -3,35 +3,13 @@
 // The UserPromptSubmit routing hook only injects text, and text is advisory, which is
 // how an agent announces a skill and then hand-rolls the work anyway. This is the half
 // that can stop the call.
-// Arms per turn, not per session, so one skill call early on does not buy a session-long
-// pass. Decision is "ask", never "deny": the human keeps the override, the agent does not.
+// Scoped to the session, not the turn: the measured misses are continuations of work that
+// routed several turns earlier. Decision is "ask", never "deny": the human keeps the
+// override, the agent does not.
 // Escape hatch: CRAFTKIT_GATE=off.
 
-const fs = require('fs');
-const os = require('os');
 const path = require('path');
-const { currentTurn } = require(path.join(__dirname, 'craftkit-transcript.js'));
-
-// One interruption per unrouted turn, not one per edit: the gate fires per tool call, and
-// a turn with ten edits would otherwise cost ten prompts, which trains you to click
-// through it. Consequence worth knowing: if you DENY the first edit, the rest of that turn
-// passes silently, on the assumption the denial itself redirected the agent.
-const STAMP_DIR = path.join(os.tmpdir(), 'craftkit-gate');
-
-function askedAlready(session, turnId) {
-  try {
-    return fs.readFileSync(path.join(STAMP_DIR, session + '.asked'), 'utf8').trim() === turnId;
-  } catch (e) {
-    return false;
-  }
-}
-
-function recordAsk(session, turnId) {
-  try {
-    fs.mkdirSync(STAMP_DIR, { recursive: true });
-    fs.writeFileSync(path.join(STAMP_DIR, session + '.asked'), turnId);
-  } catch (e) { /* an unwritable tmpdir costs a repeat prompt, not a broken gate */ }
-}
+const { currentTurn, onceInTurn } = require(path.join(__dirname, 'craftkit-transcript.js'));
 
 const CODE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|kt|java|swift|m|mm)$/i;
 
@@ -76,10 +54,7 @@ process.stdin.on('end', () => {
   if (turn.sidechain) return pass();
 
   const session = String(payload.session_id || 'nosession');
-  if (turn.turnId) {
-    if (askedAlready(session, turn.turnId)) return pass();
-    recordAsk(session, turn.turnId);
-  }
+  if (turn.turnId && !onceInTurn(session, turn.turnId, 'asked')) return pass();
 
   process.stdout.write(JSON.stringify({
     hookSpecificOutput: {

@@ -74,6 +74,10 @@ CONFLICT: file:line
 **Generated:** {{ISO timestamp}}
 **Branch:** {{branch}} | **Base:** {{base}} | **Commit:** {{git rev-parse HEAD}}
 
+**Baseline:** record the full `git rev-parse HEAD`, never a branch name or short sha:
+`hooks/craftkit-drift.js` resolves it and reports `cannot-verify` for anything unreachable.
+
+
 ## Summary
 {{2-4 sentences: what is being built, which feature module(s), user-facing purpose}}
 

@@ -42,7 +42,7 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
      already routed is spared; a task-notification turn is never caught. Firing rate stays at
      or below the measured 18% baseline.
   4. Per-file drift is reported against an explicit baseline, with unreachable commits and
-     dirty worktrees distinguished from clean.
+     dirty worktrees distinguished from clean, and consulted by the freshness step.
   5. Provenance labels exist as a rule, and `[UNVERIFIED]` cannot back an `[ERROR]` finding or
      a code edit.
   6. `bash check.sh` exits 0, `bash sync.sh` prints `Sync complete.`, and a second consecutive
@@ -63,8 +63,8 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
     all paths, which honors clean filters, covers staged and worktree states, and detects
     renames. Distinguishes clean, drifted, and cannot-verify, where an unreachable baseline
     (squash merge, rebase, amend, gc) reports cannot-verify rather than clean.
-  - **F2** `hooks/gate-stale-context.js` (PreToolUse on Edit), firing only for files the
-    current action touches.
+  - **F2 (dropped)** `hooks/gate-stale-context.js`, a PreToolUse gate on staleness. Built,
+    measured, removed. See Key decisions.
   - **F2** Cold agents review only content handed to them, via `craftkitInject: grounding`
     rather than hand-copied rule text.
   - **F3** `sync.sh` records the installed version in `~/.craftkit-state/` and refuses a
@@ -127,9 +127,21 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
   4. **Quotation is the known bypass.** `gate-announce-honored` needed line-anchoring plus
      fence-stripping for exactly this; `ponytail self-pass:` appears in 9 source files, so F4
      inherits both defenses and their negative fixtures.
-  5. **One command, not two per file.** `git diff --name-only <baseline> -- <paths>` replaces
+  5. **F2's staleness gate cut on measurement, not argument.** Firing rate across the repos
+     actually in use: `www` 8 of 41,433 source files (0.02%), `android-v3` 9 of 39,236
+     (0.02%). Staleness itself is common (6.7% to 8.1% of files have an mtime past the doc),
+     but a context doc names only ~8 files out of 41,000, so the conjunction the gate needs
+     almost never lands. A third gate, a hook file, a README row, 7 fixtures and a per-edit
+     stat, to catch 1 edit in 5,000, is decoration. What the measurement actually exposed is
+     a `/fe-context` coverage problem: the docs describe almost nothing. That is a separate
+     task, not this gate.
+     Two measurement bugs preceded the number and both produced a comfortable 0%: an
+     unreadable `transcript_path` made the gate fail open before deciding, and a sanity
+     target that predated the doc proved nothing by not firing. A rate that confirms the
+     hoped-for answer gets checked twice.
+  6. **One command, not two per file.** `git diff --name-only <baseline> -- <paths>` replaces
      `hash-object` plus `rev-parse`, and handles filters, staging, and renames for free.
-  6. **Derive, don't record.** The model-tier hook is the in-repo proof: hardcoded ids went
+  7. **Derive, don't record.** The model-tier hook is the in-repo proof: hardcoded ids went
      stale, derived ids cannot.
 
 - **Risks & open questions:**
@@ -175,10 +187,10 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
         none edited it reports clean; with an unreachable baseline or outside a git repo it
         reports cannot-verify, never clean.
   - [ ] Given a file renamed since the baseline, the detector reports it without fataling.
-  - [ ] Given an Edit to a drifted file, `gate-stale-context.js` asks; to an undrifted file it
-        passes silently; on malformed stdin it exits 0.
-  - [ ] Given `rules/grounding.md` added, README carries its row, `check.sh` covers it, and the
-        12 `agents/*.md` carry the injected body after sync.
+  - [x] Given the staleness gate measured at a 0.02% firing rate, it is cut rather than
+        shipped; see Key decisions.
+  - [ ] Given `rules/grounding.md` added, README carries its row, `check.sh` covers it, and all
+        14 `agents/*.md` carry the injected body after sync.
   - [ ] `bash check.sh` exits 0; `bash sync.sh` prints `Sync complete.`; a second consecutive
         `sync.sh` reports `(up to date)` everywhere.
 
@@ -191,15 +203,15 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
 | T1 | **CUT** Generate the routing hook's skill block from frontmatter | Both drift directions are already enforced: `sync.sh:60-68` aborts when a skill is missing from the hook, `check.sh:175` fails when the hook names a skill that does not exist. What is left diverging is the hook's editorial content (groupings, tiebreakers, `/define chains interview→spec→plan`), which is judgment, not derivable from `name` + `description`. Generating it would replace curated routing guidance with a name dump | none | none |
 | T2 | `rules/grounding.md`: three provenance labels and the `[UNVERIFIED]` law, plus README row and a `check.sh` check | README row present; `check.sh` covers it; installs to all 4 tools; second sync a no-op | none | `/build` |
 | T3 | Drift detector on `git diff --name-only <baseline> -- <paths>`, distinguishing clean, drifted, cannot-verify (unreachable baseline, non-git, renames) | Behavioral `check.sh`: edited named, unedited clean, unreachable baseline and non-git both cannot-verify, rename reported without fatal | none | `/build` |
-| T4 | `hooks/gate-stale-context.js` (PreToolUse on Edit), scoped to files the action touches, registered in `_CRAFTKIT_HOOKS` with its README row | Drifted asks; undrifted silent; malformed stdin exits 0; hook-table check green | T3 | `/build` |
+| T4 | **CUT** staleness gate. Measured at 0.02% firing (8/41,433 in `www`, 9/39,236 in `android-v3`): staleness is common but context docs describe ~8 files of 41,000, so the conjunction never lands. Kept from the attempt: `onceInTurn` extracted and shared, the rules-README-row check, and a portable drift instruction | n/a | none |
 | T5 | Point the three `*-context` skills and Standard context loading at the detector, recording an explicit baseline in the doc header | A regenerated doc carries a baseline the detector accepts; the freshness step consults it | T3 | `/build` |
-| T6 | Opt the 12 `agents/*.md` into `craftkitInject: grounding` so cold agents carry the live rule instead of a copy | `craftkitInject` sources resolve; installed agents carry the body; second sync a no-op | T2 | `/build` |
+| T6 | Opt all 14 `agents/*.md` into `craftkitInject: grounding` so cold agents carry the live rule instead of a copy | `craftkitInject` sources resolve; installed agents carry the body; second sync a no-op | T2 | `/build` |
 | T7 | `sync.sh` version guard: record the installed version in `~/.craftkit-state/`, refuse a downgrade naming both versions | Behavioral `check.sh`: older-over-newer refuses; equal or newer proceeds; first run records | none | `/fix` |
 | T8 | **DROPPED** self-pass refusal in `gate-verify-on-stop.js`. Built, dogfooded one turn, removed: it cannot tell a real rubric scan from a recitation, so it taxed every code turn for a signal that reads as compliance either way. The two defects it exposed (repeat-edit counting, escape hatch unnamed) were bugs in the verification reason too and are kept | `check.sh`: one file edited four times counts once; every refusal names `CRAFTKIT_GATE=off` | none | `/fix` (done) |
 | T9 | **DROPPED** with T8 (comment-to-code counts in the refusal message) | n/a | n/a | none |
 | T10 | **DROPPED** with T8 (self-pass fixtures) | n/a | n/a | none |
 | T11 | Extend `gate-skill-first.js` to session scope: ask on a source-editing turn only when no earlier turn in the session invoked a skill; skip task-notification turns | Behavioral `check.sh`: session-never-routed asks; session-routed-earlier does not; notification turn does not; removing the lookback makes those fixtures fail | none | `/fix` |
-| T13 | Close the `stop_hook_active` bypass while keeping the no-infinite-loop property: a second stop attempt currently passes every Stop gate with nothing emitted | Behavioral `check.sh`: a turn blocked once and retried unchanged is still refused; a turn blocked once and then corrected passes; no fixture loops more than a bounded number of attempts | none | `/fix` |
+| T13 | **DONE** `stop_hook_active` no longer waves a retry through. Both Stop gates count blocks per turn (budget 2), so a retry is judged and the loop still terminates. An unrecordable stamp resolves to pass, making the old behavior the failure mode | `check.sh`: unchanged retry blocks, third attempt passes, corrected retry passes; controls fail both when the fix is removed and when the bound is removed | none | `/fix` (done) |
 | T12 | Release: version bump in `package.json` and the README header, plus a matching `CHANGELOG.md` section | `check.sh` version-consistency check green; `sync.sh` clean and idempotent | T1-T11, T13 | `/parallel-ship` |
 
 **Parallelizable now:** T1, T2, T3, T7, T8, T11

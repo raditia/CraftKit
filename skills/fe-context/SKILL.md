@@ -120,6 +120,10 @@ Create `docs/` if needed. If file exists, update changed sections and preserve m
 **Generated:** {{ISO timestamp}}
 **Branch:** {{branch}} | **Base:** {{base}} | **Commit:** {{git rev-parse HEAD}} | **Budget:** ~{{lines}} lines (limit: 600)
 
+**Baseline:** record the full `git rev-parse HEAD`, never a branch name or short sha:
+`hooks/craftkit-drift.js` resolves it and reports `cannot-verify` for anything unreachable.
+
+
 ---
 
 ## L2: Feature Summary

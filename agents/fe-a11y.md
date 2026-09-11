@@ -4,6 +4,7 @@ description: Cold accessibility reviewer for React Native and Next.js. Spawned b
 tools: Read, Grep, Glob
 model: sonnet
 color: green
+craftkitInject: grounding-claims
 ---
 
 You are a cold accessibility reviewer for React Native and Next.js. You do not flatter.

@@ -57,7 +57,7 @@ coverage:   Lines N% / Branches N% / Functions N% / Statements N% → PASS / FAI
 
 ## Phase 1.5: Classify
 
-Apply the parallel workflow classifier from `using-agent-skills`. Announce selected agents before proceeding.
+Apply the parallel workflow classifier injected above. Announce selected agents before proceeding.
 
 ---
 
@@ -105,7 +105,7 @@ Spawn the set the classifier selected:
 
 ## Phase 3: Synthesize
 
-Apply **Step 5: Handle agent failures** (`using-agent-skills`): any selected agent that returned no findings is a coverage gap, not a clean axis, so surface it, mark it skipped, and gate the verdict to `INCOMPLETE` (never `READY TO MERGE` with an infra-skipped review agent).
+Apply **Step 5: Handle agent failures** from the injected classifier: any selected agent that returned no findings is a coverage gap, not a clean axis, so surface it, mark it skipped, and gate the verdict to `INCOMPLETE` (never `READY TO MERGE` with an infra-skipped review agent).
 
 This is a pre-merge code review → apply **Track B** (structured synthesis). Deduplicate by `file:line`, then classify each finding's confidence:
 

@@ -151,6 +151,13 @@ _inj_scan() {
 for c in "$REPO_DIR"/commands/*.md; do
     [[ -f "$c" ]] && _inj_scan "commands/$(basename "$c")" "$c"
 done
+# Agents are an injection host too (adapters/claude.sh has effective_claude_agent_source for
+# exactly that), and scanning only commands/ meant an agent's inject was never validated AND
+# a partial used only by agents reported as used by nothing. Found by a partial that 14
+# agents injected.
+for a in "$REPO_DIR"/agents/*.md; do
+    [[ -f "$a" ]] && _inj_scan "agents/$(basename "$a")" "$a"
+done
 for _p in "$PARTIALS_DIR"/*.md; do
     [[ -f "$_p" ]] || continue
     _pn="$(basename "$_p" .md)"
@@ -233,6 +240,13 @@ for a in $(agent_names); do
 done
 for s in $(skill_names); do
     grep -q "skills/$s/SKILL.md" "$README" || { fail "skills/$s/ has no README row"; _doc=1; }
+done
+# Rules were never covered here, so a rule could ship, or lose its row, unnoticed. Found
+# when an acceptance criterion claiming "check.sh covers it" turned out to be false: the
+# rule had a row by luck, not because anything held it there.
+for r in "$RULES_DIR"/*.md; do
+    _r="$(basename "$r" .md)"
+    grep -q "rules/$_r.md" "$README" || { fail "rules/$_r.md has no README row"; _doc=1; }
 done
 [[ $_doc -eq 0 ]] && pass
 
@@ -718,8 +732,8 @@ PYEOF
             | TMPDIR="$_gx" node "$REPO_DIR/hooks/gate-skill-first.js" 2>/dev/null
     }
     _stopgate() {
-        printf '{"session_id":"s","transcript_path":"%s","cwd":"%s"%s}' "$1" "$_gx/proj" "${2:-}" \
-            | node "$REPO_DIR/hooks/gate-verify-on-stop.js" 2>/dev/null
+        printf '{"session_id":"%s","transcript_path":"%s","cwd":"%s"%s}' "${3:-v$RANDOM}" "$1" "$_gx/proj" "${2:-}" \
+            | TMPDIR="$_gx" node "$REPO_DIR/hooks/gate-verify-on-stop.js" 2>/dev/null
     }
     _gd=0
     _skillgate s1 "$_gx/bare.jsonl" /x/ViewFoo.tsx | grep -q '"permissionDecision":"ask"' \
@@ -793,8 +807,16 @@ PYEOF
         || { fail "stop gate let a turn end with edits and no verification command"; _gd=1; }
     _stopgate "$_gx/verified.jsonl" | grep -q '"decision"' \
         && { fail "stop gate blocks after the gates ran, which makes ending any turn impossible"; _gd=1; }
-    _stopgate "$_gx/bare.jsonl" ',"stop_hook_active":true' | grep -q '"decision"' \
-        && { fail "stop gate re-blocks while already active, so the agent cannot ever stop"; _gd=1; }
+    # A retry is judged, not waved through, and the blocks are counted so the loop still
+    # terminates. Honoring stop_hook_active unconditionally meant only the first stop
+    # attempt was ever evaluated, which is a bypass requiring nothing but a second attempt.
+    _stopgate "$_gx/bare.jsonl" "" t13a >/dev/null
+    _stopgate "$_gx/bare.jsonl" ',"stop_hook_active":true' t13a | grep -q '"decision":"block"' \
+        || { fail "stop gate waves through a retry that changed nothing, so being blocked once is the whole cost of skipping verification"; _gd=1; }
+    _stopgate "$_gx/bare.jsonl" ',"stop_hook_active":true' t13a | grep -q '"decision"' \
+        && { fail "stop gate blocks a third attempt, so a turn it cannot satisfy can never end"; _gd=1; }
+    _stopgate "$_gx/verified.jsonl" ',"stop_hook_active":true' t13b | grep -q '"decision"' \
+        && { fail "stop gate blocks a retry that fixed the problem, so correcting the turn does not clear it"; _gd=1; }
     # Editing through the shell leaves no Edit tool call, so the turn's file list cannot
     # come from tool calls alone. Caught during this change: both gates were blind to it,
     # which is the route an agent bypassing a skill is most likely to take.
@@ -813,6 +835,10 @@ def turn(prompt, command):
 
 
 cases = {"shell": turn("edit", "sed -i '' s/a/b/ ViewX.tsx"),
+         "scratch": [{"type": "user", "message": {"role": "user", "content": "draft it"}},
+                     {"type": "assistant", "message": {"role": "assistant", "content": [
+                         {"type": "tool_use", "name": "Write",
+                          "input": {"file_path": "/private/tmp/claude-1/x/scratchpad/probe.ts"}}]}}],
          "readonly": turn("what is this", "cat ViewX.tsx"),
          "delegated": [{"type": "user", "message": {"role": "user", "content": "build it"}},
                        {"type": "assistant", "message": {"role": "assistant", "content": [
@@ -825,6 +851,10 @@ PYEOF
             || { fail "stop gate misses a shell-route edit (sed -i), the bypass most likely to skip a skill"; _gd=1; }
         _stopgate "$_gx/readonly.jsonl" | grep -q '"decision"' \
             && { fail "stop gate blocks a read-only turn on a dirty tree, so pre-existing dirt gates every turn"; _gd=1; }
+        # A throwaway file cannot be the reason a turn owes a verification run. This gate
+        # fired on a PR body drafted in the session scratchpad until it excluded them.
+        _stopgate "$_gx/scratch.jsonl" | grep -q '"decision"' \
+            && { fail "stop gate demands verification for a scratchpad-only turn, firing on throwaway files"; _gd=1; }
         # Delegating the edits hides them the same way the shell does: a subagent's writes
         # land in ITS transcript, so the parent's turn shows no edits at all.
         _stopgate "$_gx/delegated.jsonl" | grep -q '"decision":"block"' \
@@ -832,8 +862,8 @@ PYEOF
     fi
     mkdir -p "$_gx/proj/.claude/skills/zzz-fixture-skill"
     _announcegate() {
-        printf '{"session_id":"s","transcript_path":"%s","cwd":"%s"%s}' "$1" "$_gx/proj" "${2:-}" \
-            | node "$REPO_DIR/hooks/gate-announce-honored.js" 2>/dev/null
+        printf '{"session_id":"%s","transcript_path":"%s","cwd":"%s"%s}' "${3:-a$RANDOM}" "$1" "$_gx/proj" "${2:-}" \
+            | TMPDIR="$_gx" node "$REPO_DIR/hooks/gate-announce-honored.js" 2>/dev/null
     }
     # The lie the other two gates cannot see: prose-only turn, zero edits, so neither the
     # PreToolUse matcher nor the verify gate ever arms.
@@ -850,8 +880,13 @@ PYEOF
     # worse than one that abstains.
     _announcegate "$_gx/announce-unknown.jsonl" | grep -q '"decision"' \
         && { fail "announce gate blocks on a skill that is not installed, so any /word in prose blocks"; _gd=1; }
-    _announcegate "$_gx/announce-lied.jsonl" ',"stop_hook_active":true' | grep -q '"decision"' \
-        && { fail "announce gate re-blocks while already active, so the agent cannot ever stop"; _gd=1; }
+    _announcegate "$_gx/announce-lied.jsonl" "" t13c >/dev/null
+    _announcegate "$_gx/announce-lied.jsonl" ',"stop_hook_active":true' t13c | grep -q '"decision":"block"' \
+        || { fail "announce gate waves through a retry that still has not invoked what it announced"; _gd=1; }
+    _announcegate "$_gx/announce-lied.jsonl" ',"stop_hook_active":true' t13c | grep -q '"decision"' \
+        && { fail "announce gate blocks a third attempt, so a turn it cannot satisfy can never end"; _gd=1; }
+    _announcegate "$_gx/announce-kept.jsonl" ',"stop_hook_active":true' t13d | grep -q '"decision"' \
+        && { fail "announce gate blocks a retry that actually invoked the skill, so honest correction does not clear it"; _gd=1; }
     _announcegate /nope/missing.jsonl | grep -q '"decision"' \
         && { fail "announce gate blocks on an unreadable transcript instead of failing open"; _gd=1; }
     # Check 2. Without it, check 1 is defeated by dropping the announcement, which trades
@@ -920,16 +955,20 @@ else
     # Build the block + staging in a sandbox from the adapter's OWN installer, so the
     # assertion depends on this diff, not on whatever a prior sync left in $HOME. Reading
     # real ~/.craftkit and ~/.claude made the gate fail on a machine that never ran sync.
-    mkdir -p "$_pf/stage" "$_pf/cmds"
+    # Staged where the hook actually looks: os.homedir()/.craftkit/claude-rules. Staging
+    # elsewhere and then running the hook with the real HOME meant the hook read whatever a
+    # prior sync had left there, so this check passed only on a machine that had synced and
+    # could never pass on a fresh checkout. CI found it on the first run.
+    mkdir -p "$_pf/home/.craftkit/claude-rules" "$_pf/cmds"
     ( . "$REPO_DIR/adapters/claude.sh" >/dev/null 2>&1
-      CLAUDE_RULES_DIR="$_pf/stage"; CLAUDE_MD="$_pf/CLAUDE.md"; CLAUDE_COMMANDS_DIR="$_pf/cmds"
+      CLAUDE_RULES_DIR="$_pf/home/.craftkit/claude-rules"; CLAUDE_MD="$_pf/CLAUDE.md"; CLAUDE_COMMANDS_DIR="$_pf/cmds"
       for _r in "$REPO_DIR"/rules/*.md; do
           install_claude_rule "$(basename "$_r" .md)" "$_r" >/dev/null 2>&1
       done )
     while read -r _tag _rn; do
         [[ "$_tag" == "scoped" ]] || continue
         # The staged copy is what the hook reads; the block is what every project loads.
-        if ! grep -q "^name: $_rn\$" "$_pf/stage/${_rn}.md" 2>/dev/null; then
+        if ! grep -q "^name: $_rn\$" "$_pf/home/.craftkit/claude-rules/${_rn}.md" 2>/dev/null; then
             fail "rules/$_rn.md is platform-scoped but not staged, so the SessionStart hook has nothing to load"
             _px=1
         fi
@@ -945,7 +984,7 @@ else
         _px=1
     fi
 
-    _phook() { printf '{"cwd":"%s"}' "$1" | node "$REPO_DIR/hooks/craftkit-platform-rules.js" 2>/dev/null; }
+    _phook() { printf '{"cwd":"%s"}' "$1" | HOME="$_pf/home" node "$REPO_DIR/hooks/craftkit-platform-rules.js" 2>/dev/null; }
     mkdir -p "$_pf/fe" "$_pf/android" "$_pf/bare"
     echo '{}' > "$_pf/fe/package.json"
     : > "$_pf/android/settings.gradle"
@@ -1011,14 +1050,18 @@ done
 # ---------------------------------------------------------------------------
 check "sync refuses a downgrade"
 _vg=0
-_vgx="$(mktemp -d)"
 _repo_v="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$REPO_DIR/package.json" | head -1)"
 if [[ -z "$_repo_v" ]]; then
     fail "package.json has no readable version, so the downgrade guard cannot compare"
     _vg=1
 else
+    _vgx="$(mktemp -d)"
     mkdir -p "$_vgx/.craftkit-state"
-    # Installed newer than this tree: must refuse, name both versions, exit non-zero.
+    # Only the REFUSAL runs sync.sh end to end, because it exits before sourcing any
+    # adapter and costs 0.07s. The proceed paths would each complete a full four-adapter
+    # sync into the fixture HOME at ~75s apiece, which turned this gate from seconds into
+    # minutes, and a gate nobody waits for is a gate nobody runs. They are covered below
+    # by unit-testing the comparison and asserting the wiring.
     echo "99.0.0" > "$_vgx/.craftkit-state/version"
     _out="$(HOME="$_vgx" bash "$REPO_DIR/sync.sh" 2>&1)" && _rc=0 || _rc=$?
     printf '%s' "$_out" | grep -q "Refusing to sync" \
@@ -1027,25 +1070,135 @@ else
         || { fail "downgrade refusal does not name the installed version, so the gap is not diagnosable"; _vg=1; }
     [[ $_rc -ne 0 ]] \
         || { fail "sync.sh exits 0 when refusing a downgrade, so a wrapper or hook reads it as success"; _vg=1; }
-    # The override exists for the deliberate case and must actually override.
-    _out="$(HOME="$_vgx" CRAFTKIT_ALLOW_DOWNGRADE=1 bash "$REPO_DIR/sync.sh" 2>&1)" || true
-    printf '%s' "$_out" | grep -q "Refusing to sync" \
-        && { fail "CRAFTKIT_ALLOW_DOWNGRADE does not override the guard, so a deliberate downgrade is impossible"; _vg=1; }
-    # Equal version is not a downgrade, and an unrecorded version is a first run.
-    echo "$_repo_v" > "$_vgx/.craftkit-state/version"
-    HOME="$_vgx" bash "$REPO_DIR/sync.sh" 2>&1 | grep -q "Refusing to sync" \
-        && { fail "sync.sh refuses its own version, so no sync can ever run twice"; _vg=1; }
-    rm -f "$_vgx/.craftkit-state/version"
-    HOME="$_vgx" bash "$REPO_DIR/sync.sh" 2>&1 | grep -q "Refusing to sync" \
-        && { fail "sync.sh refuses a first run with no recorded version, so a fresh install cannot sync"; _vg=1; }
-    [[ "$(head -1 "$_vgx/.craftkit-state/version" 2>/dev/null)" == "$_repo_v" ]] \
-        || { fail "sync.sh does not record the synced version, so the next run has nothing to compare against"; _vg=1; }
+    # The override is asserted by wiring, not behavior: exercising it completes a full
+    # four-adapter sync (~75s). The refusal above is the dangerous direction and stays
+    # end to end; an override that silently failed would only block a deliberate
+    # downgrade, which fails safe.
+    grep -q 'CRAFTKIT_ALLOW_DOWNGRADE' "$REPO_DIR/sync.sh" \
+        || { fail "sync.sh has no CRAFTKIT_ALLOW_DOWNGRADE override, so a deliberate downgrade is impossible"; _vg=1; }
+    # Ordering, tested on the real function rather than through a sync. Extraction fails
+    # loudly if the function is renamed, which is the sensor working.
+    sed -n '/^_ck_version_lt()/,/^}/p' "$REPO_DIR/sync.sh" > "$_vgx/cmp.sh"
+    [[ -s "$_vgx/cmp.sh" ]] \
+        || { fail "_ck_version_lt not found in sync.sh, so the downgrade guard has no comparison to test"; _vg=1; }
+    for _case in "1.9.0 1.10.0 older" "1.10.0 1.9.0 newer" "1.35.0 1.35.0 newer" \
+                 "1.35.0 1.35.1 older" "1.2 1.2.1 older" "2.0.0 1.99.99 newer"; do
+        set -- $_case
+        _got="$(bash -c ". '$_vgx/cmp.sh'; if _ck_version_lt $1 $2; then echo older; else echo newer; fi")"
+        [[ "$_got" == "$3" ]] \
+            || { fail "version ordering wrong: $1 vs $2 read as $_got, expected $3"; _vg=1; }
+    done
+    # Wiring: a guard that never records leaves the next run nothing to compare against.
+    grep -q '_ck_version_file"$' "$REPO_DIR/sync.sh" \
+        || { fail "sync.sh never writes the synced version, so the guard has no baseline after a first run"; _vg=1; }
+    grep -q 'f "$_ck_version_file"' "$REPO_DIR/sync.sh" \
+        || { fail "sync.sh does not treat a missing version file as a first run, so a fresh install cannot sync"; _vg=1; }
+    rm -rf "$_vgx"
 fi
-rm -rf "$_vgx"
 [[ $_vg -eq 0 ]] && pass
 
+
 # ---------------------------------------------------------------------------
-# 26. Drift detector distinguishes clean, drifted and cannot-verify. The third
+# 26. The rubric exists once. partials/ponytail-rubric.md is injected into the
+#     cold reviewer and rules/karpathy-guidelines.md is what the writing side
+#     authors under, so the two drifting apart means review scores code by a
+#     list the author never saw. Byte-for-byte, because "author under the exact
+#     list review uses" is the design and a paraphrase breaks it silently.
+#     Also holds the always-on inventory to the actual contents of rules/,
+#     which listed 3 of 5 for two releases.
+# ---------------------------------------------------------------------------
+check "one rubric, and an honest rule inventory"
+_rb=0
+_rbf="$(mktemp)"
+awk '/^\| Tag \| Fails when \|/{f=1} f{print} /^Protected, never counted/{if(f)exit}' \
+    "$REPO_DIR/rules/karpathy-guidelines.md" > "$_rbf"
+[[ -s "$_rbf" ]] \
+    || { fail "no rubric block found in rules/karpathy-guidelines.md, so the writing side has no list to author under"; _rb=1; }
+_rbp="$(mktemp)"
+awk '/^\| Tag \| Fails when \|/{f=1} f{print} /^Protected, never counted/{if(f)exit}' \
+    "$REPO_DIR/partials/ponytail-rubric.md" > "$_rbp"
+if ! diff -q "$_rbf" "$_rbp" >/dev/null 2>&1; then
+    fail "partials/ponytail-rubric.md has drifted from the rubric in rules/karpathy-guidelines.md, so the reviewer scores by a list the author never saw"
+    _rb=1
+fi
+rm -f "$_rbf" "$_rbp"
+# The inventory is prose, so only a check keeps it true.
+for _r in "$RULES_DIR"/*.md; do
+    _rn="$(basename "$_r" .md)"
+    grep -q "^- \`$_rn\`" "$REPO_DIR/rules/using-agent-skills.md" \
+        || { fail "rules/$_rn.md is always-on but missing from the inventory in using-agent-skills.md, which then understates what every session loads"; _rb=1; }
+done
+[[ $_rb -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 27. Two drifts that only surface much later.
+#     (a) A pointer to content that moved into partials/. Seven call sites named
+#         using-agent-skills for the classifier after v1.33.0 moved it, and
+#         team-build's reference resolved in neither file because it splices
+#         nothing. A wrong pointer reads as a real instruction and sends the
+#         agent to a section that is not there.
+#     (b) EVPMR in an always-on rule. fe-rules is platform: fe precisely so
+#         EVPMR stays out of Kotlin and Swift sessions; karpathy-guidelines
+#         carried the same thresholds always-on and undid it.
+# ---------------------------------------------------------------------------
+check "no stale partial pointers, no EVPMR in always-on rules"
+_sp=0
+# (a) The classifier and its Step 5 live in the partial now.
+if grep -rn 'classifier from `using-agent-skills`' "$REPO_DIR/commands" "$REPO_DIR/rules" "$REPO_DIR/skills" >/dev/null 2>&1; then
+    fail "a file points at using-agent-skills for the parallel classifier, which moved to partials/parallel-classifier.md"
+    _sp=1
+fi
+if grep -rn 'Step 5.*(`using-agent-skills`)' "$REPO_DIR/commands" >/dev/null 2>&1; then
+    fail "a command points at using-agent-skills for Step 5, which moved to partials/parallel-classifier.md"
+    _sp=1
+fi
+# (c) The platform-agnostic reviewers run on all three platforms (the classifier says so),
+#     so an EVPMR layer recital in them is unusable on .kt and .swift and drifts from
+#     fe-rules with nothing holding it.
+for _f in "$REPO_DIR/agents/code-quality.md" "$REPO_DIR/skills/code-quality/SKILL.md"; do
+    if grep -qE "usePresenter|View\*\.tsx|Presenter\*?\.ts" "$_f"; then
+        fail "${_f#$REPO_DIR/} is platform-agnostic yet recites EVPMR layer artifacts, which it cannot apply on a .kt or .swift diff"
+        _sp=1
+    fi
+done
+# (b) An always-on rule is one with no platform: frontmatter. EVPMR belongs only in a
+#     platform-scoped rule, or the scoping mechanism is decorative.
+for _r in "$RULES_DIR"/*.md; do
+    _claude_rule_platform_probe() {
+        awk 'NR==1&&$0=="---"{fm=1;next} fm&&$0=="---"{exit} fm&&/^platform:/{found=1;exit} END{exit(found?0:1)}' "$1"
+    }
+    if ! _claude_rule_platform_probe "$_r"; then
+        if grep -qE "Presenter\*?\.ts|View\*\.tsx|usePresenter" "$_r"; then
+            fail "$(basename "$_r") is always-on yet prescribes EVPMR layer artifacts, so those laws load on Android and iOS and defeat fe-rules' platform scoping"
+            _sp=1
+        fi
+    fi
+done
+[[ $_sp -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 28. A hook dropped from _CRAFTKIT_HOOKS is uninstalled, file AND settings.json
+#     registration. Without a prune pass, retiring a hook orphaned both: the
+#     machine kept firing a gate whose source was deleted, with no signal. Same
+#     shape CLAUDE.md documents for adapter retirement, and it bit on the first
+#     real hook retirement. Static, because a behavioral run means a full sync
+#     into a fixture HOME at ~75s; the prune logic is asserted by wiring plus a
+#     state file whose absence would make the pass a no-op.
+# ---------------------------------------------------------------------------
+check "a retired hook is pruned, not orphaned"
+_ph=0
+grep -q "_claude_prune_hooks" "$REPO_DIR/adapters/claude.sh" \
+    || { fail "adapters/claude.sh has no hook prune pass, so a retired hook stays installed and registered forever"; _ph=1; }
+grep -q "_claude_prune_hooks" <(sed -n '/^install_claude_craftkit_hook()/,/^}/p' "$REPO_DIR/adapters/claude.sh") \
+    || { fail "the prune pass is never called from install_claude_craftkit_hook, so it can never run"; _ph=1; }
+grep -q "_craftkit_hook_unregister" "$REPO_DIR/adapters/claude.sh" \
+    || { fail "pruning deletes the hook file but leaves its settings.json entry, which points at a missing script"; _ph=1; }
+grep -q 'STATE_DIR/claude-hooks' "$REPO_DIR/adapters/claude.sh" \
+    || { fail "no hook state file, so the prune pass has no record of what was installed and removes nothing"; _ph=1; }
+[[ $_ph -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 29. Drift detector distinguishes clean, drifted and cannot-verify. The third
 #     is the point: a context doc records a baseline commit, and this repo
 #     squash-merges, so that commit leaves reachable history as soon as its
 #     branch merges. A detector that answered "clean" when it cannot see would

@@ -4,7 +4,7 @@ description: Cold iOS MVVM-C pattern checker. Spawned by parallel workflows when
 tools: Read, Grep, Glob
 model: sonnet
 color: blue
-craftkitInject: ios-review, flag-safety
+craftkitInject: ios-review, flag-safety, grounding-claims
 ---
 
 You are a cold iOS architecture reviewer. You do not flatter.

@@ -4,7 +4,7 @@ description: Cold accessibility reviewer for Android (Views + Data Binding and J
 tools: Read, Grep, Glob
 model: sonnet
 color: green
-craftkitInject: android-a11y
+craftkitInject: android-a11y, grounding-claims
 ---
 
 You are a cold Android accessibility reviewer. You do not flatter.
