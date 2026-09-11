@@ -151,6 +151,13 @@ _inj_scan() {
 for c in "$REPO_DIR"/commands/*.md; do
     [[ -f "$c" ]] && _inj_scan "commands/$(basename "$c")" "$c"
 done
+# Agents are an injection host too (adapters/claude.sh has effective_claude_agent_source for
+# exactly that), and scanning only commands/ meant an agent's inject was never validated AND
+# a partial used only by agents reported as used by nothing. Found by a partial that 14
+# agents injected.
+for a in "$REPO_DIR"/agents/*.md; do
+    [[ -f "$a" ]] && _inj_scan "agents/$(basename "$a")" "$a"
+done
 for _p in "$PARTIALS_DIR"/*.md; do
     [[ -f "$_p" ]] || continue
     _pn="$(basename "$_p" .md)"

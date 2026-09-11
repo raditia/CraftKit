@@ -1,4 +1,4 @@
-# craftkit `v1.35.0`
+# craftkit `v1.36.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -681,6 +681,8 @@ The parallel workflows detect the platform first, then spawn that platform's rev
 >
 > **`craftkitInject` avoids the hand-maintained duplicate.** Add `craftkitInject: <name>` to an **agent's or command's** frontmatter and the sync splices that body in as a managed block at install time, regenerated on every pull. Each name resolves `partials/<name>.md` first, then `rules/<name>.md`, then `skills/<name>/SKILL.md`, so a file can carry a live partial (`parallel-review` ← `partials/parallel-classifier`), a live rule (`fe-review` ← `fe-rules`), or a live skill checklist (`android-review` ← `skills/android-review`). Prefer it over copying text; a copy silently rots when the source changes. Claude Code only.
 >
+> **A rule can ship in two sizes.** `rules/grounding.md` is the always-on version, carrying the full provenance discipline for the session that reads it. Cold agents inject `partials/grounding-claims.md` instead, which keeps only the clauses an agent can act on (label findings, do not let an `[UNVERIFIED]` claim back an `[ERROR]`, review handed content). Measured at ~245 tokens per agent spawn against ~769 for the whole rule, which is ~1.5k saved on a six-agent build. Two files stay aligned by hand, and that is the cost of the split.
+
 > **`partials/` is the lazy-shared namespace.** A procedure several commands run, but that nothing needs resident, goes here: it syncs to no tool on its own and only ever arrives spliced. That is how the parallel classifier stopped costing ~1.4k est. tokens in every session while staying a single source of truth. A partial nothing injects fails `check.sh` check 5, since no sync would otherwise report it.
 
 ### Add an agent

@@ -7,6 +7,23 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.36.0 — 2026-09-11
+
+### Grounding, and three features cut on measurement
+
+- **`rules/grounding.md`** (new, always-on): claims that drive action carry provenance. `[verified: <how>]`, `[from context.md @<sha>]`, `[UNVERIFIED]`, and an `[UNVERIFIED]` claim may not back an `[ERROR]` finding or a code edit. Cold agents inject the shorter `partials/grounding-claims.md` (~245 tokens vs ~769 for the full rule).
+- **`hooks/craftkit-drift.js`** (new): shared staleness answer via one `git diff --name-only <baseline> -- <paths>`, which honors `.gitattributes` clean filters, covers staged and worktree states, and reports a rename instead of dying on the old path. Returns clean, drifted, or cannot-verify, and cannot-verify is never clean, because a squash-merged baseline leaves reachable history.
+- **`sync.sh` refuses a downgrade.** The state files record names only, so a one-commit-stale checkout uninstalled a live rule from all four tools with no signal. Now records the synced version and refuses to run from an older tree; `CRAFTKIT_ALLOW_DOWNGRADE=1` overrides.
+- **A retired hook is now pruned.** Dropping an entry from `_CRAFTKIT_HOOKS` orphaned both the installed file and its `settings.json` registration, so a machine kept firing a gate whose source was deleted. Found the first time a hook was actually retired.
+- **`gate-verify-on-stop`** ignores scratchpad and temp paths, and counts one file edited several times as one file.
+- **`check.sh`** verifies a rule has a README row, validates `craftkitInject` in agents (it only scanned commands), and runs in 19s instead of 204s.
+
+### Cut, with the measurement that cut it
+
+- **Routing prefilter and `triggers:` frontmatter.** 149 transcripts, 802 turns: `SlashCommand` has 0 occurrences, source-editing turns carried a `Skill` call 37.8% of the time, and the routed share moved 20.7% to 51.1% across the window the gates landed in. The misses are contextless continuations, which prompt-token scoring cannot rank.
+- **The `ponytail self-pass:` refusal.** Shipped, fired on its author's next turn, exposed two defects in itself, then removed: it cannot tell a real rubric scan from a recitation of the line.
+- **The staleness gate.** Measured at 0.02% firing (8 of 41,433 source files in one repo, 9 of 39,236 in another). Staleness is common; context docs describing ~8 files out of 41,000 is the actual problem.
+
 ## v1.35.0 — 2026-09-08
 
 **Flag-gated code had no rollback contract.** A feature behind a flag, remote config, or experiment was built like any other feature, so nothing forced the OFF path to keep working. That is the one path that has to work: a flag gets turned off mid-incident, on a stale client, by someone who never read the diff, and an OFF path whose behavior drifted turns a one-click rollback into a hotfix. The failure is quiet at review time, because the diff reads correctly and the ON path is the one anybody exercises.
