@@ -1,0 +1,53 @@
+name: Content integrity
+
+# check.sh is the only gate this repo has, and until now it ran solely on the author's
+# machine and was self-reported. A PR could land with it failing and nothing would say so.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Read-only: this workflow asserts, it never writes a tag, a release, or a comment.
+permissions:
+  contents: read
+
+# A force-push should not leave two runs racing on the same ref.
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # Both legs, because they catch different mistakes and neither alone is enough.
+    # macos-latest runs /bin/bash 3.2, which is the compatibility target CLAUDE.md names
+    # and the only place a bash 4+ feature (associative arrays, ${var,,}) actually fails.
+    # ubuntu-latest runs bash 5 with GNU coreutils, which is where a BSD-only idiom
+    # (stat -f, sed -i '') shows up instead. fail-fast off so one leg's failure does not
+    # hide the other leg's result.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            bash_bin: /bin/bash
+          - os: ubuntu-latest
+            bash_bin: bash
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # Named so a failure reads as "wrong bash" rather than "mysterious syntax error".
+      - name: Report interpreter
+        env:
+          BASH_BIN: ${{ matrix.bash_bin }}
+        run: |
+          "$BASH_BIN" --version | head -1
+          node --version
+          python3 --version
+
+      # Via env rather than spliced into the shell source, matching the discipline
+      # release.yml documents for changelog notes.
+      - name: bash check.sh
+        env:
+          BASH_BIN: ${{ matrix.bash_bin }}
+        run: "$BASH_BIN" check.sh
