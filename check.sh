@@ -601,10 +601,33 @@ def use(name, inp):
     return {"type": "tool_use", "name": name, "input": inp}
 
 
+# The other role-user impostor, and the one a tool_result fixture does not cover: an
+# injected entry carries text, so only isMeta separates it from a real prompt. A Skill body
+# (isMeta + turnCompanion + sourceToolUseID) and stop-hook feedback (isMeta + session_id)
+# both land mid-turn, and reading either as a turn start truncates the turn.
+def injected(text, **extra):
+    entry = {"type": "user", "isMeta": True,
+             "message": {"role": "user", "content": [{"type": "text", "text": text}]}}
+    entry.update(extra)
+    return entry
+
+
+BODY = "**Model:** everyday. ...skill instructions..."
+
+
 def build(mode):
     lines = [{"type": "user", "message": {"role": "user", "content": "edit foo"}}]
-    if mode == "skill":
+    if mode == "prior-routed":
+        # An EARLIER turn routed; this turn is the continuation that edits.
         lines.append(assistant([use("Skill", {"skill": "fe-test"})]))
+        lines.append({"type": "user", "message": {"role": "user", "content": "apply the fixes"}})
+    if mode == "notification":
+        lines = [{"type": "user", "message": {"role": "user",
+                  "content": "<task-notification>\n<task-id>abc</task-id>\n"}}]
+    if mode in ("skill", "skill-injected"):
+        lines.append(assistant([use("Skill", {"skill": "fe-test"})]))
+    if mode in ("skill-injected", "injected-only"):
+        lines.append(injected(BODY, turnCompanion=True, sourceToolUseID="tu_1"))
     lines.append(assistant([use("Edit", {"file_path": "/x/ViewFoo.tsx"})]))
     # A tool_result also has role user, and must not be read as a new turn.
     lines.append({"type": "user", "message": {"role": "user",
@@ -614,7 +637,8 @@ def build(mode):
     return lines
 
 
-for mode in ("bare", "skill", "verified"):
+for mode in ("bare", "skill", "verified", "skill-injected", "injected-only",
+             "prior-routed", "notification"):
     with open("%s/%s.jsonl" % (gx, mode), "w") as f:
         f.write("\n".join(json.dumps(x) for x in build(mode)) + "\n")
 
@@ -642,6 +666,40 @@ announce_cases = {
     "declare-empty": announced(""),
     "declare-by-invoking": announced("Here it is, no announcement line.", invoke=REAL),
 }
+
+# The real order of a skill-driven turn: announce, invoke, skill body arrives, agent keeps
+# working. The body is where the turn used to restart, discarding both the announcement and
+# the Skill call, so an honest turn could not end.
+announce_cases["announce-across-injection"] = [
+    {"type": "user", "message": {"role": "user", "content": "write the PR message"}},
+    assistant([{"type": "text", "text": "Running /%s [cheapest]: generate it." % REAL}]),
+    assistant([use("Skill", {"skill": REAL})]),
+    injected(BODY, turnCompanion=True, sourceToolUseID="tu_1"),
+    assistant([{"type": "text", "text": "Here is the message."}]),
+]
+# Stop feedback is the other injected class, and it erased the declaration the retry had
+# just added, so the block repeated instead of clearing.
+announce_cases["declare-across-stop-feedback"] = [
+    {"type": "user", "message": {"role": "user", "content": "write the PR message"}},
+    assistant([{"type": "text", "text": "No skill matched for this request. Responding directly."}]),
+    injected("Stop hook feedback: No routing declaration this turn.", session_id="s"),
+    assistant([{"type": "text", "text": "Here is the message."}]),
+]
+# Negative control: widening the turn must not make an undeclared turn look declared.
+announce_cases["declare-silent-across-injection"] = [
+    {"type": "user", "message": {"role": "user", "content": "write the PR message"}},
+    injected(BODY, turnCompanion=True, sourceToolUseID="tu_1"),
+    assistant([{"type": "text", "text": "Here is the PR message you asked for."}]),
+]
+
+# One file edited four times is one file: the reason line counted tool calls, not files,
+# and reported "21 file(s)" for six. Found when this gate fired on its own author's turn.
+repeat = [{"type": "user", "message": {"role": "user", "content": "edit foo"}}]
+for _ in range(4):
+    repeat.append(assistant([use("Edit", {"file_path": "/x/ViewFoo.tsx"})]))
+with open("%s/repeat-edits.jsonl" % gx, "w") as f:
+    f.write("\n".join(json.dumps(x) for x in repeat) + "\n")
+
 for name, lines in announce_cases.items():
     with open("%s/%s.jsonl" % (gx, name), "w") as f:
         f.write("\n".join(json.dumps(x) for x in lines) + "\n")
@@ -684,6 +742,53 @@ PYEOF
     # background agent may have nobody able to answer.
     _skillgate s7 "$_gx/sidechain.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
         && { fail "skill gate asks inside a subagent, so every parallel-build implementer stalls on a prompt"; _gd=1; }
+    # The skill body lands between the Skill call and the edits the skill prescribes, which
+    # is where every routed turn does its work. Truncating there gated the routed case.
+    _skillgate s8 "$_gx/skill-injected.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "skill gate asks after a Skill call once the skill body arrives, so every routed edit costs a prompt"; _gd=1; }
+    # Negative control: the same injected entry with no Skill call anywhere must still ask,
+    # or widening the turn has disarmed the gate rather than fixed it.
+    _skillgate s9 "$_gx/injected-only.jsonl" /x/ViewFoo.tsx | grep -q '"permissionDecision":"ask"' \
+        || { fail "skill gate stopped asking on an unrouted turn containing an injected entry, so the turn fix disarmed the gate"; _gd=1; }
+    # Session scope, not turn scope. Asking on every unrouted source edit fires at 62% of
+    # source-editing turns (measured); asking only when the session never routed fires at
+    # 18% and still catches the misses. The turns in between are continuations whose
+    # routing happened earlier, and re-asking there is what trains click-through.
+    _skillgate s10 "$_gx/prior-routed.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "skill gate asks on a continuation whose session already routed, the 62%-firing behavior the session scope replaces"; _gd=1; }
+    _skillgate s11 "$_gx/notification.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "skill gate asks on a background-task notification, which is not a prompt and carries no routing intent"; _gd=1; }
+    # A system-reminder can prefix a genuine prompt in the same entry, so treating it as a
+    # notification would disarm the gate on ordinary routable work. Found in review after
+    # the regex had been widened to match it with no spec line behind it.
+    python3 - "$_gx" << 'PYEOF'
+import json, sys
+gx = sys.argv[1]
+lines = [{"type": "user", "message": {"role": "user", "content":
+          "<system-reminder>context</system-reminder>\nadd a field to the booking form"}},
+         {"type": "assistant", "message": {"role": "assistant", "content": [
+             {"type": "tool_use", "name": "Edit", "input": {"file_path": "/x/ViewFoo.tsx"}}]}}]
+with open("%s/reminder-prefixed.jsonl" % gx, "w") as f:
+    f.write("\n".join(json.dumps(x) for x in lines) + "\n")
+# A session past TAIL_BYTES must not lose its routing history: the transcript only grows,
+# so reading a short window as "never routed" switched the gate off for the rest of any
+# long session. Padded past 1MB with an early Skill call that only a full scan can see.
+pad = {"type": "assistant", "message": {"role": "assistant", "content": [
+    {"type": "text", "text": "x" * 2000}]}}
+big = [{"type": "user", "message": {"role": "user", "content": "build the thing"}},
+       {"type": "assistant", "message": {"role": "assistant", "content": [
+           {"type": "tool_use", "name": "Skill", "input": {"skill": "fe-test"}}]}}]
+big += [pad] * 600
+big += [{"type": "user", "message": {"role": "user", "content": "apply the fixes"}},
+        {"type": "assistant", "message": {"role": "assistant", "content": [
+            {"type": "tool_use", "name": "Edit", "input": {"file_path": "/x/ViewFoo.tsx"}}]}}]
+with open("%s/truncated-routed.jsonl" % gx, "w") as f:
+    f.write("\n".join(json.dumps(x) for x in big) + "\n")
+PYEOF
+    _skillgate s12 "$_gx/reminder-prefixed.jsonl" /x/ViewFoo.tsx | grep -q '"permissionDecision":"ask"' \
+        || { fail "skill gate treats a system-reminder-prefixed real prompt as a notification, silently disarming on routable work"; _gd=1; }
+    _skillgate s13 "$_gx/truncated-routed.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "skill gate loses a session's routing history once the transcript passes the tail window, disabling itself for the rest of a long session"; _gd=1; }
     _stopgate "$_gx/bare.jsonl" | grep -q '"decision":"block"' \
         || { fail "stop gate let a turn end with edits and no verification command"; _gd=1; }
     _stopgate "$_gx/verified.jsonl" | grep -q '"decision"' \
@@ -763,6 +868,21 @@ PYEOF
         && { fail "announce gate demands prose from a turn that invoked a skill, so invoking is not enough"; _gd=1; }
     _announcegate "$_gx/declare-empty.jsonl" | grep -q '"decision"' \
         && { fail "announce gate blocks an empty reply, which is an interrupted turn, not an unrouted one"; _gd=1; }
+    # Every skill-driven turn has a body injected mid-turn, so this is the common case, not
+    # an edge one: the gate blocked turns that had both announced and invoked.
+    _announcegate "$_gx/announce-across-injection.jsonl" | grep -q '"decision"' \
+        && { fail "announce gate blocks a turn that announced and invoked, because the skill body reset the turn"; _gd=1; }
+    _announcegate "$_gx/declare-across-stop-feedback.jsonl" | grep -q '"decision"' \
+        && { fail "announce gate loses a declaration to its own stop feedback, so the block repeats instead of clearing"; _gd=1; }
+    # Negative control for check 2, mirroring s9.
+    _announcegate "$_gx/declare-silent-across-injection.jsonl" | grep -q '"decision":"block"' \
+        || { fail "announce gate stopped seeing an undeclared turn once an injected entry appeared, so the turn fix disarmed check 2"; _gd=1; }
+
+    _stopgate "$_gx/repeat-edits.jsonl" | grep -q 'edited 1 file' \
+        || { fail "stop gate counts repeat edits to one file as several files, inflating the reason line"; _gd=1; }
+    # A blocked party cannot find the escape hatch in a file comment nobody reads mid-turn.
+    _stopgate "$_gx/bare.jsonl" | grep -q 'CRAFTKIT_GATE=off' \
+        || { fail "stop gate refusal never names its own escape hatch, unlike the skill gate"; _gd=1; }
 
     for _g in gate-skill-first.js gate-verify-on-stop.js gate-announce-honored.js; do
         echo 'not json' | node "$REPO_DIR/hooks/$_g" >/dev/null 2>&1 \
@@ -878,6 +998,113 @@ for _b in $_table; do
     grep -q "$_b" "$README" || { fail "$_b is installed but undocumented in README"; _ht=1; }
 done
 [[ $_ht -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 25. sync.sh refuses a downgrade. The state files record names only, so a sync
+#     from a checkout older than the install uninstalls every rule added since,
+#     silently: a one-commit-stale main removed flag-safety from all four tools
+#     that way, and the only symptom was rules quietly reverting. Behavioral,
+#     because a grep for the guard cannot tell whether it fires. HOME is
+#     redirected into the fixture, which contains every write: each adapter
+#     destination is $HOME-derived, and the refusal path exits before any
+#     adapter is sourced.
+# ---------------------------------------------------------------------------
+check "sync refuses a downgrade"
+_vg=0
+_vgx="$(mktemp -d)"
+_repo_v="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$REPO_DIR/package.json" | head -1)"
+if [[ -z "$_repo_v" ]]; then
+    fail "package.json has no readable version, so the downgrade guard cannot compare"
+    _vg=1
+else
+    mkdir -p "$_vgx/.craftkit-state"
+    # Installed newer than this tree: must refuse, name both versions, exit non-zero.
+    echo "99.0.0" > "$_vgx/.craftkit-state/version"
+    _out="$(HOME="$_vgx" bash "$REPO_DIR/sync.sh" 2>&1)" && _rc=0 || _rc=$?
+    printf '%s' "$_out" | grep -q "Refusing to sync" \
+        || { fail "sync.sh proceeds from a checkout older than the install, silently uninstalling newer rules"; _vg=1; }
+    printf '%s' "$_out" | grep -q "99.0.0" \
+        || { fail "downgrade refusal does not name the installed version, so the gap is not diagnosable"; _vg=1; }
+    [[ $_rc -ne 0 ]] \
+        || { fail "sync.sh exits 0 when refusing a downgrade, so a wrapper or hook reads it as success"; _vg=1; }
+    # The override exists for the deliberate case and must actually override.
+    _out="$(HOME="$_vgx" CRAFTKIT_ALLOW_DOWNGRADE=1 bash "$REPO_DIR/sync.sh" 2>&1)" || true
+    printf '%s' "$_out" | grep -q "Refusing to sync" \
+        && { fail "CRAFTKIT_ALLOW_DOWNGRADE does not override the guard, so a deliberate downgrade is impossible"; _vg=1; }
+    # Equal version is not a downgrade, and an unrecorded version is a first run.
+    echo "$_repo_v" > "$_vgx/.craftkit-state/version"
+    HOME="$_vgx" bash "$REPO_DIR/sync.sh" 2>&1 | grep -q "Refusing to sync" \
+        && { fail "sync.sh refuses its own version, so no sync can ever run twice"; _vg=1; }
+    rm -f "$_vgx/.craftkit-state/version"
+    HOME="$_vgx" bash "$REPO_DIR/sync.sh" 2>&1 | grep -q "Refusing to sync" \
+        && { fail "sync.sh refuses a first run with no recorded version, so a fresh install cannot sync"; _vg=1; }
+    [[ "$(head -1 "$_vgx/.craftkit-state/version" 2>/dev/null)" == "$_repo_v" ]] \
+        || { fail "sync.sh does not record the synced version, so the next run has nothing to compare against"; _vg=1; }
+fi
+rm -rf "$_vgx"
+[[ $_vg -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 26. Drift detector distinguishes clean, drifted and cannot-verify. The third
+#     is the point: a context doc records a baseline commit, and this repo
+#     squash-merges, so that commit leaves reachable history as soon as its
+#     branch merges. A detector that answered "clean" when it cannot see would
+#     hand every later claim a false all-clear. Behavioral, in a throwaway repo,
+#     because the failure is entirely in how git is asked.
+# ---------------------------------------------------------------------------
+check "drift detector reports cannot-verify rather than clean"
+_dd=0
+if ! command -v node >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1; then
+    echo "    skipped (node or git not on PATH)"
+else
+    _ddx="$(mktemp -d)"
+    (
+        cd "$_ddx" && git init -q . && git config user.email t@t && git config user.name t
+        echo one > a.txt && echo two > b.txt && git add -A && git commit -qm base
+    ) >/dev/null 2>&1
+    _base="$(git -C "$_ddx" rev-parse HEAD)"
+    _drift() {
+        node -e '
+const { drift } = require(process.argv[1]);
+const r = drift(process.argv[2], process.argv[3], process.argv.slice(4));
+console.log(r.state + "|" + r.files.join(",") + "|" + r.reason);' \
+            "$REPO_DIR/hooks/craftkit-drift.js" "$_ddx" "$1" "${@:2}"
+    }
+    [[ "$(_drift "$_base" a.txt)" == clean\|\|* ]] \
+        || { fail "drift detector does not report clean when nothing changed"; _dd=1; }
+    echo changed > "$_ddx/a.txt"
+    [[ "$(_drift "$_base" a.txt)" == "drifted|a.txt|"* ]] \
+        || { fail "drift detector misses an edited file, so a stale context doc reads as current"; _dd=1; }
+    [[ "$(_drift "$_base" b.txt)" == clean\|\|* ]] \
+        || { fail "drift detector reports an untouched file as drifted, which would fire the gate on every file"; _dd=1; }
+    # A rename must be reported, not fatal: rev-parse <commit>:<oldpath> dies here.
+    (cd "$_ddx" && git checkout -q -- a.txt && git mv b.txt c.txt && git commit -qm rename) >/dev/null 2>&1
+    case "$(_drift "$_base")" in
+        drifted*) : ;;
+        *) fail "drift detector does not report a rename, so a moved file silently reads as unchanged" ; _dd=1 ;;
+    esac
+    # An unreachable baseline is this repo's normal case after a squash merge.
+    # The reason, not just the state: git diff already throws on a bogus sha, so a check
+    # asserting only cannot-verify passes with the reachability probe deleted and proves
+    # nothing. The probe exists to say WHY, which is the difference between a diagnosable
+    # message and "git diff failed".
+    _unreach="$(_drift 0000000000000000000000000000000000000000 a.txt)"
+    [[ "$_unreach" == cannot-verify\|\|* ]] \
+        || { fail "drift detector answers clean for an unreachable baseline, handing every later claim a false all-clear"; _dd=1; }
+    case "$_unreach" in
+        *unreachable*squashed*) : ;;
+        *) fail "unreachable baseline reports no diagnosable reason, so a permanently blind detector looks like a transient git error"; _dd=1 ;;
+    esac
+    [[ "$(_drift "" a.txt)" == cannot-verify\|\|* ]] \
+        || { fail "drift detector answers clean when no baseline was recorded"; _dd=1; }
+    _nogit="$(mktemp -d)"
+    [[ "$(node -e '
+const { drift } = require(process.argv[1]);
+console.log(drift(process.argv[2], "HEAD", ["a.txt"]).state);' "$REPO_DIR/hooks/craftkit-drift.js" "$_nogit")" == "cannot-verify" ]] \
+        || { fail "drift detector answers clean outside a git repository"; _dd=1; }
+    rm -rf "$_ddx" "$_nogit"
+    [[ $_dd -eq 0 ]] && pass
+fi
 
 echo
 if [[ $FAILURES -eq 0 ]]; then

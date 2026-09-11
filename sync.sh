@@ -16,6 +16,34 @@ PARTIALS_DIR="$REPO_DIR/partials"
 
 mkdir -p "$STATE_DIR"
 
+# Downgrade guard. The state files record names only, so syncing from a checkout older
+# than what is installed uninstalls the newer rules and says nothing about it: a
+# one-commit-stale main removed the flag-safety rule from all four tools this way. Refuse
+# instead, because "your rules silently reverted" is not a diagnosable symptom.
+# Version comparison is numeric per dot-segment so 1.9.0 stays below 1.10.0.
+_ck_version_file="$STATE_DIR/version"
+_ck_repo_version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$REPO_DIR/package.json" | head -1)"
+
+_ck_version_lt() {
+    # 0 (true) when $1 is strictly older than $2. sort -V does the version ordering,
+    # and this repo already depends on it for the same job (adapters/claude.sh).
+    [[ "$1" == "$2" ]] && return 1
+    [[ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)" == "$1" ]]
+}
+
+if [[ -n "$_ck_repo_version" && -f "$_ck_version_file" && -z "${CRAFTKIT_ALLOW_DOWNGRADE:-}" ]]; then
+    _ck_installed="$(head -1 "$_ck_version_file" | tr -d '[:space:]')"
+    if [[ -n "$_ck_installed" ]] && _ck_version_lt "$_ck_repo_version" "$_ck_installed"; then
+        echo "Refusing to sync: this checkout is older than what is installed." >&2
+        echo "  installed: v$_ck_installed" >&2
+        echo "  this tree: v$_ck_repo_version" >&2
+        echo "Syncing would uninstall every rule, skill, command and agent added since" >&2
+        echo "v$_ck_repo_version, with no other signal that it happened." >&2
+        echo "Fix: git pull, then sync again. Override: CRAFTKIT_ALLOW_DOWNGRADE=1" >&2
+        exit 1
+    fi
+fi
+
 source "$REPO_DIR/adapters/claude.sh"
 source "$REPO_DIR/adapters/cursor.sh"
 source "$REPO_DIR/adapters/gemini.sh"
@@ -449,4 +477,6 @@ for adapter in "${ADAPTERS[@]}"; do
     fi
 done
 echo ""
+[[ -n "$_ck_repo_version" ]] && printf '%s\n' "$_ck_repo_version" > "$_ck_version_file"
+
 echo "Sync complete."

@@ -12,6 +12,7 @@ const { currentTurn } = require(path.join(__dirname, 'craftkit-transcript.js'));
 
 const CODE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|kt|java|swift|m|mm)$/i;
 
+
 // Walk up for the project's own gate. check.sh outranks package.json: a repo that
 // ships one has declared it the gate, and craftkit itself has both.
 function requiredGate(startDir) {
@@ -79,12 +80,16 @@ process.stdin.on('end', () => {
   const turn = currentTurn(payload.transcript_path);
   if (!turn.readable) return pass();
 
+  // Deduped because turn.edits holds one entry per Edit call, so four edits to one file
+  // reported "4 file(s)" and listed it four times. Caught by this gate firing on itself.
   let touched = turn.edits;
   if (wroteViaShell(turn.commands) || turn.delegated) touched = touched.concat(gitDirty(cwd));
+  touched = touched.filter((f, i) => touched.indexOf(f) === i);
   const edited = gate.gatesEveryFile ? touched : touched.filter(f => CODE_EXT.test(f));
   if (!edited.length) return pass();
 
   if (gate.patterns.every(p => turn.commands.some(c => p.test(c)))) return pass();
+
 
   process.stdout.write(JSON.stringify({
     decision: 'block',
@@ -94,6 +99,7 @@ process.stdin.on('end', () => {
       (edited.length > 6 ? ', ...' : '') + '\n' +
       'Run: ' + gate.run + '\n' +
       'Then report the actual output. If a gate genuinely cannot run here, say which and why, ' +
-      'and that the change is unverified. Do not report done instead.'
+      'and that the change is unverified. Do not report done instead.\n' +
+      'Set CRAFTKIT_GATE=off to disable this gate.'
   }));
 });
