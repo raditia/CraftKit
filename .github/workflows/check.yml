@@ -50,4 +50,5 @@ jobs:
       - name: bash check.sh
         env:
           BASH_BIN: ${{ matrix.bash_bin }}
-        run: "$BASH_BIN" check.sh
+        run: |
+          "$BASH_BIN" check.sh
