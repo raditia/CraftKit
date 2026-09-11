@@ -21,6 +21,7 @@ _CRAFTKIT_HOOKS=(
     "gate-skill-first.js%PreToolUse%Edit|Write|MultiEdit|NotebookEdit%CraftKit skill gate..."
     "gate-verify-on-stop.js%Stop%%CraftKit verify gate..."
     "gate-announce-honored.js%Stop%%CraftKit announce gate..."
+    "gate-stale-context.js%PreToolUse%Edit|Write|MultiEdit|NotebookEdit%CraftKit stale-context gate..."
     "craftkit-platform-rules.js%SessionStart%%CraftKit platform rules..."
     "craftkit-transcript.js%-%%"
     "craftkit-platform.js%-%%"

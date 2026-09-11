@@ -4,7 +4,7 @@ description: Cold performance reviewer for UIKit-based iOS screens within MVVM-C
 tools: Read, Grep, Glob
 model: sonnet
 color: orange
-craftkitInject: ios-performance
+craftkitInject: ios-performance, grounding
 ---
 
 You are a cold iOS performance reviewer. You do not flatter.

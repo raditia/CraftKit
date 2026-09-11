@@ -884,7 +884,43 @@ PYEOF
     _stopgate "$_gx/bare.jsonl" | grep -q 'CRAFTKIT_GATE=off' \
         || { fail "stop gate refusal never names its own escape hatch, unlike the skill gate"; _gd=1; }
 
-    for _g in gate-skill-first.js gate-verify-on-stop.js gate-announce-honored.js; do
+    # Stale-context gate. The failure that kills it is firing on files a context doc
+    # already described, so the fixtures pin both directions: a file older than the doc
+    # passes even though git would call it dirty, and a file touched after it asks.
+    mkdir -p "$_gx/proj/docs"
+    printf '# Context\n\nDescribes ViewStale.tsx and ViewFresh.tsx.\n' > "$_gx/proj/docs/context.md"
+    printf 'x\n' > "$_gx/proj/ViewStale.tsx"
+    printf 'x\n' > "$_gx/proj/ViewFresh.tsx"
+    printf 'x\n' > "$_gx/proj/ViewUnmentioned.tsx"
+    # mtimes set explicitly rather than with sleeps: the gate compares timestamps, so the
+    # fixture should state them instead of racing a 1s grace window.
+    node -e '
+const fs = require("fs"), d = process.argv[1];
+const doc = d + "/docs/context.md";
+const t = fs.statSync(doc).mtimeMs / 1000;
+fs.utimesSync(d + "/ViewStale.tsx", t - 60, t - 60);
+fs.utimesSync(d + "/ViewFresh.tsx", t + 60, t + 60);
+fs.utimesSync(d + "/ViewUnmentioned.tsx", t + 60, t + 60);' "$_gx/proj"
+    _stalegate() {
+        printf '{"session_id":"%s","transcript_path":"%s","cwd":"%s","tool_input":{"file_path":"%s"}}' \
+            "$1" "$_gx/bare.jsonl" "$_gx/proj" "$2" \
+            | TMPDIR="$_gx" node "$REPO_DIR/hooks/gate-stale-context.js" 2>/dev/null
+    }
+    _stalegate t1 "$_gx/proj/ViewFresh.tsx" | grep -q '"permissionDecision":"ask"' \
+        || { fail "stale gate misses a file changed after the context doc was written, which is the whole session-belief gap"; _gd=1; }
+    _stalegate t2 "$_gx/proj/ViewStale.tsx" | grep -q 'permissionDecision' \
+        && { fail "stale gate asks about a file older than the doc, so every file the doc already summarized would fire"; _gd=1; }
+    _stalegate t3 "$_gx/proj/ViewUnmentioned.tsx" | grep -q 'permissionDecision' \
+        && { fail "stale gate asks about a file the doc never mentions, which cannot be described stalely"; _gd=1; }
+    _stalegate t4 "$_gx/proj/ViewMissing.tsx" | grep -q 'permissionDecision' \
+        && { fail "stale gate asks about a file being created, which has nothing to be stale against"; _gd=1; }
+    _stalegate t5 "$_gx/proj/ViewFresh.tsx" >/dev/null
+    _stalegate t5 "$_gx/proj/ViewFresh.tsx" | grep -q 'permissionDecision' \
+        && { fail "stale gate asks twice in one turn, so a multi-edit turn is a wall of prompts"; _gd=1; }
+    echo 'not json' | node "$REPO_DIR/hooks/gate-stale-context.js" >/dev/null 2>&1 \
+        || { fail "gate-stale-context.js exits non-zero on malformed stdin"; _gd=1; }
+
+    for _g in gate-skill-first.js gate-verify-on-stop.js gate-announce-honored.js gate-stale-context.js; do
         echo 'not json' | node "$REPO_DIR/hooks/$_g" >/dev/null 2>&1 \
             || { fail "$_g exits non-zero on malformed stdin, which surfaces as a tool error every call"; _gd=1; }
     done
@@ -1011,14 +1047,18 @@ done
 # ---------------------------------------------------------------------------
 check "sync refuses a downgrade"
 _vg=0
-_vgx="$(mktemp -d)"
 _repo_v="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$REPO_DIR/package.json" | head -1)"
 if [[ -z "$_repo_v" ]]; then
     fail "package.json has no readable version, so the downgrade guard cannot compare"
     _vg=1
 else
+    _vgx="$(mktemp -d)"
     mkdir -p "$_vgx/.craftkit-state"
-    # Installed newer than this tree: must refuse, name both versions, exit non-zero.
+    # Only the REFUSAL runs sync.sh end to end, because it exits before sourcing any
+    # adapter and costs 0.07s. The proceed paths would each complete a full four-adapter
+    # sync into the fixture HOME at ~75s apiece, which turned this gate from seconds into
+    # minutes, and a gate nobody waits for is a gate nobody runs. They are covered below
+    # by unit-testing the comparison and asserting the wiring.
     echo "99.0.0" > "$_vgx/.craftkit-state/version"
     _out="$(HOME="$_vgx" bash "$REPO_DIR/sync.sh" 2>&1)" && _rc=0 || _rc=$?
     printf '%s' "$_out" | grep -q "Refusing to sync" \
@@ -1027,22 +1067,33 @@ else
         || { fail "downgrade refusal does not name the installed version, so the gap is not diagnosable"; _vg=1; }
     [[ $_rc -ne 0 ]] \
         || { fail "sync.sh exits 0 when refusing a downgrade, so a wrapper or hook reads it as success"; _vg=1; }
-    # The override exists for the deliberate case and must actually override.
-    _out="$(HOME="$_vgx" CRAFTKIT_ALLOW_DOWNGRADE=1 bash "$REPO_DIR/sync.sh" 2>&1)" || true
-    printf '%s' "$_out" | grep -q "Refusing to sync" \
-        && { fail "CRAFTKIT_ALLOW_DOWNGRADE does not override the guard, so a deliberate downgrade is impossible"; _vg=1; }
-    # Equal version is not a downgrade, and an unrecorded version is a first run.
-    echo "$_repo_v" > "$_vgx/.craftkit-state/version"
-    HOME="$_vgx" bash "$REPO_DIR/sync.sh" 2>&1 | grep -q "Refusing to sync" \
-        && { fail "sync.sh refuses its own version, so no sync can ever run twice"; _vg=1; }
-    rm -f "$_vgx/.craftkit-state/version"
-    HOME="$_vgx" bash "$REPO_DIR/sync.sh" 2>&1 | grep -q "Refusing to sync" \
-        && { fail "sync.sh refuses a first run with no recorded version, so a fresh install cannot sync"; _vg=1; }
-    [[ "$(head -1 "$_vgx/.craftkit-state/version" 2>/dev/null)" == "$_repo_v" ]] \
-        || { fail "sync.sh does not record the synced version, so the next run has nothing to compare against"; _vg=1; }
+    # The override is asserted by wiring, not behavior: exercising it completes a full
+    # four-adapter sync (~75s). The refusal above is the dangerous direction and stays
+    # end to end; an override that silently failed would only block a deliberate
+    # downgrade, which fails safe.
+    grep -q 'CRAFTKIT_ALLOW_DOWNGRADE' "$REPO_DIR/sync.sh" \
+        || { fail "sync.sh has no CRAFTKIT_ALLOW_DOWNGRADE override, so a deliberate downgrade is impossible"; _vg=1; }
+    # Ordering, tested on the real function rather than through a sync. Extraction fails
+    # loudly if the function is renamed, which is the sensor working.
+    sed -n '/^_ck_version_lt()/,/^}/p' "$REPO_DIR/sync.sh" > "$_vgx/cmp.sh"
+    [[ -s "$_vgx/cmp.sh" ]] \
+        || { fail "_ck_version_lt not found in sync.sh, so the downgrade guard has no comparison to test"; _vg=1; }
+    for _case in "1.9.0 1.10.0 older" "1.10.0 1.9.0 newer" "1.35.0 1.35.0 newer" \
+                 "1.35.0 1.35.1 older" "1.2 1.2.1 older" "2.0.0 1.99.99 newer"; do
+        set -- $_case
+        _got="$(bash -c ". '$_vgx/cmp.sh'; if _ck_version_lt $1 $2; then echo older; else echo newer; fi")"
+        [[ "$_got" == "$3" ]] \
+            || { fail "version ordering wrong: $1 vs $2 read as $_got, expected $3"; _vg=1; }
+    done
+    # Wiring: a guard that never records leaves the next run nothing to compare against.
+    grep -q '_ck_version_file"$' "$REPO_DIR/sync.sh" \
+        || { fail "sync.sh never writes the synced version, so the guard has no baseline after a first run"; _vg=1; }
+    grep -q 'f "$_ck_version_file"' "$REPO_DIR/sync.sh" \
+        || { fail "sync.sh does not treat a missing version file as a first run, so a fresh install cannot sync"; _vg=1; }
+    rm -rf "$_vgx"
 fi
-rm -rf "$_vgx"
 [[ $_vg -eq 0 ]] && pass
+
 
 # ---------------------------------------------------------------------------
 # 26. Drift detector distinguishes clean, drifted and cannot-verify. The third
