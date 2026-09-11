@@ -1152,6 +1152,15 @@ if grep -rn 'Step 5.*(`using-agent-skills`)' "$REPO_DIR/commands" >/dev/null 2>&
     fail "a command points at using-agent-skills for Step 5, which moved to partials/parallel-classifier.md"
     _sp=1
 fi
+# (c) The platform-agnostic reviewers run on all three platforms (the classifier says so),
+#     so an EVPMR layer recital in them is unusable on .kt and .swift and drifts from
+#     fe-rules with nothing holding it.
+for _f in "$REPO_DIR/agents/code-quality.md" "$REPO_DIR/skills/code-quality/SKILL.md"; do
+    if grep -qE "usePresenter|View\*\.tsx|Presenter\*?\.ts" "$_f"; then
+        fail "${_f#$REPO_DIR/} is platform-agnostic yet recites EVPMR layer artifacts, which it cannot apply on a .kt or .swift diff"
+        _sp=1
+    fi
+done
 # (b) An always-on rule is one with no platform: frontmatter. EVPMR belongs only in a
 #     platform-scoped rule, or the scoping mechanism is decorative.
 for _r in "$RULES_DIR"/*.md; do

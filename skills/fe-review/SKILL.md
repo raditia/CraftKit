@@ -57,8 +57,7 @@ alwaysApply: false
 ### Code quality
 
 - [ ] Single responsibility, where each function/component does one job
-- [ ] View JSX return > ~80 lines without `UI*` sub-component extraction
-- [ ] Presenter hook > ~100 lines without sub-hook splitting
+- [ ] A View or Presenter past the split threshold `fe-rules` sets, with no extraction
 - [ ] No nested ternaries more than one level deep
 - [ ] No cryptic abbreviations or unclear names
 - [ ] No abstractions (helpers, HOCs) that are only used once

@@ -57,14 +57,7 @@ Naming: `[Role][ProductPrefix][Platform][FeatureName].[ext]`
 
 ### `Model[Name].ts`
 - TypeScript types only + pure reducer/selector functions
-- Discriminated unions for async data:
-  ```ts
-  type AsyncData<T> =
-    | { type: 'NOT_ASKED' }
-    | { type: 'LOADING' }
-    | { type: 'DATA_READY'; payload: T }
-    | { type: 'ERROR'; error: string }
-  ```
+- Discriminated unions for async data, in the shape `fe-rules` defines
 
 ### `Resource[Name].ts`
 - Content resource keys with empty string defaults
@@ -80,12 +73,8 @@ Naming: `[Role][ProductPrefix][Platform][FeatureName].[ext]`
 
 ## Step 3: Styling rules
 
-- **Never** inline styles (`style={{ margin: 8 }}`)
-- **Always** `StyleSheet.create()` at bottom of file
-- **Always** design tokens from your project's token system (adapt paths to your setup):
-  - Spacing: e.g. `Token.spacing.xs / s / m / l / xl`
-  - Color: e.g. `Token.color.primary / secondary / neutral`
-  - Border: e.g. `Token.border.radius.normal`
+- Styling follows `fe-rules` (always active on RN/web): `StyleSheet.create()` at the bottom,
+  design tokens, no inline styles. Not repeated here.
 - Compose as arrays: `style={[styles.base, isActive && styles.active]}`
 
 ---

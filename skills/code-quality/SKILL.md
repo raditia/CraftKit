@@ -43,13 +43,11 @@ Determine which mode applies from the request:
 - Abstractions earning their complexity?
 - Dead code present? (no-op variables, backwards-compat shims)
 
-**3. Architecture (EVPMR)**
-- **View:** only calls `usePresenter*()` and renders? Flag `useState`, `useEffect`, API calls
-- **Presenter:** returns plain object? Flag any JSX
-- **Model:** types and pure functions only? Flag React imports or side effects
-- **Entry:** wraps in `<ErrorBoundary>`?
-- **Resource:** all display strings here, not hardcoded in View?
+**3. Architecture**
+- Layer boundaries respected? logic out of render, no cross-layer imports?
 - No circular dependencies?
+- The platform's layer laws belong to its own reviewer (`/fe-review`, `/android-review`,
+  `/ios-review`), and on RN/web they are always-on via `fe-rules`. Not repeated here.
 
 **4. Security**
 - User input validated and sanitized?
@@ -143,8 +141,7 @@ BEFORE SIMPLIFYING:
 | Generic names (`data`, `result`, `item`) | Rename to content: `userProfile`, `validationErrors` |
 | Duplicated logic (5+ lines in multiple places) | Extract to shared function |
 | Dead code | Remove after confirming |
-| View JSX > ~80 lines | Extract `UI[Name][Section].tsx` sub-component |
-| Presenter hook > ~100 lines | Split to `usePresenter[Name]Data` + `usePresenter[Name]Handlers` |
+| A render function or a hook past its platform's split threshold | Extract, per that platform's rule |
 | Hardcoded strings in View | Move to `Resource[Name].ts` |
 | Magic numbers in StyleSheet | Replace with `Token.spacing.*` / `Token.color.*` |
 
