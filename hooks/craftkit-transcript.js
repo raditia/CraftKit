@@ -185,22 +185,40 @@ function currentTurn(transcriptPath) {
   return out;
 }
 
-// One interruption per turn, shared by the PreToolUse gates. Each fires per tool call, so
-// a ten-edit turn would otherwise cost ten prompts, which trains clicking through. Lives
-// here because every caller already requires this module for currentTurn.
-// Consequence worth knowing: DENY the first prompt and the rest of that turn passes
-// silently, on the assumption the denial itself redirected the agent.
-function onceInTurn(session, turnId, key) {
+// A bounded budget of interruptions per turn, shared by every gate. Returns true while the
+// turn still has budget for this key, and counts the action.
+//
+// Two callers with different needs. The PreToolUse gates want exactly one prompt per turn,
+// because they fire per tool call and a ten-edit turn would otherwise cost ten prompts,
+// which trains clicking through. The Stop gates want more than one, because honoring
+// stop_hook_active unconditionally meant only the FIRST stop attempt was ever judged: a
+// turn could be blocked, change nothing, and stop again to get through.
+//
+// An unwritable stamp returns false, which is deliberate. It makes "cannot record" resolve
+// to "do not act", so the failure mode is the pre-existing behavior (a gate that lets the
+// retry through) rather than a gate that blocks forever because it cannot count.
+function turnBudget(session, turnId, key, max) {
   const dir = path.join(os.tmpdir(), 'craftkit-gate');
   const stamp = path.join(dir, session + '.' + key);
+  let used = 0;
   try {
-    if (fs.readFileSync(stamp, 'utf8').trim() === turnId) return false;
-  } catch (e) { /* no stamp yet, so this is the turn's first ask */ }
+    const parts = fs.readFileSync(stamp, 'utf8').trim().split(/\s+/);
+    if (parts[0] === turnId) used = Number(parts[1]) || 0;
+  } catch (e) { /* no stamp yet, so nothing spent on this turn */ }
+  if (used >= max) return false;
   try {
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(stamp, turnId);
-  } catch (e) { /* an unwritable tmpdir costs a repeat prompt, not a broken gate */ }
+    fs.writeFileSync(stamp, turnId + ' ' + (used + 1));
+  } catch (e) {
+    return false;
+  }
   return true;
 }
 
-module.exports = { currentTurn, onceInTurn };
+// Consequence worth knowing for the PreToolUse callers: DENY the first prompt and the rest
+// of that turn passes silently, on the assumption the denial itself redirected the agent.
+function onceInTurn(session, turnId, key) {
+  return turnBudget(session, turnId, key, 1);
+}
+
+module.exports = { currentTurn, onceInTurn, turnBudget };

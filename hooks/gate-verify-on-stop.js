@@ -2,13 +2,15 @@
 // CraftKit Stop gate: a turn that edited source cannot end without running this
 // project's verification command. Closes the gap where the agent reports done, having
 // skipped the gates the skill told it to run, because nothing checked the claim.
-// Blocks at most once per stop attempt (stop_hook_active), so there is no loop.
+// Blocks at most twice per turn, counted, so a turn gets one real second chance and the
+// loop still terminates. Honoring stop_hook_active unconditionally meant only the first
+// stop attempt was judged, so a blocked turn could change nothing and stop again.
 // Escape hatch: CRAFTKIT_GATE=off.
 
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { currentTurn } = require(path.join(__dirname, 'craftkit-transcript.js'));
+const { currentTurn, turnBudget } = require(path.join(__dirname, 'craftkit-transcript.js'));
 
 const CODE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|kt|java|swift|m|mm)$/i;
 
@@ -70,7 +72,6 @@ process.stdin.on('end', () => {
 
   let payload;
   try { payload = JSON.parse(input); } catch (e) { return pass(); }
-  if (payload.stop_hook_active) return pass();
   if (!payload.transcript_path) return pass();
 
   const cwd = payload.cwd || process.cwd();
@@ -96,6 +97,11 @@ process.stdin.on('end', () => {
 
   if (gate.patterns.every(p => turn.commands.some(c => p.test(c)))) return pass();
 
+
+  // Budget checked only once the turn is known to be failing, so a compliant turn spends
+  // nothing and a later failure in the same turn still has its chance.
+  const session = String(payload.session_id || 'nosession');
+  if (turn.turnId && !turnBudget(session, turn.turnId, 'verify', 2)) return pass();
 
   process.stdout.write(JSON.stringify({
     decision: 'block',

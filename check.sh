@@ -732,8 +732,8 @@ PYEOF
             | TMPDIR="$_gx" node "$REPO_DIR/hooks/gate-skill-first.js" 2>/dev/null
     }
     _stopgate() {
-        printf '{"session_id":"s","transcript_path":"%s","cwd":"%s"%s}' "$1" "$_gx/proj" "${2:-}" \
-            | node "$REPO_DIR/hooks/gate-verify-on-stop.js" 2>/dev/null
+        printf '{"session_id":"%s","transcript_path":"%s","cwd":"%s"%s}' "${3:-v$RANDOM}" "$1" "$_gx/proj" "${2:-}" \
+            | TMPDIR="$_gx" node "$REPO_DIR/hooks/gate-verify-on-stop.js" 2>/dev/null
     }
     _gd=0
     _skillgate s1 "$_gx/bare.jsonl" /x/ViewFoo.tsx | grep -q '"permissionDecision":"ask"' \
@@ -807,8 +807,16 @@ PYEOF
         || { fail "stop gate let a turn end with edits and no verification command"; _gd=1; }
     _stopgate "$_gx/verified.jsonl" | grep -q '"decision"' \
         && { fail "stop gate blocks after the gates ran, which makes ending any turn impossible"; _gd=1; }
-    _stopgate "$_gx/bare.jsonl" ',"stop_hook_active":true' | grep -q '"decision"' \
-        && { fail "stop gate re-blocks while already active, so the agent cannot ever stop"; _gd=1; }
+    # A retry is judged, not waved through, and the blocks are counted so the loop still
+    # terminates. Honoring stop_hook_active unconditionally meant only the first stop
+    # attempt was ever evaluated, which is a bypass requiring nothing but a second attempt.
+    _stopgate "$_gx/bare.jsonl" "" t13a >/dev/null
+    _stopgate "$_gx/bare.jsonl" ',"stop_hook_active":true' t13a | grep -q '"decision":"block"' \
+        || { fail "stop gate waves through a retry that changed nothing, so being blocked once is the whole cost of skipping verification"; _gd=1; }
+    _stopgate "$_gx/bare.jsonl" ',"stop_hook_active":true' t13a | grep -q '"decision"' \
+        && { fail "stop gate blocks a third attempt, so a turn it cannot satisfy can never end"; _gd=1; }
+    _stopgate "$_gx/verified.jsonl" ',"stop_hook_active":true' t13b | grep -q '"decision"' \
+        && { fail "stop gate blocks a retry that fixed the problem, so correcting the turn does not clear it"; _gd=1; }
     # Editing through the shell leaves no Edit tool call, so the turn's file list cannot
     # come from tool calls alone. Caught during this change: both gates were blind to it,
     # which is the route an agent bypassing a skill is most likely to take.
@@ -854,8 +862,8 @@ PYEOF
     fi
     mkdir -p "$_gx/proj/.claude/skills/zzz-fixture-skill"
     _announcegate() {
-        printf '{"session_id":"s","transcript_path":"%s","cwd":"%s"%s}' "$1" "$_gx/proj" "${2:-}" \
-            | node "$REPO_DIR/hooks/gate-announce-honored.js" 2>/dev/null
+        printf '{"session_id":"%s","transcript_path":"%s","cwd":"%s"%s}' "${3:-a$RANDOM}" "$1" "$_gx/proj" "${2:-}" \
+            | TMPDIR="$_gx" node "$REPO_DIR/hooks/gate-announce-honored.js" 2>/dev/null
     }
     # The lie the other two gates cannot see: prose-only turn, zero edits, so neither the
     # PreToolUse matcher nor the verify gate ever arms.
@@ -872,8 +880,13 @@ PYEOF
     # worse than one that abstains.
     _announcegate "$_gx/announce-unknown.jsonl" | grep -q '"decision"' \
         && { fail "announce gate blocks on a skill that is not installed, so any /word in prose blocks"; _gd=1; }
-    _announcegate "$_gx/announce-lied.jsonl" ',"stop_hook_active":true' | grep -q '"decision"' \
-        && { fail "announce gate re-blocks while already active, so the agent cannot ever stop"; _gd=1; }
+    _announcegate "$_gx/announce-lied.jsonl" "" t13c >/dev/null
+    _announcegate "$_gx/announce-lied.jsonl" ',"stop_hook_active":true' t13c | grep -q '"decision":"block"' \
+        || { fail "announce gate waves through a retry that still has not invoked what it announced"; _gd=1; }
+    _announcegate "$_gx/announce-lied.jsonl" ',"stop_hook_active":true' t13c | grep -q '"decision"' \
+        && { fail "announce gate blocks a third attempt, so a turn it cannot satisfy can never end"; _gd=1; }
+    _announcegate "$_gx/announce-kept.jsonl" ',"stop_hook_active":true' t13d | grep -q '"decision"' \
+        && { fail "announce gate blocks a retry that actually invoked the skill, so honest correction does not clear it"; _gd=1; }
     _announcegate /nope/missing.jsonl | grep -q '"decision"' \
         && { fail "announce gate blocks on an unreadable transcript instead of failing open"; _gd=1; }
     # Check 2. Without it, check 1 is defeated by dropping the announcement, which trades

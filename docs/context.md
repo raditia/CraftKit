@@ -211,7 +211,7 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
 | T9 | **DROPPED** with T8 (comment-to-code counts in the refusal message) | n/a | n/a | none |
 | T10 | **DROPPED** with T8 (self-pass fixtures) | n/a | n/a | none |
 | T11 | Extend `gate-skill-first.js` to session scope: ask on a source-editing turn only when no earlier turn in the session invoked a skill; skip task-notification turns | Behavioral `check.sh`: session-never-routed asks; session-routed-earlier does not; notification turn does not; removing the lookback makes those fixtures fail | none | `/fix` |
-| T13 | Close the `stop_hook_active` bypass while keeping the no-infinite-loop property: a second stop attempt currently passes every Stop gate with nothing emitted | Behavioral `check.sh`: a turn blocked once and retried unchanged is still refused; a turn blocked once and then corrected passes; no fixture loops more than a bounded number of attempts | none | `/fix` |
+| T13 | **DONE** `stop_hook_active` no longer waves a retry through. Both Stop gates count blocks per turn (budget 2), so a retry is judged and the loop still terminates. An unrecordable stamp resolves to pass, making the old behavior the failure mode | `check.sh`: unchanged retry blocks, third attempt passes, corrected retry passes; controls fail both when the fix is removed and when the bound is removed | none | `/fix` (done) |
 | T12 | Release: version bump in `package.json` and the README header, plus a matching `CHANGELOG.md` section | `check.sh` version-consistency check green; `sync.sh` clean and idempotent | T1-T11, T13 | `/parallel-ship` |
 
 **Parallelizable now:** T1, T2, T3, T7, T8, T11

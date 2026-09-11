@@ -9,14 +9,15 @@
 //      Without this, check 1 is defeated by simply not announcing, which trades the lie for
 //      a silent skip and destroys the tell. Declaring converts the silent skip back into a
 //      claim, which check 1 then holds to.
-// Blocks at most once per stop attempt (stop_hook_active), so there is no loop: the retry
-// after adding the missing line passes.
+// Blocks at most twice per turn, counted, so the retry is judged rather than waved through
+// and the loop still terminates. A turn that adds the missing line passes on the retry; a
+// turn that changes nothing is refused once more, then allowed to end.
 // Escape hatch: CRAFTKIT_GATE=off.
 
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { currentTurn } = require(path.join(__dirname, 'craftkit-transcript.js'));
+const { currentTurn, turnBudget } = require(path.join(__dirname, 'craftkit-transcript.js'));
 
 // Line-anchored on purpose. Prose that merely mentions the announce format wraps it in
 // backticks or buries it mid-sentence, so requiring the line to START with the verb keeps
@@ -57,7 +58,10 @@ function installed(cwd) {
 }
 
 const pass = () => process.stdout.write('{}');
-const block = reason => process.stdout.write(JSON.stringify({ decision: 'block', reason }));
+let budget = () => true;
+const block = reason => budget()
+  ? process.stdout.write(JSON.stringify({ decision: 'block', reason }))
+  : process.stdout.write('{}');
 
 let input = '';
 process.stdin.on('data', c => { input += c; });
@@ -66,13 +70,17 @@ process.stdin.on('end', () => {
 
   let payload;
   try { payload = JSON.parse(input); } catch (e) { return pass(); }
-  if (payload.stop_hook_active) return pass();
   if (!payload.transcript_path) return pass();
 
   const turn = currentTurn(payload.transcript_path);
   if (!turn.readable) return pass();
   // A subagent does not announce; the parent turn is where routing is claimed.
   if (turn.sidechain) return pass();
+
+  // Bound the blocks for this turn. Wired here so every block() path below shares one
+  // budget, rather than each refusal counting separately.
+  const session = String(payload.session_id || 'nosession');
+  budget = () => !turn.turnId || turnBudget(session, turn.turnId, 'announce', 2);
 
   const known = installed(payload.cwd || process.cwd());
   const invoked = new Set(turn.skills.concat(turn.slashCommands).map(norm));
