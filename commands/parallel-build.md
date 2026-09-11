@@ -99,14 +99,18 @@ Spawn **all** selected agents in **one** message: N `Agent` tool-use blocks in a
 
 **Do not wait by polling.** Never `grep`/`sleep`-loop over task output files (`tasks/*.output`) to detect completion. The harness wakes the main thread automatically when every spawned agent comes to rest, and re-invokes you with their results. Spin-loops keep running for minutes after the agents already finished. On wake, read the returned results and go straight to synthesis.
 
-Every agent gets the same user message:
+Every agent gets the same user message. Not the whole context doc: shipping all of it to
+six agents duplicated up to 600 lines six times. The `### Spec` subsection stays because
+the classifier asks `code-quality` to check spec conformance against it, which is the one
+thing a freshly built module most needs reviewed; Task Plan and Decisions do not help a
+reviewer and are dropped.
 
 ```
 FILES:
 <content of all newly created/modified files>
 
 CONTEXT:
-<docs/context.md full content, or, for a single native screen, the sibling screen read in Phase 0>
+<docs/context.md Summary + Key Changes, plus the PLANNING block's `### Spec` subsection when one exists, or, for a single native screen, the sibling screen read in Phase 0>
 ```
 
 `adversarial` gets one extra prefix line: `This is a newly built feature. Argue the strongest case against shipping it as-is.`

@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Pre-merge readiness workflow: orchestrates fe-test (coverage gate), code-review (5-axis), and fe-review (EVPMR). Use when preparing a branch for PR.
+description: Pre-merge readiness workflow: orchestrates fe-test (coverage gate), code-quality (5-axis), and fe-review (EVPMR). Use when preparing a branch for PR.
 ---
 
 **Commands:** `rtk jest`, `rtk tsc`, `rtk lint`, `rtk git diff`
@@ -81,7 +81,7 @@ Fix all errors. No `// eslint-disable` without a documented reason.
 
 ## Step 5: Review
 
-Run the `/review` command, which applies `/code-review` (5-axis: correctness, readability, architecture, security, performance) and `/fe-review` (EVPMR checklist). Use severity labels from `/using-agent-skills`.
+Run the `/review` command, which applies `/code-quality` (5-axis: correctness, readability, architecture, security, performance) and `/fe-review` (EVPMR checklist). Use severity labels from `/using-agent-skills`.
 
 **Gate:** No `[ERROR]` findings remain.
 

@@ -14,8 +14,10 @@ description: Skill routing, model selection, core operating behaviors, and failu
 
 Loaded from `rules/` automatically on every session:
 - `karpathy-guidelines`: think before coding, simplicity, surgical changes, goal-driven
-- `fe-rules`: EVPMR layer constraints, TypeScript, styling, React correctness, tracking
+- `flag-safety`: flag OFF stays behavior-identical, `flag:` marker, both states tested
+- `grounding`: provenance on claims that drive action, staleness as a reported state
 - `using-agent-skills`: this file, covering routing, behaviors, severity labels
+- `fe-rules`: EVPMR layer constraints and React correctness, on RN/web cwds only (`platform: fe`)
 
 Output compression (caveman) is delivered by the caveman plugin's hooks, not a synced rule. One channel, no duplicate.
 

@@ -1099,7 +1099,39 @@ fi
 
 
 # ---------------------------------------------------------------------------
-# 26. A hook dropped from _CRAFTKIT_HOOKS is uninstalled, file AND settings.json
+# 26. The rubric exists once. partials/ponytail-rubric.md is injected into the
+#     cold reviewer and rules/karpathy-guidelines.md is what the writing side
+#     authors under, so the two drifting apart means review scores code by a
+#     list the author never saw. Byte-for-byte, because "author under the exact
+#     list review uses" is the design and a paraphrase breaks it silently.
+#     Also holds the always-on inventory to the actual contents of rules/,
+#     which listed 3 of 5 for two releases.
+# ---------------------------------------------------------------------------
+check "one rubric, and an honest rule inventory"
+_rb=0
+_rbf="$(mktemp)"
+awk '/^\| Tag \| Fails when \|/{f=1} f{print} /^Protected, never counted/{if(f)exit}' \
+    "$REPO_DIR/rules/karpathy-guidelines.md" > "$_rbf"
+[[ -s "$_rbf" ]] \
+    || { fail "no rubric block found in rules/karpathy-guidelines.md, so the writing side has no list to author under"; _rb=1; }
+_rbp="$(mktemp)"
+awk '/^\| Tag \| Fails when \|/{f=1} f{print} /^Protected, never counted/{if(f)exit}' \
+    "$REPO_DIR/partials/ponytail-rubric.md" > "$_rbp"
+if ! diff -q "$_rbf" "$_rbp" >/dev/null 2>&1; then
+    fail "partials/ponytail-rubric.md has drifted from the rubric in rules/karpathy-guidelines.md, so the reviewer scores by a list the author never saw"
+    _rb=1
+fi
+rm -f "$_rbf" "$_rbp"
+# The inventory is prose, so only a check keeps it true.
+for _r in "$RULES_DIR"/*.md; do
+    _rn="$(basename "$_r" .md)"
+    grep -q "^- \`$_rn\`" "$REPO_DIR/rules/using-agent-skills.md" \
+        || { fail "rules/$_rn.md is always-on but missing from the inventory in using-agent-skills.md, which then understates what every session loads"; _rb=1; }
+done
+[[ $_rb -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 27. A hook dropped from _CRAFTKIT_HOOKS is uninstalled, file AND settings.json
 #     registration. Without a prune pass, retiring a hook orphaned both: the
 #     machine kept firing a gate whose source was deleted, with no signal. Same
 #     shape CLAUDE.md documents for adapter retirement, and it bit on the first
@@ -1120,7 +1152,7 @@ grep -q 'STATE_DIR/claude-hooks' "$REPO_DIR/adapters/claude.sh" \
 [[ $_ph -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
-# 27. Drift detector distinguishes clean, drifted and cannot-verify. The third
+# 28. Drift detector distinguishes clean, drifted and cannot-verify. The third
 #     is the point: a context doc records a baseline commit, and this repo
 #     squash-merges, so that commit leaves reachable history as soon as its
 #     branch merges. A detector that answered "clean" when it cannot see would
