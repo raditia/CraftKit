@@ -62,6 +62,14 @@ process.stdin.on('end', () => {
   // An unreadable transcript is a gate that cannot see, so it must not block.
   if (!turn.readable) return pass();
   if (turn.skills.length || turn.slashCommand) return pass();
+  // Session scope, not turn scope. T-1 measured 76 source-editing turns: asking on every
+  // unrouted one fires at 62%, while asking only when the session has never routed fires
+  // at 18% and still catches the miss population. The turns in between are continuations
+  // ("apply the fixes", "go with option 2") whose routing decision was made earlier, and
+  // re-asking there is the click-through training this gate cannot afford.
+  if (turn.priorSkills > 0) return pass();
+  // A background-task event is not a prompt and carries no routing intent.
+  if (turn.notification) return pass();
   // A subagent gets its own transcript, so the parent's Skill call is not in it and every
   // subagent edit would prompt. The parent turn is the right place to enforce routing, and
   // a background agent may have no one able to answer the prompt anyway.

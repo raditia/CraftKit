@@ -23,12 +23,42 @@ function readTailLines(transcriptPath) {
     const lines = buf.toString('utf8').split('\n');
     // A mid-line start yields a partial first line that will not parse anyway.
     if (start > 0) lines.shift();
-    return lines;
+    // truncated says the session's earlier turns are outside this window, which is what
+    // stops priorSkills from being read as "the session never routed".
+    return { lines: lines, truncated: start > 0 };
   } catch (e) {
-    return [];
+    return { lines: [], truncated: false };
   } finally {
     if (fd !== undefined) { try { fs.closeSync(fd); } catch (e) { /* nothing to do */ } }
   }
+}
+
+// Counts Skill calls across the WHOLE file, for when the tail window missed the session
+// start. Needed because the transcript only grows: once a session passes TAIL_BYTES,
+// every later turn sees a truncated window, so treating "unknown" as "never routed" would
+// have flipped a session-scoped gate off permanently partway through. A plain substring
+// count, no JSON parse, because the only question is how many Skill calls exist.
+function countSkillCalls(transcriptPath) {
+  const NEEDLE = '"name":"Skill"';
+  let fd, total = 0;
+  try {
+    fd = fs.openSync(transcriptPath, 'r');
+    const buf = Buffer.alloc(256 * 1024);
+    // Carry the tail of each chunk so a needle split across a chunk boundary still counts.
+    let carry = '';
+    let read;
+    while ((read = fs.readSync(fd, buf, 0, buf.length, null)) > 0) {
+      const text = carry + buf.toString('utf8', 0, read).replace(/\s+/g, '');
+      let i = 0;
+      while ((i = text.indexOf(NEEDLE, i)) !== -1) { total++; i += NEEDLE.length; }
+      carry = text.slice(-NEEDLE.length);
+    }
+  } catch (e) {
+    return 0;
+  } finally {
+    if (fd !== undefined) { try { fs.closeSync(fd); } catch (e) { /* nothing to do */ } }
+  }
+  return total;
 }
 
 // A real user turn, as opposed to a tool_result, which the transcript also records
@@ -73,14 +103,18 @@ function turnIdOf(entry, text) {
 // (stable identity of this turn), sidechain (this transcript belongs to a subagent, which
 // gets its own file under <session>/subagents/), delegated (the turn spawned an agent,
 // so files may have been written where this transcript cannot see them), slashCommands
-// (the names the user typed, so a gate can match an announcement against them), and
+// (the names the user typed, so a gate can match an announcement against them),
 // assistantText (everything the agent said this turn, which is where an announcement of a
-// skill lives when no Skill call followed it).
+// skill lives when no Skill call followed it), notification (the turn was opened by a
+// background-task event rather than a prompt), and priorSkills (Skill calls in EARLIER
+// turns of this session, so a gate can spare a continuation of already-routed work,
+// counted across the whole file when the tail window missed the session start).
 function currentTurn(transcriptPath) {
   const out = { edits: [], commands: [], skills: [], slashCommand: false, readable: false,
                 turnId: '', sidechain: false, delegated: false, slashCommands: [],
-                assistantText: '' };
-  const lines = readTailLines(transcriptPath);
+                assistantText: '', notification: false, priorSkills: 0 };
+  const tail = readTailLines(transcriptPath);
+  const lines = tail.lines;
   if (!lines.length) return out;
   out.readable = true;
 
@@ -98,9 +132,23 @@ function currentTurn(transcriptPath) {
   // the whole tail then over-counts history rather than under-counting this turn,
   // which fails toward letting the agent through instead of blocking it wrongly.
 
+  // Whether the SESSION routed before this turn, not just whether this turn did. See the
+  // rationale at the consuming site, gate-skill-first.js.
+  for (let i = 0; i < start; i++) {
+    const content = entries[i].message && entries[i].message.content;
+    if (!Array.isArray(content)) continue;
+    for (const item of content) {
+      if (item && item.type === 'tool_use' && item.name === 'Skill') out.priorSkills++;
+    }
+  }
+
   if (entries[start] && isUserTurn(entries[start])) {
     const text = userText(entries[start]);
     out.slashCommand = /<command-name>/.test(text);
+    // A background-task event is not a prompt, so it carries no routing intent to judge.
+    // Only task-notification: a system-reminder can prefix a genuine prompt in the same
+    // entry, and matching it would silently disarm the gate on ordinary routable work.
+    out.notification = /^\s*<task-notification\b/.test(text);
     let sc;
     const scRe = /<command-name>\s*\/?([A-Za-z0-9:_-]+)/g;
     while ((sc = scRe.exec(text)) !== null) out.slashCommands.push(sc[1]);
@@ -127,6 +175,11 @@ function currentTurn(transcriptPath) {
     }
   }
   out.assistantText = said.join('\n');
+  // Only now, and only when the window was short: the whole-file count includes this
+  // turn's own calls, so subtract them to get what happened strictly earlier.
+  if (tail.truncated) {
+    out.priorSkills = Math.max(0, countSkillCalls(transcriptPath) - out.skills.length);
+  }
   return out;
 }
 

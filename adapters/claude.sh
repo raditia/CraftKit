@@ -24,6 +24,7 @@ _CRAFTKIT_HOOKS=(
     "craftkit-platform-rules.js%SessionStart%%CraftKit platform rules..."
     "craftkit-transcript.js%-%%"
     "craftkit-platform.js%-%%"
+    "craftkit-drift.js%-%%"
 )
 _CLAUDE_SECTION_START="<!-- BEGIN CRAFTKIT (managed: do not edit manually) -->"
 _CLAUDE_SECTION_END="<!-- END CRAFTKIT -->"

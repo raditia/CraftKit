@@ -6,7 +6,7 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
 
 <!-- BEGIN PLANNING: managed by /spec /plan /adr; preserved by /fe-context -->
 ## Planning (forward)
-**Updated:** 2026-09-11T08:36:45Z · **By:** /spec
+**Updated:** 2026-09-11T08:43:36Z · **By:** /spec
 
 ### Spec: unskippable gates + git-derived grounding
 
@@ -42,8 +42,9 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
   3. `sync.sh` run from a tree older than the recorded install refuses and names the gap.
   4. A turn that edits source and emits no `ponytail self-pass:` line is refused, and a mere
      quotation of that line inside prose or a fence does not satisfy it.
-  5. A continuation turn that edits source without routing is caught, not just the first edit
-     of a fresh turn.
+  5. A source-editing turn in a session that has never routed is caught; one whose session
+     already routed is spared; a task-notification turn is never caught. Firing rate stays at
+     or below the measured 18% baseline.
   6. Per-file drift is reported against an explicit baseline, with unreachable commits and
      dirty worktrees distinguished from clean.
   7. Provenance labels exist as a rule, and `[UNVERIFIED]` cannot back an `[ERROR]` finding or
@@ -77,9 +78,12 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
     with both refusal reasons collected before returning so one turn yields one message.
   - **F4** Per-file added-comment vs added-code counts in that refusal message, against an
     explicit diff baseline so pre-existing dirt is not attributed to this turn.
-  - **F5** Extend `hooks/gate-skill-first.js` to cover the continuation case: a turn that edits
-    source with no routing carrier is the measured miss population, and the gate currently asks
-    once per turn only.
+  - **F5** Extend `hooks/gate-skill-first.js` to cover the continuation case. Firing condition,
+    chosen by measurement: a source-editing turn with no routing carrier asks **only when the
+    session has not invoked a skill in any earlier turn**. Task-notification turns are skipped,
+    since they are not prompts. Measured firing rate: **14 of 76 source-editing turns (18%)**,
+    against 62% for the naive condition and 39% for a keyword filter. Record 18% as the
+    baseline so a later pass can tell whether it improved.
 
 - **Out of scope:**
   - **`triggers:` frontmatter on 36 skills.** Cut with the prefilter that was its only
@@ -136,10 +140,15 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
      stale, derived ids cannot.
 
 - **Risks & open questions:**
-  - *F5 is the one unproven lever.* Enforcement moved routing from 21% to 51%, but the
-    remaining misses include legitimate no-skill work (branch syncs, conflict resolution). A
-    gate that fires on those trains click-through, the failure this repo has already documented.
-    Needs a precision bound before it ships.
+  - *F5's condition leaks in both directions, and shipping it accepts that.* It fires on
+    approval turns ("I'd go with your recommendation", "yes run it on emulator") where asking is
+    noise, and it spares a genuine miss ("fix fe-rules path scoping") whose session had routed
+    earlier for unrelated work. No mechanical condition separates these, because the
+    discriminator is task identity, which a hook cannot judge. 18% was the lowest rate any
+    tested condition reached while still catching the miss population.
+  - *Keyword filtering was tested and rejected*, not skipped: a git-plumbing word list spared
+    three real misses ("can you check this PR?", "apply the 4 shrinks", "update the throttle on
+    this branch") because "PR", "push" and "branch" appeared incidentally.
   - *T-1's miss classification is judgment, not mechanics.* ~15 of 25 flagged turns are genuine
     misses; 5 are task notifications and ~5 are git plumbing.
   - *Two months and 74 source-editing turns is a small sample.* The direction is clear, the
@@ -149,7 +158,9 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
   - *F4 adds a second refusal to every code turn,* which must read as one message.
   - *Open:* should the comment ratio ever gate above some bound, or only inform.
   - *Open:* should `flag self-pass:` get the same treatment in a follow-up.
-  - *Open:* what precision bound makes F5 shippable.
+  - *Measurement caveat:* three T-1 passes counted 74, 56 and 76 source-editing turns, each
+    including a different subset of shell-route detection. Proportions are stable, absolute
+    counts are not comparable across passes. The 18% baseline comes from the 76-turn pass.
 
 - **Acceptance:**
   - [x] Given a transcript where a `Skill` tool_use is followed by an `isMeta` skill body and
@@ -167,8 +178,11 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
   - [ ] Given a turn with the line present as its own claim, it passes on either form; given a
         turn that edited no source, it passes untouched.
   - [ ] Given both refusals due at once, the turn is blocked once with both named.
-  - [ ] Given a continuation turn that edits source with no routing carrier, the skill gate
-        asks; given one that routed earlier in the same turn, it does not.
+  - [ ] Given a source-editing turn in a session with no earlier `Skill` call, the skill gate
+        asks; given one whose session routed in an earlier turn, it does not; given a
+        task-notification turn, it does not.
+  - [ ] Given the session-scope lookback removed, the continuation fixtures fail, so the scope
+        cannot pass for the wrong reason.
   - [ ] Given a baseline commit and one file edited since, the detector names that file; with
         none edited it reports clean; with an unreachable baseline or outside a git repo it
         reports cannot-verify, never clean.
@@ -186,7 +200,7 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
 | ID | Task | Acceptance | Depends on | Executes via |
 |----|------|-----------|-----------|--------------|
 | T0 | **DONE** `isUserTurn` ignores injected (`isMeta`) entries so a skill body no longer truncates the turn | 5 `check.sh` assertions pass; all 3 positive ones fail with the fix removed | none | `/fix` (done) |
-| T1 | Generate the routing hook's skill block from each skill's `name` and `description` into a managed region, plus a currency check | Editing a description without regenerating fails `check.sh`; regenerating twice yields no diff | none | `/build` |
+| T1 | **CUT** Generate the routing hook's skill block from frontmatter | Both drift directions are already enforced: `sync.sh:60-68` aborts when a skill is missing from the hook, `check.sh:175` fails when the hook names a skill that does not exist. What is left diverging is the hook's editorial content (groupings, tiebreakers, `/define chains interview→spec→plan`), which is judgment, not derivable from `name` + `description`. Generating it would replace curated routing guidance with a name dump | none | none |
 | T2 | `rules/grounding.md`: three provenance labels and the `[UNVERIFIED]` law, plus README row and a `check.sh` check | README row present; `check.sh` covers it; installs to all 4 tools; second sync a no-op | none | `/build` |
 | T3 | Drift detector on `git diff --name-only <baseline> -- <paths>`, distinguishing clean, drifted, cannot-verify (unreachable baseline, non-git, renames) | Behavioral `check.sh`: edited named, unedited clean, unreachable baseline and non-git both cannot-verify, rename reported without fatal | none | `/build` |
 | T4 | `hooks/gate-stale-context.js` (PreToolUse on Edit), scoped to files the action touches, registered in `_CRAFTKIT_HOOKS` with its README row | Drifted asks; undrifted silent; malformed stdin exits 0; hook-table check green | T3 | `/build` |
@@ -196,8 +210,9 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
 | T8 | Extend `gate-verify-on-stop.js` with the self-pass refusal, line-anchored and fence-stripped, collecting both reasons before returning | Undeclared refused; quoted or fenced mention still refused; declared passes; no-source-edit untouched; both reasons in one message | none | `/fix` |
 | T9 | Add per-file added-comment vs added-code counts to that message, against an explicit diff baseline | Counts shown per changed file; pre-existing dirt not attributed to the turn; counting never triggers the refusal | T8 | `/build` |
 | T10 | `check.sh` fixtures for T8: declared, undeclared, fenced mention, edits-a-rule-file, no-source-edit, shell-route, delegated, malformed stdin, both-refusals, negative control | Removing the T8 check makes every undeclared fixture fail; malformed stdin exits 0 | T8 | `/fe-test` |
-| T11 | Extend `gate-skill-first.js` to the continuation case, with a precision bound that spares legitimate no-skill work (branch sync, conflict resolution) | Behavioral `check.sh`: continuation source edit with no carrier asks; a turn that routed earlier does not; a git-plumbing turn does not | none | `/fix` |
-| T12 | Release: version bump in `package.json` and the README header, plus a matching `CHANGELOG.md` section | `check.sh` version-consistency check green; `sync.sh` clean and idempotent | T1-T11 | `/parallel-ship` |
+| T11 | Extend `gate-skill-first.js` to session scope: ask on a source-editing turn only when no earlier turn in the session invoked a skill; skip task-notification turns | Behavioral `check.sh`: session-never-routed asks; session-routed-earlier does not; notification turn does not; removing the lookback makes those fixtures fail | none | `/fix` |
+| T13 | Close the `stop_hook_active` bypass while keeping the no-infinite-loop property: a second stop attempt currently passes every Stop gate with nothing emitted | Behavioral `check.sh`: a turn blocked once and retried unchanged is still refused; a turn blocked once and then corrected passes; no fixture loops more than a bounded number of attempts | none | `/fix` |
+| T12 | Release: version bump in `package.json` and the README header, plus a matching `CHANGELOG.md` section | `check.sh` version-consistency check green; `sync.sh` clean and idempotent | T1-T11, T13 | `/parallel-ship` |
 
 **Parallelizable now:** T1, T2, T3, T7, T8, T11
 **Critical path:** T3 → T4 → T12, and T8 → T9 → T12 (3 deep)
@@ -206,9 +221,18 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
 own self-pass enforceable, so building the rest first means building it under the advisory
 regime this change exists to end.
 
-**T11 is the one task without evidence behind its design.** Its lever is proven (enforcement
-moved routing from 20.7% to 51.1%), its precision bound is not. Build it last of the
-parallelizable set, or split the bound into its own measurement pass first.
+**T13 came out of the T8 review and outranks T8 in severity.** `stop_hook_active`
+(`gate-verify-on-stop.js:87`) passes a second stop attempt with no check at all, and
+`check.sh:796` codifies that as required behavior. So a blocked turn need not emit the
+self-pass line: it can emit nothing and stop again. That is a cheaper bypass than the
+gaming decision 3 already accepts, and it applies to all three Stop gates. The constraint
+on any fix is the reason the flag exists, which is that a gate refusing its own retry
+forever is unusable.
+
+**T11's bound is now measured, not assumed:** session-never-routed fires on 18% of
+source-editing turns, against 62% naive and 39% keyword-filtered. The leak in both directions
+is documented under Risks and accepted, because no mechanical condition can judge task
+identity. Re-measure against the 18% baseline after it ships.
 
 ### Decisions
 _(appended by /adr)_

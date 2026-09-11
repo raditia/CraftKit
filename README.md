@@ -241,16 +241,19 @@ Routing context is text, and an agent can read text, announce the right skill, a
 | Hook | Event | What it does |
 |------|-------|--------------|
 | [`craftkit-routing.js`](hooks/craftkit-routing.js) | `UserPromptSubmit` | Injects the routing table, platform, and model tiers. Advisory: it describes the rule |
-| [`gate-skill-first.js`](hooks/gate-skill-first.js) | `PreToolUse` on `Edit\|Write\|MultiEdit\|NotebookEdit` | An edit to source code with no `Skill` call in this turn returns `ask`, naming the skills that fit the file |
-| [`gate-verify-on-stop.js`](hooks/gate-verify-on-stop.js) | `Stop` | A turn that edited source and ran no verification command is blocked from ending, and told which command to run |
+| [`gate-skill-first.js`](hooks/gate-skill-first.js) | `PreToolUse` on `Edit\|Write\|MultiEdit\|NotebookEdit` | An edit to source code in a session that has never invoked a skill returns `ask`, naming the skills that fit the file |
+| [`gate-verify-on-stop.js`](hooks/gate-verify-on-stop.js) | `Stop` | Two refusals: a turn that edited source and ran no verification command, and a turn that edited source and emitted no `ponytail self-pass:` line. Both reasons arrive in one message |
 | [`gate-announce-honored.js`](hooks/gate-announce-honored.js) | `Stop` | Two refusals: a reply saying `Running /<skill>` with no `Skill` call behind it, and a reply carrying no routing declaration at all |
 | [`craftkit-platform-rules.js`](hooks/craftkit-platform-rules.js) | `SessionStart` | Loads a `platform:`-scoped rule only where the cwd matches, so EVPMR laws stay out of Kotlin and Swift sessions |
+
+[`craftkit-drift.js`](hooks/craftkit-drift.js) is the shared staleness answer: one `git diff --name-only <baseline> -- <paths>` per question, which honors `.gitattributes` clean filters, covers staged and worktree states together, and reports a rename instead of dying on the old path. It returns clean, drifted, or cannot-verify, and cannot-verify is never clean, because this repo squash-merges and a context doc's baseline commit leaves reachable history the moment its branch lands.
 
 [`craftkit-transcript.js`](hooks/craftkit-transcript.js) is the shared scanner all three gates read the current turn through, so they can never disagree about where the turn started. [`craftkit-platform.js`](hooks/craftkit-platform.js) plays the same role for the platform question, shared by the routing hook and the platform-rules hook: two copies drifting would route the prompt to one platform's skills while loading another's rules.
 
 Design notes worth knowing before you trust them:
 
-- **Per turn, not per session.** One skill call early on buys no session-long pass; the gate re-arms every time you speak. A slash command you typed yourself arms it too.
+- **Per turn, except the skill gate.** The two `Stop` gates judge the turn in front of them: a self-pass or a verification run in an earlier turn buys nothing later. `gate-skill-first.js` is the exception and is scoped to the session, because the misses it exists to catch are continuation turns ("apply the fixes") whose routing decision was made several turns back. Measured on 76 source-editing turns, asking on every unrouted one fires at 62%, while asking only when the session never routed fires at 18% and still reaches the miss population. A slash command you typed yourself arms it too.
+- **A downgrade refuses, it does not revert.** `sync.sh` records the synced version in `~/.craftkit-state/version` and refuses to run from a checkout older than the install, because the state files hold names only: a one-commit-stale `main` uninstalled a live rule from all four tools this way, and the only symptom was rules quietly reverting. Two clones at different versions share that one file, so a deliberately old tree needs `CRAFTKIT_ALLOW_DOWNGRADE=1`.
 - **`ask`, never `deny`.** The human keeps the override, the agent does not.
 - **One prompt per unrouted turn.** The gate fires per tool call, so a ten-edit turn would have cost ten prompts, which trains you to click through it. The first ask stamps the turn and the rest of it passes. Denying the first edit therefore lets the remainder of that turn through, on the assumption the denial already redirected the agent.
 - **Fail open.** An unreadable transcript, malformed stdin, or a project with no gate command passes. A gate that guesses is worse than one that abstains, so both abstain.
@@ -558,6 +561,7 @@ Loaded automatically on every session. Never invoke these; they're always presen
 |------|---------|
 | [`fe-rules`](rules/fe-rules.md) | EVPMR layer constraints, TypeScript strict, module-over-barrel imports, styling tokens, React correctness, tracking |
 | [`flag-safety`](rules/flag-safety.md) | Flag OFF stays behavior-identical: code paths, persisted state, API contracts, analytics. `flag:` marker, both states tested |
+| [`grounding`](rules/grounding.md) | Claims that drive action carry provenance: `[verified: how]`, `[from context.md @sha]`, `[UNVERIFIED]`. An `[UNVERIFIED]` claim cannot back an `[ERROR]` finding or an edit. Cold agents review handed content only; staleness reports cannot-verify, never clean |
 | [`karpathy-guidelines`](rules/karpathy-guidelines.md) | Think before coding, simplicity, surgical changes, goal-driven, read before write, tests verify intent, checkpoint after steps |
 | [`using-agent-skills`](rules/using-agent-skills.md) | Skill routing (mandatory gate: classify before every response, announce match or "No skill matched."), model selection, severity labels, parallel classifier, model for judgment only, surface conflicts |
 
