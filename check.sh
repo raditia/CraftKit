@@ -634,9 +634,6 @@ def build(mode):
                   "content": [{"type": "tool_result", "content": "ok"}]}})
     if mode == "verified":
         lines.append(assistant([use("Bash", {"command": "rtk tsc --noEmit && rtk lint ViewFoo.tsx"})]))
-        # A fully compliant code-editing turn now also declares its self-pass, so this
-        # fixture carries both. The sp-* cases below test that axis on its own.
-        lines.append(assistant([{"type": "text", "text": "ponytail self-pass: clean"}]))
     return lines
 
 
@@ -695,38 +692,13 @@ announce_cases["declare-silent-across-injection"] = [
     assistant([{"type": "text", "text": "Here is the PR message you asked for."}]),
 ]
 
-# Self-pass fixtures. karpathy-guidelines demands the line from any turn that edits code,
-# and the string appears in 9 source files, so the quoted and fenced forms are the bypass
-# that matters, exactly as they were for the announcement.
-def selfpass(text, target="/x/ViewFoo.tsx", verify=True, repeats=1):
-    lines = [{"type": "user", "message": {"role": "user", "content": "edit foo"}}]
-    # repeats > 1 models several edits to the SAME file, which the reason line counted as
-    # several files until this gate fired on its own author's turn and said "21 file(s)".
-    for _ in range(repeats):
-        lines.append(assistant([use("Edit", {"file_path": target})]))
-    if verify:
-        lines.append(assistant([use("Bash", {"command": "rtk tsc --noEmit && rtk lint ViewFoo.tsx"})]))
-    if text:
-        lines.append(assistant([{"type": "text", "text": text}]))
-    return lines
-
-
-selfpass_cases = {
-    "sp-missing": selfpass(""),
-    "sp-declared": selfpass("ponytail self-pass: clean"),
-    "sp-declared-cut": selfpass("ponytail self-pass: cut the wrapper, marked the lock"),
-    "sp-bullet": selfpass("- ponytail self-pass: clean"),
-    "sp-fenced": selfpass("Example:\n```\nponytail self-pass: clean\n```\nThat is documentation."),
-    "sp-midsentence": selfpass("The rule wants a `ponytail self-pass: clean` line at the end."),
-    "sp-md-only": selfpass("", target="/x/notes.md"),
-    "sp-both-missing": selfpass("", verify=False),
-    # Both regressions this gate found by refusing its own author's turn.
-    "sp-backticked": selfpass("`ponytail self-pass: clean` and nothing was cut."),
-    "sp-repeat-edits": selfpass("", repeats=4),
-}
-for name, lines in selfpass_cases.items():
-    with open("%s/%s.jsonl" % (gx, name), "w") as f:
-        f.write("\n".join(json.dumps(x) for x in lines) + "\n")
+# One file edited four times is one file: the reason line counted tool calls, not files,
+# and reported "21 file(s)" for six. Found when this gate fired on its own author's turn.
+repeat = [{"type": "user", "message": {"role": "user", "content": "edit foo"}}]
+for _ in range(4):
+    repeat.append(assistant([use("Edit", {"file_path": "/x/ViewFoo.tsx"})]))
+with open("%s/repeat-edits.jsonl" % gx, "w") as f:
+    f.write("\n".join(json.dumps(x) for x in repeat) + "\n")
 
 for name, lines in announce_cases.items():
     with open("%s/%s.jsonl" % (gx, name), "w") as f:
@@ -906,37 +878,11 @@ PYEOF
     _announcegate "$_gx/declare-silent-across-injection.jsonl" | grep -q '"decision":"block"' \
         || { fail "announce gate stopped seeing an undeclared turn once an injected entry appeared, so the turn fix disarmed check 2"; _gd=1; }
 
-    # Self-pass refusal. The line is required by karpathy-guidelines rule 2 and was checked
-    # by nothing, which made it advisory in exactly the turns it exists to govern.
-    _stopgate "$_gx/sp-missing.jsonl" | grep -q 'ponytail self-pass' \
-        || { fail "stop gate lets a code-editing turn end with no ponytail self-pass, so the rubric stays advisory"; _gd=1; }
-    _stopgate "$_gx/sp-declared.jsonl" | grep -q '"decision"' \
-        && { fail "stop gate blocks a turn that declared its self-pass, so honest turns cannot end"; _gd=1; }
-    _stopgate "$_gx/sp-declared-cut.jsonl" | grep -q '"decision"' \
-        && { fail "stop gate accepts only the clean form, so a turn that actually cut something is refused"; _gd=1; }
-    _stopgate "$_gx/sp-bullet.jsonl" | grep -q '"decision"' \
-        && { fail "stop gate rejects a bulleted self-pass line, so formatting the declaration breaks it"; _gd=1; }
-    # The string lives in 9 source files, so quotation is the bypass, same as the announcement.
-    _stopgate "$_gx/sp-fenced.jsonl" | grep -q 'ponytail self-pass' \
-        || { fail "stop gate accepts a fenced example as a self-pass claim, so quoting the rule satisfies it"; _gd=1; }
-    _stopgate "$_gx/sp-midsentence.jsonl" | grep -q 'ponytail self-pass' \
-        || { fail "stop gate accepts a mid-sentence mention as a self-pass claim, so prose about the rule satisfies it"; _gd=1; }
-    _stopgate "$_gx/sp-md-only.jsonl" | grep -q '"decision"' \
-        && { fail "stop gate demands a code self-pass from a prose-only edit, which gates documentation turns"; _gd=1; }
-    # Both refusals in one message: returning on the first makes the turn fix one, get
-    # refused for the other, and pay two rounds for one mistake.
-    _gb="$(_stopgate "$_gx/sp-both-missing.jsonl")"
-    printf '%s' "$_gb" | grep -q 'Verification gate not run' \
-        || { fail "stop gate drops the verification reason when the self-pass reason also applies"; _gd=1; }
-    printf '%s' "$_gb" | grep -q 'ponytail self-pass' \
-        || { fail "stop gate drops the self-pass reason when the verification reason also applies"; _gd=1; }
-    # A backticked claim at line start is a claim. Line-anchoring is what rejects a
-    # quotation, so refusing the backtick only refuses honest turns.
-    _stopgate "$_gx/sp-backticked.jsonl" | grep -q '"decision"' \
-        && { fail "stop gate rejects a backticked self-pass line, which is how the first live turn wrote it"; _gd=1; }
-    # One file edited four times is one file.
-    _stopgate "$_gx/sp-repeat-edits.jsonl" | grep -q '1 source file' \
+    _stopgate "$_gx/repeat-edits.jsonl" | grep -q 'edited 1 file' \
         || { fail "stop gate counts repeat edits to one file as several files, inflating the reason line"; _gd=1; }
+    # A blocked party cannot find the escape hatch in a file comment nobody reads mid-turn.
+    _stopgate "$_gx/bare.jsonl" | grep -q 'CRAFTKIT_GATE=off' \
+        || { fail "stop gate refusal never names its own escape hatch, unlike the skill gate"; _gd=1; }
 
     for _g in gate-skill-first.js gate-verify-on-stop.js gate-announce-honored.js; do
         echo 'not json' | node "$REPO_DIR/hooks/$_g" >/dev/null 2>&1 \

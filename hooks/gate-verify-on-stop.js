@@ -12,20 +12,6 @@ const { currentTurn } = require(path.join(__dirname, 'craftkit-transcript.js'));
 
 const CODE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|kt|java|swift|m|mm)$/i;
 
-// Scope for the self-pass refusal, deliberately not CODE_EXT: this repo's source is shell
-// and Node, so check.sh and sync.sh are code the rubric applies to, while a Markdown spec
-// edit is not and must not demand a code self-pass.
-const RUBRIC_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|kt|java|swift|m|mm|sh|bash|zsh)$/i;
-
-// karpathy-guidelines rule 2 requires this line from any turn that writes or edits code,
-// and until now nothing checked it. Line-anchored and fence-stripped for the reason
-// gate-announce-honored already needed both: the string appears in 9 source files, so a
-// mid-sentence mention or a fenced example is documentation, not a claim about this turn.
-// The leading-marker set includes a backtick because the first live turn this gate ran on
-// wrote its claim as `ponytail self-pass: clean` and was refused. Line-anchoring is what
-// rejects a quotation, not the absence of backticks: a prose mention reads "the rule wants
-// a `ponytail self-pass:` line", which does not start the line.
-const SELF_PASS = /^[ \t]*(?:[-*>]\s*)?[`*]{0,3}ponytail self-pass\b/im;
 
 // Walk up for the project's own gate. check.sh outranks package.json: a repo that
 // ships one has declared it the gate, and craftkit itself has both.
@@ -88,10 +74,8 @@ process.stdin.on('end', () => {
   if (!payload.transcript_path) return pass();
 
   const cwd = payload.cwd || process.cwd();
-  // No early return on a missing gate: the rubric's self-pass requirement is not
-  // conditioned on the repo shipping check.sh or package.json, so returning here left a
-  // bare shell, Rust or Go repo with no self-pass enforcement at all.
   const gate = requiredGate(cwd);
+  if (!gate) return pass();
 
   const turn = currentTurn(payload.transcript_path);
   if (!turn.readable) return pass();
@@ -101,37 +85,21 @@ process.stdin.on('end', () => {
   let touched = turn.edits;
   if (wroteViaShell(turn.commands) || turn.delegated) touched = touched.concat(gitDirty(cwd));
   touched = touched.filter((f, i) => touched.indexOf(f) === i);
-  const edited = !gate ? [] : gate.gatesEveryFile ? touched : touched.filter(f => CODE_EXT.test(f));
-  const rubric = touched.filter(f => RUBRIC_EXT.test(f));
-  if (!edited.length && !rubric.length) return pass();
+  const edited = gate.gatesEveryFile ? touched : touched.filter(f => CODE_EXT.test(f));
+  if (!edited.length) return pass();
 
-  // Both refusals are collected before returning. Returning on the first means a turn
-  // missing both gets told about one, fixes it, and is refused again for the other.
-  const reasons = [];
+  if (gate.patterns.every(p => turn.commands.some(c => p.test(c)))) return pass();
 
-  if (edited.length && !gate.patterns.every(p => turn.commands.some(c => p.test(c)))) {
-    reasons.push(
+
+  process.stdout.write(JSON.stringify({
+    decision: 'block',
+    reason:
       'Verification gate not run. This turn edited ' + edited.length + ' file(s): ' +
       edited.slice(0, 6).map(f => path.basename(f)).join(', ') +
       (edited.length > 6 ? ', ...' : '') + '\n' +
       'Run: ' + gate.run + '\n' +
       'Then report the actual output. If a gate genuinely cannot run here, say which and why, ' +
-      'and that the change is unverified. Do not report done instead.');
-  }
-
-  if (rubric.length && !SELF_PASS.test(String(turn.assistantText || '').replace(/```[\s\S]*?```/g, ''))) {
-    reasons.push(
-      'No ponytail self-pass this turn, and it edited ' + rubric.length + ' source file(s): ' +
-      rubric.slice(0, 6).map(f => path.basename(f)).join(', ') +
-      (rubric.length > 6 ? ', ...' : '') + '\n' +
-      'Scan your own diff against the six rubric tags (delete: stdlib: native: yagni: shrink: narrate:), ' +
-      'cut each hit or mark it ponytail: with its ceiling, then emit one line:\n' +
-      '  ponytail self-pass: clean\n' +
-      '  ponytail self-pass: cut <what>, marked <what>\n' +
-      'A fenced example or mid-sentence mention is documentation, not a claim about this turn.\n' +
-      'Set CRAFTKIT_GATE=off to disable this gate.');
-  }
-
-  if (!reasons.length) return pass();
-  process.stdout.write(JSON.stringify({ decision: 'block', reason: reasons.join('\n\n') }));
+      'and that the change is unverified. Do not report done instead.\n' +
+      'Set CRAFTKIT_GATE=off to disable this gate.'
+  }));
 });

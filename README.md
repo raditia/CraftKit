@@ -242,7 +242,7 @@ Routing context is text, and an agent can read text, announce the right skill, a
 |------|-------|--------------|
 | [`craftkit-routing.js`](hooks/craftkit-routing.js) | `UserPromptSubmit` | Injects the routing table, platform, and model tiers. Advisory: it describes the rule |
 | [`gate-skill-first.js`](hooks/gate-skill-first.js) | `PreToolUse` on `Edit\|Write\|MultiEdit\|NotebookEdit` | An edit to source code in a session that has never invoked a skill returns `ask`, naming the skills that fit the file |
-| [`gate-verify-on-stop.js`](hooks/gate-verify-on-stop.js) | `Stop` | Two refusals: a turn that edited source and ran no verification command, and a turn that edited source and emitted no `ponytail self-pass:` line. Both reasons arrive in one message |
+| [`gate-verify-on-stop.js`](hooks/gate-verify-on-stop.js) | `Stop` | A turn that edited source and ran no verification command is blocked from ending, and told which command to run |
 | [`gate-announce-honored.js`](hooks/gate-announce-honored.js) | `Stop` | Two refusals: a reply saying `Running /<skill>` with no `Skill` call behind it, and a reply carrying no routing declaration at all |
 | [`craftkit-platform-rules.js`](hooks/craftkit-platform-rules.js) | `SessionStart` | Loads a `platform:`-scoped rule only where the cwd matches, so EVPMR laws stay out of Kotlin and Swift sessions |
 

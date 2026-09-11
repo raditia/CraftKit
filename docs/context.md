@@ -10,11 +10,11 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
 
 ### Spec: unskippable gates + git-derived grounding
 
-- **Objective:** Five pieces of craftkit machinery degrade without saying so. The gates read a
-  truncated turn; `sync.sh` compares no versions and downgrades an install silently; the
-  `ponytail self-pass:` line is demanded in 9 source files and checked by nothing; nothing
-  detects that context read earlier has drifted; and source edits route to a skill only 38% of
-  the time. One failure class, five fixes.
+- **Objective:** Craftkit machinery degrades without saying so. The gates read a truncated
+  turn; `sync.sh` compares no versions and downgrades an install silently; nothing detects that
+  context read earlier has drifted; and source edits route to a skill only 38% of the time.
+  Four fixes ship (F0, F2, F3, F5). Two candidates were built or planned and dropped on
+  evidence (F1, F4), which is recorded here rather than quietly dropped.
 
 - **Users & job:** The craftkit author plus every synced tool session (Claude, Cursor, Gemini,
   Codex). Job 1: reach the right skill without being told which. Job 2: never assert a fact
@@ -37,29 +37,25 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
 - **Success:** (each maps to an acceptance check below)
   1. A turn containing a Skill invocation is seen by both gates as one turn, including
      everything after the skill body arrives.
-  2. The routing hook's skill block is generated from skill frontmatter, so the hook and the
-     rule can no longer disagree.
-  3. `sync.sh` run from a tree older than the recorded install refuses and names the gap.
-  4. A turn that edits source and emits no `ponytail self-pass:` line is refused, and a mere
-     quotation of that line inside prose or a fence does not satisfy it.
-  5. A source-editing turn in a session that has never routed is caught; one whose session
+  2. `sync.sh` run from a tree older than the recorded install refuses and names the gap.
+  3. A source-editing turn in a session that has never routed is caught; one whose session
      already routed is spared; a task-notification turn is never caught. Firing rate stays at
      or below the measured 18% baseline.
-  6. Per-file drift is reported against an explicit baseline, with unreachable commits and
+  4. Per-file drift is reported against an explicit baseline, with unreachable commits and
      dirty worktrees distinguished from clean.
-  7. Provenance labels exist as a rule, and `[UNVERIFIED]` cannot back an `[ERROR]` finding or
+  5. Provenance labels exist as a rule, and `[UNVERIFIED]` cannot back an `[ERROR]` finding or
      a code edit.
-  8. `bash check.sh` exits 0, `bash sync.sh` prints `Sync complete.`, and a second consecutive
+  6. `bash check.sh` exits 0, `bash sync.sh` prints `Sync complete.`, and a second consecutive
      run reports `(up to date)` everywhere.
 
 - **In scope:**
   - **F0 (done)** `hooks/craftkit-transcript.js:isUserTurn` treats an injected entry
     (`isMeta === true`) as not a turn boundary, covering both a skill body and stop-hook
     feedback. Fixtures in `check.sh` model the injected entry, which they previously did not.
-  - **F1 (reduced)** Generate the routing hook's skill block from each skill's existing `name`
-    and `description` frontmatter into a managed region, plus a currency check. This closes the
-    drift bug `CLAUDE.md` documents ("the hook text duplicates the routing table, update
-    both"). Nothing else from the original F1 survives; see Out of scope.
+  - **F1 (dropped)** Generating the routing hook's skill block from frontmatter. Both drift
+    directions were already enforced: `sync.sh` aborts when a skill is missing from the hook,
+    `check.sh` fails when the hook names a skill that does not exist. What still diverges is the
+    hook's editorial content, which is judgment rather than derivable frontmatter.
   - **F2** `rules/grounding.md`: the three provenance labels
     (`[verified: <cmd|file:line>]`, `[from context.md @<sha>]`, `[UNVERIFIED]`) and the law that
     `[UNVERIFIED]` may not back an `[ERROR]` finding or a code edit.
@@ -73,11 +69,8 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
     rather than hand-copied rule text.
   - **F3** `sync.sh` records the installed version in `~/.craftkit-state/` and refuses a
     downgrade, naming both versions.
-  - **F4** `hooks/gate-verify-on-stop.js` also refuses a turn that edited source and carried no
-    `ponytail self-pass:` line, line-anchored and fence-stripped so a quotation does not pass,
-    with both refusal reasons collected before returning so one turn yields one message.
-  - **F4** Per-file added-comment vs added-code counts in that refusal message, against an
-    explicit diff baseline so pre-existing dirt is not attributed to this turn.
+  - **F4 (dropped)** The `ponytail self-pass:` refusal was built, dogfooded for one turn, and
+    removed. See Key decisions.
   - **F5** Extend `hooks/gate-skill-first.js` to cover the continuation case. Firing condition,
     chosen by measurement: a source-editing turn with no routing carrier asks **only when the
     session has not invoked a skill in any earlier turn**. Task-notification turns are skipped,
@@ -98,7 +91,7 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
     every skill) and the byte criterion would pressure against its own vocabulary.
   - **Recording `SlashCommand` in `currentTurn`.** Zero occurrences in 149 transcripts.
   - **`/humanizer` on code comments.** Its contract is "rewrite, don't delete, cover everything
-    the original covers", so it holds the count where F4 wants it cut; its patterns target
+    the original covers", so it preserves the comment count a trim was meant to reduce; its patterns target
     prose essays; and it holds `Write`/`Edit`, so aimed at source it can alter code.
   - **A hard comment-to-code ratio as a blocking condition.** F0 measured 20 added comment lines
     to 2 added code lines with every comment protected by the rubric. The ratio is evidence.
@@ -171,13 +164,8 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
   - [ ] Given an install recorded newer than the tree being synced from, `sync.sh` refuses and
         names both versions; equal or newer proceeds; a first run with no recorded version
         proceeds and records one.
-  - [ ] Given a turn that edited source with no `ponytail self-pass:` line, the stop gate
-        refuses, naming the line and the per-file comment-to-code counts.
-  - [ ] Given a turn whose only occurrence of that line is inside a fence or mid-sentence, or
-        which edited a rule file containing the line, the gate still refuses.
-  - [ ] Given a turn with the line present as its own claim, it passes on either form; given a
-        turn that edited no source, it passes untouched.
-  - [ ] Given both refusals due at once, the turn is blocked once with both named.
+  - [x] Given one file edited several times in a turn, the refusal counts it once.
+  - [x] Given any refusal from the stop gate, the message names `CRAFTKIT_GATE=off`.
   - [ ] Given a source-editing turn in a session with no earlier `Skill` call, the skill gate
         asks; given one whose session routed in an earlier turn, it does not; given a
         task-notification turn, it does not.
@@ -207,9 +195,9 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
 | T5 | Point the three `*-context` skills and Standard context loading at the detector, recording an explicit baseline in the doc header | A regenerated doc carries a baseline the detector accepts; the freshness step consults it | T3 | `/build` |
 | T6 | Opt the 12 `agents/*.md` into `craftkitInject: grounding` so cold agents carry the live rule instead of a copy | `craftkitInject` sources resolve; installed agents carry the body; second sync a no-op | T2 | `/build` |
 | T7 | `sync.sh` version guard: record the installed version in `~/.craftkit-state/`, refuse a downgrade naming both versions | Behavioral `check.sh`: older-over-newer refuses; equal or newer proceeds; first run records | none | `/fix` |
-| T8 | Extend `gate-verify-on-stop.js` with the self-pass refusal, line-anchored and fence-stripped, collecting both reasons before returning | Undeclared refused; quoted or fenced mention still refused; declared passes; no-source-edit untouched; both reasons in one message | none | `/fix` |
-| T9 | Add per-file added-comment vs added-code counts to that message, against an explicit diff baseline | Counts shown per changed file; pre-existing dirt not attributed to the turn; counting never triggers the refusal | T8 | `/build` |
-| T10 | `check.sh` fixtures for T8: declared, undeclared, fenced mention, edits-a-rule-file, no-source-edit, shell-route, delegated, malformed stdin, both-refusals, negative control | Removing the T8 check makes every undeclared fixture fail; malformed stdin exits 0 | T8 | `/fe-test` |
+| T8 | **DROPPED** self-pass refusal in `gate-verify-on-stop.js`. Built, dogfooded one turn, removed: it cannot tell a real rubric scan from a recitation, so it taxed every code turn for a signal that reads as compliance either way. The two defects it exposed (repeat-edit counting, escape hatch unnamed) were bugs in the verification reason too and are kept | `check.sh`: one file edited four times counts once; every refusal names `CRAFTKIT_GATE=off` | none | `/fix` (done) |
+| T9 | **DROPPED** with T8 (comment-to-code counts in the refusal message) | n/a | n/a | none |
+| T10 | **DROPPED** with T8 (self-pass fixtures) | n/a | n/a | none |
 | T11 | Extend `gate-skill-first.js` to session scope: ask on a source-editing turn only when no earlier turn in the session invoked a skill; skip task-notification turns | Behavioral `check.sh`: session-never-routed asks; session-routed-earlier does not; notification turn does not; removing the lookback makes those fixtures fail | none | `/fix` |
 | T13 | Close the `stop_hook_active` bypass while keeping the no-infinite-loop property: a second stop attempt currently passes every Stop gate with nothing emitted | Behavioral `check.sh`: a turn blocked once and retried unchanged is still refused; a turn blocked once and then corrected passes; no fixture loops more than a bounded number of attempts | none | `/fix` |
 | T12 | Release: version bump in `package.json` and the README header, plus a matching `CHANGELOG.md` section | `check.sh` version-consistency check green; `sync.sh` clean and idempotent | T1-T11, T13 | `/parallel-ship` |
@@ -221,13 +209,12 @@ _Backward sections (Summary, Key Changes) are filled by `/fe-context` from the d
 own self-pass enforceable, so building the rest first means building it under the advisory
 regime this change exists to end.
 
-**T13 came out of the T8 review and outranks T8 in severity.** `stop_hook_active`
-(`gate-verify-on-stop.js:87`) passes a second stop attempt with no check at all, and
-`check.sh:796` codifies that as required behavior. So a blocked turn need not emit the
-self-pass line: it can emit nothing and stop again. That is a cheaper bypass than the
-gaming decision 3 already accepts, and it applies to all three Stop gates. The constraint
-on any fix is the reason the flag exists, which is that a gate refusing its own retry
-forever is unusable.
+**T13 came out of the T8 review and outlived it.** With T8 dropped its severity falls, but it
+still holds against the verification and announce gates: `stop_hook_active` passes a second
+stop attempt with no check at all, and `check.sh` codifies that as required behavior, so a
+turn blocked for skipping verification can emit nothing and stop again. The constraint on
+any fix is the reason the flag exists, which is that a gate refusing its own retry forever
+is unusable.
 
 **T11's bound is now measured, not assumed:** session-never-routed fires on 18% of
 source-editing turns, against 62% naive and 39% keyword-filtered. The leak in both directions
