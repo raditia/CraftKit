@@ -7,6 +7,39 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.39.0 — 2026-09-17
+
+### Feature intent moved out of the shared context doc
+
+`docs/context.md` carried one PLANNING block, so it could describe one feature. Writing a spec
+for a second one destroyed the first, which is not a hypothetical: it happened while v1.38.0 was
+being built, when a `/spec` run overwrote the shipped v1.36.0 block. Worse than the overwrite,
+`/fe-context` preserved that block verbatim while regenerating the derived sections around it, so
+the file could hold feature A's intent beside branch B's changed-file list and read as
+authoritative. This is release 1 of ADR-0001; ADR-0002 (derived context stops being stored) is
+release 2.
+
+- Intent now lives at `docs/planning/<slug>.md`, one file per feature. The slug is named by the
+  author at `/spec` time, not derived from the branch, because a branch name breaks on rename and
+  has no answer on `main`. Distinct filenames mean parallel merges cannot collide in generated
+  content and no feature can overwrite a sibling's spec.
+- `partials/planning-resolve.md` is the single resolver, injected into `/spec` `/plan` `/adr`
+  `/docs` `/eval`. The branch-to-feature mapping stays **derived**, globbed from `status: active`,
+  so there is no index to go stale. Two candidates resolve by matching against the diff, and the
+  author is asked only when the diff intersects two or none: matching is a fact, choosing between
+  real candidates is a decision.
+- `status:` is human-owned (`active` / `shipped` / `abandoned`) and no check maintains it. Intent
+  goes stale when a person changes their mind, not when code moves. The drift detector was
+  considered and rejected here: this repo squash-merges, so a recorded baseline is unreachable
+  after merge and `cannot-verify` would be the common answer rather than the edge case.
+- `/fe-context` no longer preserves the block. A legacy one is **migrated**, not copied through.
+- `check.sh` check 32 is the release-completion condition ADR-0001 named: no source file may
+  reference the shared block, the generator's template may not carry the marker, and every intent
+  skill must inject the one resolver. All three branches were confirmed to fail before passing.
+- The live block was migrated rather than deleted, into
+  `docs/planning/eval-correctness.md` (`status: shipped`). The redesign dogfoods itself:
+  `docs/planning/context-intent-split.md` is the active intent file for this very change.
+
 ## v1.38.0 — 2026-09-17
 
 ### /eval scores a run into a weighted correctness percentage

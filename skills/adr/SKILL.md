@@ -1,7 +1,8 @@
 ---
 name: adr
-description: Record one architectural decision as an immutable ADR: context, options weighed, decision, consequences. Captures the WHY a choice was made so future readers don't re-litigate it. Appends a summary to the docs/context.md PLANNING block. Adapted from addyosmani/agent-skills documentation-and-adrs (MIT).
+description: Record one architectural decision as an immutable ADR: context, options weighed, decision, consequences. Captures the WHY a choice was made so future readers don't re-litigate it. Appends a pointer to the feature's docs/planning/ intent file. Adapted from addyosmani/agent-skills documentation-and-adrs (MIT).
 alwaysApply: false
+craftkitInject: planning-resolve
 ---
 
 **Model:** everyday.
@@ -50,20 +51,20 @@ Status honesty: only `Accepted` if truly decided. A decision still being weighed
 
 ---
 
-## Link into docs/context.md
+## Link into the feature's intent file
 
-Append a one-line pointer to the `### Decisions` subsection of the PLANNING block (see `/spec` for the block; leave Spec/Task-Plan intact):
+Append a one-line pointer to the `## Decisions` section of the resolved intent file (leave Spec and Task Plan intact). Paths are relative to `docs/planning/`, so they start `../adr/`. When no intent file resolves, the ADR still stands on its own and the pointer is simply skipped:
 
 ```markdown
-### Decisions
-- [ADR-0001](adr/0001-<title>.md) · <one-line what & why> · Accepted {{date}}
+## Decisions
+- [ADR-0001](../adr/0001-<title>.md) · <one-line what & why> · Accepted {{date}}
 ```
 
-Keep it to the pointer line, because the full reasoning lives in the ADR file, not the context block (budget).
+Keep it to the pointer line, because the full reasoning lives in the ADR file, not the intent file.
 
 ## Output
 
 ```
-ADR-NNNN · <title>  ·  docs/adr/NNNN-<title>.md  ·  linked in docs/context.md
+ADR-NNNN · <title>  ·  docs/adr/NNNN-<title>.md  ·  linked in docs/planning/<slug>.md
 Status: <status>   Options weighed: <N>
 ```

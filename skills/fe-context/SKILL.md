@@ -15,7 +15,7 @@ alwaysApply: false
 
 # Feature Context Engineering
 
-Feed the right information at the right time. `docs/context.md` is the single source of truth for what is being developed on this branch. All other skills read it instead of re-scanning the project.
+Feed the right information at the right time. `docs/context.md` carries the **derived** half only: what this branch changed, as git reports it. Intent lives per feature under `docs/planning/` (ADR-0001), which this skill does not touch.
 
 ## Context hierarchy
 
@@ -111,7 +111,7 @@ If requirements are missing or ambiguous, stop and ask; do not invent.
 
 Create `docs/` if needed. If file exists, update changed sections and preserve manually added notes.
 
-**Preserve the forward-planning block.** If a `<!-- BEGIN PLANNING … -->` … `<!-- END PLANNING -->` block exists (written by `/spec` `/plan` `/adr`), copy it through verbatim; never regenerate or drop it. It holds the forward spec/tasks/decisions the backward diff sections below complement.
+**This file holds derived facts only.** Intent (spec, tasks, decisions) lives in `docs/planning/<slug>.md`, one file per feature, and `/fe-context` neither reads nor writes it (ADR-0001). A legacy `<!-- BEGIN PLANNING … -->` block found in an existing `docs/context.md` is migrated, not preserved: move its content into the feature's intent file, then drop the block. Copying it through is what let one feature's spec sit beside another branch's changed-file list.
 
 ```markdown
 # Feature Context

@@ -170,7 +170,8 @@ Where it does apply, every skill follows this on start, not repeated per skill:
    ```
    `clean` → proceed · `drifted` → the named files are suspect, so regenerate · `cannot-verify` → say so and treat the doc as unverified, never as fresh. Per `grounding`, a claim resting on a cannot-verify doc is `[UNVERIFIED]` and cannot back an `[ERROR]` finding or a code edit.
 3. **Read `docs/context.md`**, required wherever this procedure applies. Read only the sections the skill specifies (see each skill's **Context:** line); at minimum: Summary + Key Changes
-4. If context conflicts with code → `CONFUSION: docs/context.md says X but code shows Y. Options: A) ... B) ... → Which?`
+4. **Resolve intent separately.** `docs/context.md` carries derived facts only. A feature's spec, task plan and decision pointers live in `docs/planning/<slug>.md`, one file per feature, found by globbing for `status: active` rather than by any recorded mapping (ADR-0001). Skills that need intent inject `planning-resolve`, which carries the full rule including what to do when two files resolve. Freshness does not apply: intent goes stale when a human changes their mind, so its `status` field is human-owned and no check maintains it.
+5. If context conflicts with code → `CONFUSION: docs/context.md says X but code shows Y. Options: A) ... B) ... → Which?`
 
 ---
 

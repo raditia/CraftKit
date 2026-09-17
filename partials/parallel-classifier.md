@@ -88,7 +88,7 @@ Evaluate before spawning:
 | Diff > 300 lines | Add `[WARNING] Change size: N lines, consider splitting` to synthesis |
 | 3+ architecture layers changed: EVPMR (Entry/View/Presenter/Model/Resource), Android MVP (View/Presenter/ViewModel/Repository/DI), or iOS MVVM-C (ViewController/View/ViewModel/Fetcher/Coordinator) | Add `adversarial` agent (definition in `agents/adversarial.md`) |
 | Security-sensitive paths | Pass "Security-sensitive code present. Emphasize security axis." in user message to `code-quality` agent |
-| `docs/context.md` has a PLANNING block | Pass "Spec conformance: verify the diff implements the PLANNING block's spec and acceptance criteria; flag drift between what was planned and what was built." in user message to `code-quality` agent |
+| An intent file resolves under `docs/planning/` | Pass "Spec conformance: verify the diff implements this feature's spec and acceptance criteria; flag drift between what was planned and what was built." plus that file's `## Spec` in the user message to `code-quality` agent |
 
 ### Step 4: Announce selection
 

@@ -1,4 +1,4 @@
-# craftkit `v1.38.0`
+# craftkit `v1.39.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -776,23 +776,33 @@ type AsyncData<T> =
 
 ### How context flows between skills
 
-`/fe-context` writes `docs/context.md` (≤ 600 lines). Every skill reads it instead of re-scanning the project: one diff scan, many skills benefit.
+Context splits in two, because the halves have opposite maintenance needs (ADR-0001, ADR-0002).
+
+**Derived context** is what git already knows: changed files, diff summary, patterns in the code. `/fe-context` writes it to `docs/context.md` (≤ 600 lines) so one diff scan serves many skills.
+
+**Intent** is what a human decided: spec, task plan, decision pointers. Git cannot derive it, so it is stored, one file per feature at `docs/planning/<slug>.md`, with the slug named by the author and a human-owned `status:` field. The branch-to-feature mapping is **derived**, by globbing for `status: active`, so there is no index to go stale.
 
 ```mermaid
 flowchart TD
     A["/fe-context\nreads diff · writes docs/context.md"]
+    P["/spec · /plan · /adr\nwrite docs/planning/&lt;slug&gt;.md"]
     A --> B["/fe-scaffold\n5-file EVPMR module"]
     A --> C["/fe-review · /fe-patterns\n/fe-performance · /code-quality"]
     A --> D["/fe-test\n≥93% coverage"]
+    P --> C
+    P --> E["/eval\nspec conformance"]
+    P --> F["/docs\ndual-audience"]
 ```
 
-| Level | Source | What |
-|-------|--------|------|
-| L1 Rules | Always-active skill files | EVPMR, tokens, Karpathy guidelines |
-| L2 Spec | `docs/context.md` | What's being built, constraints, decisions |
-| L3 Source | Diff output | Files touched by this branch |
-| L4 Errors | On demand | Failing tests, lint, TypeScript errors |
-| L5 History | Session | Conversation context |
+| Level | Source | What | Stale when |
+|-------|--------|------|-----------|
+| L1 Rules | Always-active rule files | EVPMR, tokens, Karpathy guidelines | Never; loaded fresh each session |
+| L2 Intent | `docs/planning/<slug>.md` | What's being built, constraints, decisions | The author changes their mind, so `status:` is theirs to set |
+| L3 Derived | `docs/context.md` | Files touched by this branch, as git reports | Any commit lands, which is why ADR-0002 stops storing it |
+| L4 Errors | On demand | Failing tests, lint, TypeScript errors | n/a, always live |
+| L5 History | Session | Conversation context | n/a |
+
+One resolver serves every skill that touches intent: `partials/planning-resolve.md`, injected into `/spec` `/plan` `/adr` `/docs` `/eval`. A second copy of the glob rule is how two skills come to disagree about which feature is active, so `check.sh` check 32 holds the single copy and refuses any source file that still names the old shared PLANNING block.
 
 ---
 

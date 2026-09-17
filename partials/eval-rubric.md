@@ -9,7 +9,7 @@ A deliverable is scored on five criteria, each `0-5`, each carrying a fixed weig
 
 | Criterion | Weight | Scored on |
 |---|---:|---|
-| Spec conformance | 35 | Every acceptance criterion in the `docs/context.md` PLANNING block is actually implemented, not approximated |
+| Spec conformance | 35 | Every acceptance criterion in the feature's `docs/planning/` intent file is actually implemented, not approximated |
 | Correctness | 25 | Logic holds on the inputs it claims to handle: edge cases, error paths, no crash or data-loss path |
 | Pattern adherence | 20 | The platform contract holds: EVPMR layers (RN/web), MVP + Core (Android), MVVM-C (iOS) |
 | Verification | 15 | Tests cover the changed paths and pass; type/lint gates clean |
@@ -70,10 +70,10 @@ A weighted average hides a total miss: 85% can mean "solid everywhere" or "perfe
 
 When the input needed for a criterion is absent, that criterion is `n/a` and the run is `INCOMPLETE`. It is never scored `5` by default and never silently reweighted, because reweighting turns missing evidence into a higher percentage. This mirrors the skipped-agent doctrine: missing coverage is a gap, not a clean axis.
 
-The common case is no PLANNING block, so Spec conformance is unscorable. Report the other four out of their 65 available points, say so explicitly, and leave the verdict `INCOMPLETE`:
+The common case is no intent file resolving, so Spec conformance is unscorable. Report the other four out of their 65 available points, say so explicitly, and leave the verdict `INCOMPLETE`:
 
 ```
-Spec conformance: n/a  (no PLANNING block in docs/context.md, so no acceptance criteria to check)
+Spec conformance: n/a  (no active intent file under docs/planning/, so no acceptance criteria to check)
 Partial: 54.0 / 65 possible  →  INCOMPLETE
 ```
 

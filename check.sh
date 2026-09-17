@@ -1368,6 +1368,39 @@ for _evh in "$REPO_DIR/skills/eval/SKILL.md" "$REPO_DIR/agents/eval-judge.md"; d
 done
 [[ $_ev -eq 0 ]] && pass
 
+# ---------------------------------------------------------------------------
+# 32. Intent lives per feature, and every reader of it resolves the same way.
+#     ADR-0001 names this as the release-completion condition: while any skill
+#     still writes the old shared PLANNING block, intent has two possible homes
+#     and a missed writer splits it across both silently, which is worse than
+#     the single-slot bug because it is quiet rather than destructive.
+# ---------------------------------------------------------------------------
+check "intent is per-feature, and its readers share one resolver"
+_pl=0
+# The old shared block. Its phrase is what every writer and reader used to say.
+_pl_hits="$(grep -rln "PLANNING block" "$REPO_DIR/skills" "$REPO_DIR/commands" \
+    "$REPO_DIR/partials" "$REPO_DIR/rules" "$REPO_DIR/agents" 2>/dev/null || true)"
+[[ -z "$_pl_hits" ]] \
+    || { fail "still writing or reading the shared PLANNING block: $(echo "$_pl_hits" | tr '\n' ' ')- intent then has two homes and a missed writer splits it silently"; _pl=1; }
+# The generator must not carry the marker in its own output template, or it
+# recreates the shared block on the next regenerate.
+_pl_tmpl="$(awk '/^```markdown/,/^```$/' "$REPO_DIR/skills/fe-context/SKILL.md")"
+case "$_pl_tmpl" in
+    *"BEGIN PLANNING"*) fail "skills/fe-context still emits a BEGIN PLANNING marker in its template, so regenerating recreates the shared intent slot"; _pl=1 ;;
+esac
+# One resolver, injected by everything that touches intent. A second copy of the
+# glob rule is how two skills come to disagree about which feature is active.
+[[ -f "$REPO_DIR/partials/planning-resolve.md" ]] \
+    || { fail "partials/planning-resolve.md is missing, so each intent skill resolves the active feature its own way"; _pl=1; }
+for _pls in spec plan adr docs eval; do
+    grep -q '^craftkitInject:.*planning-resolve' "$REPO_DIR/skills/$_pls/SKILL.md" \
+        || { fail "skills/$_pls does not inject planning-resolve, so it resolves the active feature by its own rule"; _pl=1; }
+done
+# Nothing may record the branch-to-feature mapping; it is derived (ADR-0001).
+grep -rn "status: active" "$REPO_DIR/partials/planning-resolve.md" >/dev/null \
+    || { fail "planning-resolve no longer globs on status, so the mapping has to be recorded somewhere and will go stale"; _pl=1; }
+[[ $_pl -eq 0 ]] && pass
+
 echo
 if [[ $FAILURES -eq 0 ]]; then
     echo "All checks passed."

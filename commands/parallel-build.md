@@ -110,7 +110,7 @@ FILES:
 <content of all newly created/modified files>
 
 CONTEXT:
-<docs/context.md Summary + Key Changes, plus the PLANNING block's `### Spec` subsection when one exists, or, for a single native screen, the sibling screen read in Phase 0>
+<the resolved intent file's `## Spec` when one exists, plus docs/context.md Summary + Key Changes, or, for a single native screen, the sibling screen read in Phase 0>
 ```
 
 `adversarial` gets one extra prefix line: `This is a newly built feature. Argue the strongest case against shipping it as-is.`
@@ -187,4 +187,4 @@ Offer, never auto-run:
 → Score this build into a correctness %? (e) /eval  (n) skip
 ```
 
-`/eval` spawns `eval-judge` over the built module, the PLANNING block, and the gate results above, then appends a row to `docs/evals/ledger.md`. Pass it the Phase 3 gate results and the test/coverage numbers rather than making it re-run them, since Verification cannot be scored from a diff. Skip when the user declines or the module is trivial; never block the build on a score.
+`/eval` spawns `eval-judge` over the built module, the resolved intent file, and the gate results above, then appends a row to `docs/evals/ledger.md`. Pass it the Phase 3 gate results and the test/coverage numbers rather than making it re-run them, since Verification cannot be scored from a diff. Skip when the user declines or the module is trivial; never block the build on a score.

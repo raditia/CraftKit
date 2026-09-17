@@ -3,12 +3,14 @@
 - **Status:** Accepted
 - **Date:** 2026-09-17
 - **Deciders:** Gusti Raditia Madya
+- **Note:** the writer count in Context was corrected from seven to four writers plus two readers after the migration mapped every reference. `/grill` and `/interview` never touched the block. The decision is unchanged.
 
 ## Context
 
 `docs/context.md` holds a single delimited PLANNING block carrying the spec, task plan and
-decisions for "the current feature". Seven skills write into that block (`/spec`, `/plan`,
-`/adr`, `/grill`, `/interview`, `/docs`, `/eval`) and the file is git-tracked.
+decisions for "the current feature". Four skills write into that block (`/spec`, `/plan`,
+`/adr`, `/fe-context`, the last only to copy it through) and two read it (`/docs`, `/eval`), and
+the file is git-tracked.
 
 The block has exactly one slot, and the doc has exactly one `**Branch:**` field, so it can
 describe one feature at a time. Real work runs several features across several branches from a
@@ -74,9 +76,9 @@ before reading intent, and that resolution can be ambiguous.
   Committing the planning file early is a discipline this design depends on and does not enforce.
 - `Status: active` can rot. Nothing detects a feature abandoned weeks ago and still marked
   active.
-- Seven writers must be migrated. Until all seven are, intent has two possible homes and a
-  missed writer splits it across both silently, which is worse than the single-slot bug because
-  it is quiet. **This release is therefore not complete without a `check.sh` invariant that no
+- Six skills must be migrated, plus three commands and two partials. Until all are, intent has
+  two possible homes and a missed writer splits it across both silently, which is worse than the
+  single-slot bug because it is quiet. **This release is therefore not complete without a `check.sh` invariant that no
   skill writes the PLANNING block and that the marker is gone from the `/fe-context` template.**
 - The author now names features. That name becomes the durable key, so a badly chosen slug is
   mildly sticky.
