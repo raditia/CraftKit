@@ -1,4 +1,4 @@
-# craftkit `v1.36.0`
+# craftkit `v1.38.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -19,6 +19,7 @@ One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**,
   - [Experimental: /team-build](#experimental-team-build-agent-teams) · agent-teams build
   - [Fix, tests, and PR message](#fix-tests-and-pr-message)
   - [Grill, research, and handoff](#grill-research-and-handoff) · stress-test plans, delegate reading, hand off sessions
+  - [Scoring a run: /eval](#scoring-a-run-eval) · weighted correctness %, judged and ledgered
 - [Skills reference](#skills-reference)
 - [Agents reference](#agents-reference)
 - [Architecture (EVPMR)](#architecture-evpmr)
@@ -165,7 +166,7 @@ flowchart TD
     C --> S["skills/*/SKILL.md\non-demand slash commands"]
     C --> M["commands/*.md\nworkflow orchestrators"]
     C --> G["agents/*.md\ncold sub-agents · Claude only"]
-    C --> P["partials/*.md\nspliced into commands/agents\nnever loaded on its own"]
+    C --> P["partials/*.md\nspliced into skills/commands/agents\nnever loaded on its own"]
 ```
 
 Five namespaces, one source of truth:
@@ -176,7 +177,7 @@ Five namespaces, one source of truth:
 | `skills/` | On demand | Slash command or natural language |
 | `commands/` | On demand | Slash command or natural language |
 | `agents/` | Spawned by an orchestrator | `subagent_type:`, never directly (Claude only) |
-| `partials/` | Only as a splice into a command or agent | Never, since it ships inside its host file (Claude only) |
+| `partials/` | Only as a splice into a skill, command or agent | Never, since it ships inside its host file (every tool for a skill, Claude only for a command or agent) |
 
 ### Where files land per AI tool
 
@@ -553,6 +554,37 @@ Picking the right interrogator:
 
 ---
 
+### Scoring a run: /eval
+
+Reviews tell you *what* is wrong. `/eval` tells you *how much* was right, as one number you can track across runs.
+
+```
+"score this run" / "how correct was that" / "what is our success rate"
+  /eval  →  gathers diff + PLANNING acceptance criteria + gate results
+         →  spawns eval-judge (cold) → five criteria, each 0-5, each weighted
+         →  recomputes the weighted sum in awk (judgment is the model's, arithmetic is not)
+         →  appends a row to docs/evals/ledger.md → derives the running success rate
+```
+
+| Criterion | Weight | Scored on |
+|---|---:|---|
+| Spec conformance | 35 | Every PLANNING acceptance criterion actually implemented |
+| Correctness | 25 | Edge cases, error paths, no crash or data-loss path |
+| Pattern adherence | 20 | EVPMR / MVP / MVVM-C contract holds |
+| Verification | 15 | Tests cover changed paths and pass; type + lint clean |
+| Simplicity | 5 | Ponytail rubric: nothing to delete |
+
+`Correctness % = Σ (score / 5 × weight)`, so `5·4·4·3·5` is 85.0%. Bands: `≥90 PASS` · `75-89 PASS WITH GAPS` · `<75 BLOCKED`.
+
+Two design choices worth knowing, because both are where a naive scorer lies to you:
+
+- **Floors override the band.** Any criterion at 0, or Spec conformance / Correctness at 2 or below, is `BLOCKED` whatever the total says. An 85% that means "perfect except it does not do what was asked" is the failure mode a weighted average is built to hide.
+- **Unscorable is a gap, not a pass.** No PLANNING block means Spec conformance is `n/a` and the verdict is `INCOMPLETE`, reported out of the 65 remaining points. Reweighting would turn missing evidence into a higher score, which is the skipped-agent doctrine applied to scoring.
+
+The success rate is derived from the ledger rows at read time, never stored, so it cannot go stale. Set a hard gate by putting a `**Threshold:**` line in the ledger header, and `/eval` reads it in place of the 90 boundary: that is the CI shape, where a prompt change or a model upgrade that drops the score reports `BLOCKED` instead of a passing percentage with a footnote. `/eval` reports; it never blocks a merge or reverts, because deciding what a 78% means is the author's call.
+
+---
+
 ## Skills reference
 
 ### Always-active rules
@@ -576,7 +608,7 @@ Use when a task is narrower than a full workflow.
 | [`fe-context`](skills/fe-context/SKILL.md) | Generate `docs/context.md` from branch diff | Diff spans > 10 interdependent files |
 | [`fe-scaffold`](skills/fe-scaffold/SKILL.md) | Create a new 5-file EVPMR module | Novel architecture outside EVPMR |
 | [`fe-review`](skills/fe-review/SKILL.md) | EVPMR pattern review only | Architectural conflicts with non-obvious resolution |
-| [`fe-patterns`](skills/fe-patterns/SKILL.md) | Composition patterns, hooks discipline, state location | Novel state architecture |
+| [`fe-patterns`](skills/fe-patterns/SKILL.md) | Props drilling, shared state placement (Context in Model, provider in Entry), composition patterns, hooks discipline | Novel state architecture |
 | [`fe-performance`](skills/fe-performance/SKILL.md) | Waterfall elimination, bundle size, re-renders | Lighthouse regressions with non-obvious root cause |
 | [`fe-a11y`](skills/fe-a11y/SKILL.md) | Labels, roles, focus management, reduced motion, for RN & Next.js | Complex focus flows spanning multiple routes |
 | [`fe-test`](skills/fe-test/SKILL.md) | Write/improve tests, enforcing ≥93% coverage. **RN/web only**, since native goes to `/android-test` / `/ios-test` | Can't reach 93%, root cause unclear |
@@ -621,6 +653,7 @@ The `*-review`, `*-a11y`, and `*-performance` skills below double as the source 
 | [`think`](skills/think/SKILL.md) | Systems/strategy reasoning router: cynefin, systems, feedback loops, constraints, leverage, second-order. Architecture + complex-system decisions | Architecture call with non-obvious tradeoffs, so escalate analysis to opus |
 | [`research`](skills/research/SKILL.md) | Background agent researches a question against primary sources only, writes a cited note into the repo | n/a |
 | [`handoff`](skills/handoff/SKILL.md) | Compact the session into a handoff doc for a fresh agent: state, decisions, next steps, suggested skills | n/a |
+| [`eval`](skills/eval/SKILL.md) | Score a finished run into a weighted correctness %: spawns `eval-judge`, appends `docs/evals/ledger.md`, derives the success rate | Score gates a merge or release, so escalate the judge; irreversible gate, so run a fusion panel of two judges |
 | [`ponytail-review`](skills/ponytail-review/SKILL.md) | Over-engineering audit on a diff or file: what to delete/shrink | Correctness or security concerns → use `code-quality` |
 | [`ponytail-audit`](skills/ponytail-audit/SKILL.md) | Whole-repo bloat scan: ranked list of removals | n/a |
 | [`ponytail-debt`](skills/ponytail-debt/SKILL.md) | Ledger of every `ponytail:` shortcut and `flag:` branch, surfacing deferred simplifications and removable flags | n/a |
@@ -655,7 +688,7 @@ The parallel workflows detect the platform first, then spawn that platform's rev
 | [`adversarial`](agents/adversarial.md) | all | Devil's advocate: strongest case against merging/shipping | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
 | [`fe-review`](agents/fe-review.md) | RN / web | EVPMR layer violations, TypeScript, styling, React correctness, tracking | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
 | [`fe-a11y`](agents/fe-a11y.md) | RN / web | Accessibility: labels, roles, focus, announcements, reduced motion | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
-| [`fe-patterns`](agents/fe-patterns.md) | RN / web | Composition patterns, hooks discipline, state location | `parallel-build` | sonnet |
+| [`fe-patterns`](agents/fe-patterns.md) | RN / web | Props drilling past 3 levels, state location, hooks discipline, composition patterns | `parallel-build` | sonnet |
 | [`fe-performance`](agents/fe-performance.md) | RN / web | Waterfalls, bundle size, re-renders, server-side, RN patterns | `parallel-build`, `parallel-ship` | sonnet |
 | [`android-review`](agents/android-review.md) | Android | MVP layer violations, Dagger DI, NavigatorService nav, string resources, coroutine correctness | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
 | [`android-a11y`](agents/android-a11y.md) | Android | TalkBack labels, roles/state, touch targets, focus order, text scaling | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
@@ -664,6 +697,7 @@ The parallel workflows detect the platform first, then spawn that platform's rev
 | [`ios-a11y`](agents/ios-a11y.md) | iOS | VoiceOver labels/traits/hints, focus & announcements, Dynamic Type, reduce motion | `parallel-review`, `parallel-build`, `parallel-ship` | sonnet |
 | [`ios-performance`](agents/ios-performance.md) | iOS | Main-thread discipline, cell reuse & prefetch, image downsampling, layout cost, retain cycles | `parallel-build`, `parallel-ship` | sonnet |
 | [`plan-roaster`](agents/plan-roaster.md) | all | Stress-test a plan before implementation: weakest assumption + failure modes | On demand | sonnet |
+| [`eval-judge`](agents/eval-judge.md) | all | Weighted correctness scoring of a finished deliverable: five criteria at 0-5, floors, verdict | `/eval`, offered by `parallel-build` + `parallel-ship` | sonnet |
 
 ### Skill vs agent: when to add which
 
@@ -681,12 +715,14 @@ The parallel workflows detect the platform first, then spawn that platform's rev
 >
 > **CI runs the gate.** `.github/workflows/check.yml` runs `check.sh` on every pull request and every push to `main`, on two legs: `macos-latest` with `/bin/bash` 3.2, which is the compatibility target and the only place a bash 4+ feature actually fails, and `ubuntu-latest` with bash 5 and GNU coreutils, where a BSD-only idiom shows up instead. Before this, the only gate the repo has ran solely on the author's machine and was self-reported.
 
-> **`craftkitInject` avoids the hand-maintained duplicate.** Add `craftkitInject: <name>` to an **agent's or command's** frontmatter and the sync splices that body in as a managed block at install time, regenerated on every pull. Each name resolves `partials/<name>.md` first, then `rules/<name>.md`, then `skills/<name>/SKILL.md`, so a file can carry a live partial (`parallel-review` ← `partials/parallel-classifier`), a live rule (`fe-review` ← `fe-rules`), or a live skill checklist (`android-review` ← `skills/android-review`). Prefer it over copying text; a copy silently rots when the source changes. Claude Code only.
+> **`craftkitInject` avoids the hand-maintained duplicate.** Add `craftkitInject: <name>` to a **skill's, agent's or command's** frontmatter and the sync splices that body in as a managed block at install time, regenerated on every pull. Each name resolves `partials/<name>.md` first, then `rules/<name>.md`, then `skills/<name>/SKILL.md`, so a file can carry a live partial (`parallel-review` ← `partials/parallel-classifier`), a live rule (`fe-review` ← `fe-rules`), or a live skill checklist (`android-review` ← `skills/android-review`). Prefer it over copying text; a copy silently rots when the source changes. Agents and commands render on Claude Code only, since no other tool has those hosts. **Skills render on all four**, because every adapter installs the same `SKILL.md`, so a Claude-only splice would ship the other three a skill with its core section missing (`sync.sh:craftkit_render_injected`, gated by `check.sh` check 30).
 >
 > **The ponytail rubric ships in two sizes too**, for the same reason and with a stronger guard. `rules/karpathy-guidelines.md` keeps the full rule, because the writing side needs the whole ladder; the `ponytail-review` agent injects `partials/ponytail-rubric.md`, which is the six-tag table and the protected list only. The agent is read-only, so the write-side rules (assumptions, surgical edits, run tests, checkpoint, the self-pass) were ~167 lines it could never act on, every spawn. `check.sh` diffs the two byte for byte, because "author under the exact list review scores by" stops being true the moment one is paraphrased.
 
 > **A rule can ship in two sizes.** `rules/grounding.md` is the always-on version, carrying the full provenance discipline for the session that reads it. Cold agents inject `partials/grounding-claims.md` instead, which keeps only the clauses an agent can act on (label findings, do not let an `[UNVERIFIED]` claim back an `[ERROR]`, review handed content). Measured at ~245 tokens per agent spawn against ~769 for the whole rule, which is ~1.5k saved on a six-agent build. Two files stay aligned by hand, and that is the cost of the split.
 
+> **A partial can serve a skill and its agent at once.** `partials/fe-state-location.md` holds the EVPMR state-location mapping and the props-drilling threshold, spliced into both `skills/fe-patterns` and `agents/fe-patterns`. The skill teaches it while building, the cold agent reviews against it, and one edit moves both. The agent previously carried a thinner paraphrase, which is how it came to review component trees with no threshold to review by.
+>
 > **`partials/` is the lazy-shared namespace.** A procedure several commands run, but that nothing needs resident, goes here: it syncs to no tool on its own and only ever arrives spliced. That is how the parallel classifier stopped costing ~1.4k est. tokens in every session while staying a single source of truth. A partial nothing injects fails `check.sh` check 5, since no sync would otherwise report it.
 
 ### Add an agent

@@ -176,3 +176,15 @@ Tests:     PASS (N tests, N new)
 Coverage:  Lines N% / Branches N% / Functions N% / Statements N%  (native: actual, or "not measured")
 Verdict:   DONE / BLOCKED (<list blockers>) / INCOMPLETE (<axes unverified due to skipped agents>)
 ```
+
+---
+
+## Score the run (opt-in, only if verdict DONE)
+
+Offer, never auto-run:
+
+```
+→ Score this build into a correctness %? (e) /eval  (n) skip
+```
+
+`/eval` spawns `eval-judge` over the built module, the PLANNING block, and the gate results above, then appends a row to `docs/evals/ledger.md`. Pass it the Phase 3 gate results and the test/coverage numbers rather than making it re-run them, since Verification cannot be scored from a diff. Skip when the user declines or the module is trivial; never block the build on a score.

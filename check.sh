@@ -158,6 +158,12 @@ done
 for a in "$REPO_DIR"/agents/*.md; do
     [[ -f "$a" ]] && _inj_scan "agents/$(basename "$a")" "$a"
 done
+# Skills joined the host list in v1.37.0 (the skills pass renders for every adapter). An
+# unscanned host is the same vacuous pass as before: the skill installs with its core
+# section simply absent, and no sync reports it.
+for _s in "$SKILLS_DIR"/*/SKILL.md; do
+    [[ -f "$_s" ]] && _inj_scan "skills/$(basename "$(dirname "$_s")")/SKILL.md" "$_s"
+done
 for _p in "$PARTIALS_DIR"/*.md; do
     [[ -f "$_p" ]] || continue
     _pn="$(basename "$_p" .md)"
@@ -1258,6 +1264,109 @@ console.log(drift(process.argv[2], "HEAD", ["a.txt"]).state);' "$REPO_DIR/hooks/
     rm -rf "$_ddx" "$_nogit"
     [[ $_dd -eq 0 ]] && pass
 fi
+
+# ---------------------------------------------------------------------------
+# 30. A skill's craftkitInject renders, on every tool. Agents and commands render
+#     only through the Claude adapter, which is correct: they are the one tool with
+#     those hosts. A skill is different, because all four adapters install the same
+#     SKILL.md, so leaving the splice in claude.sh would ship Cursor, Gemini and
+#     Codex a skill with its core section missing and nothing would say so. Cursor's
+#     parallel-review proved the shape: 139 lines against Claude's 255.
+#     Two halves, because either alone passes vacuously. The renderer must splice,
+#     and the skills pass must call it: a revert to `diff -q "$source_file"` leaves
+#     the renderer present, correct, and unreached.
+# ---------------------------------------------------------------------------
+check "a skill's craftkitInject renders for every tool"
+_si=0
+_six="$(mktemp -d)"
+mkdir -p "$_six/partials" "$_six/rules" "$_six/skills/probe"
+cat > "$_six/partials/probe-partial.md" <<'EOF'
+---
+name: probe-partial
+description: fixture
+---
+
+PROBE-PARTIAL-BODY
+EOF
+cat > "$_six/skills/probe/SKILL.md" <<'EOF'
+---
+name: probe
+craftkitInject: probe-partial
+---
+
+PROBE-SKILL-BODY
+EOF
+{
+    echo "PARTIALS_DIR='$_six/partials'; RULES_DIR='$_six/rules'; SKILLS_DIR='$_six/skills'"
+    sed -n '/^_CRAFTKIT_INJECTED_START=/p;/^_CRAFTKIT_INJECTED_END=/p' "$REPO_DIR/sync.sh"
+    sed -n '/^craftkit_inject_list() {/,/^}/p' "$REPO_DIR/sync.sh"
+    sed -n '/^craftkit_strip_frontmatter() {/,/^}/p' "$REPO_DIR/sync.sh"
+    sed -n '/^craftkit_render_injected() {/,/^}/p' "$REPO_DIR/sync.sh"
+    echo 'craftkit_render_injected "$1" "$2"'
+} > "$_six/render.sh"
+if bash "$_six/render.sh" "$_six/skills/probe/SKILL.md" "$_six/out.md" 2>/dev/null; then
+    grep -q 'PROBE-PARTIAL-BODY' "$_six/out.md" \
+        || { fail "the shared renderer does not splice a partial into a skill, so an injecting skill installs without its core section"; _si=1; }
+    grep -q 'PROBE-SKILL-BODY' "$_six/out.md" \
+        || { fail "the shared renderer drops the skill's own body while splicing"; _si=1; }
+    [[ "$(head -1 "$_six/out.md")" == "---" ]] \
+        || { fail "the shared renderer splices above the frontmatter, so the skill loses its name and never registers"; _si=1; }
+    grep -q 'name: probe-partial' "$_six/out.md" \
+        && { fail "the shared renderer splices the partial's frontmatter as body text"; _si=1; }
+else
+    fail "sync.sh no longer exposes craftkit_render_injected as a tool-agnostic function, so only Claude can render an injected skill"
+    _si=1
+fi
+# The skills pass has to reach it. Structural on purpose: the loop's job is choosing what
+# to diff and install, and only the source text says which of the two it passes on.
+_skills_loop="$(awk '/^sync_adapter\(\) \{/,/^\}/' "$REPO_DIR/sync.sh")"
+case "$_skills_loop" in
+    *'craftkit_render_injected "$source_file" "$rendered"'*) : ;;
+    *) fail "sync_adapter installs SKILL.md without rendering, so a skill's craftkitInject is silently dropped on every tool"; _si=1 ;;
+esac
+case "$_skills_loop" in
+    *'"install_${adapter}_skill" "$skill" "$rendered"'*) : ;;
+    *) fail "sync_adapter renders but installs the raw source, so the rendered block never reaches any tool"; _si=1 ;;
+esac
+rm -rf "$_six"
+[[ $_si -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 31. The eval rubric's weights sum to 100, in both places they are written.
+#     A percentage is only meaningful against a known total, so a weight edit
+#     that lands on 95 or 110 produces a score that looks authoritative and is
+#     wrong, silently, forever. The README repeats the table for the reader, so
+#     it is checked against the partial the judge actually scores by: a reader
+#     trusting a stale README is the same defect one layer out.
+# ---------------------------------------------------------------------------
+check "eval rubric weights sum to 100, partial and README agree"
+_ev=0
+_ev_weights() {
+    awk -F'|' '
+        $2 ~ /^ *(Spec conformance|Correctness|Pattern adherence|Verification|Simplicity) *$/ &&
+        $3 ~ /^ *[0-9]+ *$/ { s += $3; n++ }
+        END { print s " " n }
+    ' "$1"
+}
+_ev_p="$(_ev_weights "$REPO_DIR/partials/eval-rubric.md")"
+_ev_r="$(_ev_weights "$REPO_DIR/README.md")"
+[[ "$_ev_p" == "100 5" ]] \
+    || { fail "partials/eval-rubric.md weights read '$_ev_p' (want '100 5'), so /eval reports a percentage against the wrong total"; _ev=1; }
+[[ "$_ev_r" == "100 5" ]] \
+    || { fail "the eval rubric table in README.md reads '$_ev_r' (want '100 5'), so the documented weights differ from the ones the judge scores by"; _ev=1; }
+# The awk recompute in skills/eval is the third copy of the weights, and the one that
+# produces the number, so it is the copy that matters most and the easiest to miss.
+_ev_awk="$(awk -F'[()]' '/s\*[0-9]+ \+ c\*[0-9]+/{print $0}' "$REPO_DIR/skills/eval/SKILL.md")"
+case "$_ev_awk" in
+    *"s*35 + c*25 + p*20 + v*15 + x*5"*) : ;;
+    *) fail "the awk recompute in skills/eval/SKILL.md no longer carries the rubric weights 35/25/20/15/5, so /eval computes a total the rubric does not describe"; _ev=1 ;;
+esac
+# The partial is the single source only while both hosts inject it.
+for _evh in "$REPO_DIR/skills/eval/SKILL.md" "$REPO_DIR/agents/eval-judge.md"; do
+    grep -q '^craftkitInject:.*eval-rubric' "$_evh" \
+        || { fail "$(basename "$(dirname "$_evh")")/$(basename "$_evh") no longer injects eval-rubric, so it scores by a copied rubric that will drift"; _ev=1; }
+done
+[[ $_ev -eq 0 ]] && pass
 
 echo
 if [[ $FAILURES -eq 0 ]]; then

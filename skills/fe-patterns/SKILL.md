@@ -1,7 +1,8 @@
 ---
 name: fe-patterns
-description: React/React Native composition patterns, hooks discipline, and state location, all mapped to the EVPMR architecture. Use when designing or reviewing component structure.
+description: Props drilling, shared state across several components, Context API placement, composition patterns, and hooks discipline, all mapped to the EVPMR architecture. Use when state is needed by more than one component, when props pass through intermediate layers that ignore them, or when designing component structure.
 alwaysApply: false
+craftkitInject: fe-state-location
 ---
 
 **Commands:** `rtk grep "pattern" .`, `rtk tsc`, `rtk lint`
@@ -14,22 +15,6 @@ alwaysApply: false
 ---
 
 **Context:** `docs/context.md`, reading Summary, Architecture Patterns in Use, Key Changes. Standard load procedure in `/using-agent-skills`.
-
----
-
-## State location → EVPMR mapping
-
-Before writing state, ask where it lives:
-
-```
-Used by one Presenter?          → useState inside that Presenter
-Used by multiple Presenters?    → lift to nearest common ancestor Entry / Context
-Cross-feature shared state?     → Redux (genuinely shared, low-frequency reads)
-Async server data?              → React Query in Presenter (useQuery / useMutation)
-Display strings?                → Resource file, accessed via useContentResource
-```
-
-Never put state in View. Never fetch data outside a Presenter.
 
 ---
 
@@ -76,28 +61,6 @@ type Props = {
   children: React.ReactNode;
 };
 function UILayout({ header, footer, children }: Props) { ... }
-```
-
-### Compound components (shared state via Context, living in Entry)
-```tsx
-// Entry.tsx: provides context
-const TabsContext = createContext<TabsContextValue | undefined>(undefined);
-
-export function EntryCheckout() {
-  return (
-    <ErrorBoundary>
-      <TabsContext.Provider value={tabsState}>
-        <ViewCheckout />
-      </TabsContext.Provider>
-    </ErrorBoundary>
-  );
-}
-
-// View consumes context, never owns it
-function UICheckoutTabs() {
-  const { activeTab } = useContext(TabsContext)!;
-  return ...;
-}
 ```
 
 ### Render props / function-as-child

@@ -28,8 +28,6 @@ _CRAFTKIT_HOOKS=(
 )
 _CLAUDE_SECTION_START="<!-- BEGIN CRAFTKIT (managed: do not edit manually) -->"
 _CLAUDE_SECTION_END="<!-- END CRAFTKIT -->"
-_CLAUDE_AGENT_RULES_START="<!-- BEGIN CRAFTKIT-INJECTED-RULES (managed — regenerated on sync from partials/, rules/ or skills/) -->"
-_CLAUDE_AGENT_RULES_END="<!-- END CRAFTKIT-INJECTED-RULES -->"
 
 # Returns 0 if the skill's SKILL.md has alwaysApply: true
 _claude_is_rule() {
@@ -472,73 +470,10 @@ get_claude_agent_dest() {
     echo "$CLAUDE_AGENTS_DIR/${1}.md"
 }
 
-# Reads the comma-separated source names from a `craftkitInject:` frontmatter line
-# (only inside the leading --- block). Empty output = no injection requested.
-_claude_inject_list() {
-    awk '
-        NR==1 && $0=="---" { infm=1; next }
-        infm && $0=="---" { exit }
-        infm && /^craftkitInject:/ { sub(/^craftkitInject:[[:space:]]*/, ""); print; exit }
-    ' "$1"
-}
-
-# Prints a markdown file with its leading YAML frontmatter stripped.
-_claude_strip_frontmatter() {
-    awk '
-        NR==1 && $0=="---" { infm=1; next }
-        infm && $0=="---" { infm=0; next }
-        !infm { print }
-    ' "$1"
-}
-
-# Renders a source file into $out. If it opts in via `craftkitInject: a, b`, the
-# bodies of partials/<a>.md / rules/<a>.md / skills/<a>/SKILL.md ... are spliced in as a
-# managed block right after its own frontmatter, so the installed copy carries the live
-# text instead of a hand-maintained duplicate. No opt-in → plain copy.
-# Used for agents (a cold agent inherits no rules) and for commands (content shared by
-# several orchestrators that must not sit always-on in a rule to be shared).
+# Injection is tool-agnostic and lives in sync.sh (craftkit_render_injected), because the
+# skills pass renders for every adapter while agents and commands render only here.
 _claude_render_injected() {
-    local src="$1" out="$2"
-    local list
-    list="$(_claude_inject_list "$src")"
-    if [[ -z "$list" ]]; then
-        cp "$src" "$out"
-        return
-    fi
-
-    local block
-    block="$(mktemp)"
-    {
-        echo "$_CLAUDE_AGENT_RULES_START"
-        echo "$list" | tr ',' '\n' | while IFS= read -r r; do
-            r="$(echo "$r" | tr -d '[:space:]')"
-            [[ -z "$r" ]] && continue
-            # partials/ first: it exists only to be spliced, so a name there is
-            # unambiguous. rules/ then wins over skills/ when a name is in both.
-            if [[ -f "$PARTIALS_DIR/${r}.md" ]]; then
-                echo ""
-                _claude_strip_frontmatter "$PARTIALS_DIR/${r}.md"
-            elif [[ -f "$RULES_DIR/${r}.md" ]]; then
-                echo ""
-                _claude_strip_frontmatter "$RULES_DIR/${r}.md"
-            elif [[ -f "$SKILLS_DIR/${r}/SKILL.md" ]]; then
-                echo ""
-                _claude_strip_frontmatter "$SKILLS_DIR/${r}/SKILL.md"
-            else
-                echo "    ! craftkitInject: '$r' not found in partials/, rules/ or skills/, skipped" >&2
-            fi
-        done
-        echo ""
-        echo "$_CLAUDE_AGENT_RULES_END"
-    } > "$block"
-
-    awk -v blockfile="$block" '
-        BEGIN { while ((getline line < blockfile) > 0) blk = blk line "\n" }
-        NR==1 && $0=="---" { infm=1; print; next }
-        infm && $0=="---" { print; printf "\n%s", blk; infm=0; next }
-        { print }
-    ' "$src" > "$out"
-    rm -f "$block"
+    craftkit_render_injected "$1" "$2"
 }
 
 # Optional currency hook used by sync.sh's agent loop: renders the agent to a temp

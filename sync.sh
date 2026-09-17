@@ -133,6 +133,80 @@ read_current_commands() {
     done
 }
 
+# Injection marker written into installed agents, commands and skills. Renaming it orphans
+# every block already on disk, so it stays put (and check.sh exempts it from the em-dash gate).
+_CRAFTKIT_INJECTED_START="<!-- BEGIN CRAFTKIT-INJECTED-RULES (managed — regenerated on sync from partials/, rules/ or skills/) -->"
+_CRAFTKIT_INJECTED_END="<!-- END CRAFTKIT-INJECTED-RULES -->"
+
+# Prints the raw craftkitInject value from a file's frontmatter, empty when absent.
+craftkit_inject_list() {
+    awk '
+        NR==1 && $0=="---" { infm=1; next }
+        infm && $0=="---" { exit }
+        infm && /^craftkitInject:/ { sub(/^craftkitInject:[[:space:]]*/, ""); print; exit }
+    ' "$1"
+}
+
+# Prints a markdown file with its leading YAML frontmatter stripped.
+craftkit_strip_frontmatter() {
+    awk '
+        NR==1 && $0=="---" { infm=1; next }
+        infm && $0=="---" { infm=0; next }
+        !infm { print }
+    ' "$1"
+}
+
+# Renders a source file into $out. If it opts in via `craftkitInject: a, b`, the bodies of
+# partials/<a>.md / rules/<a>.md / skills/<a>/SKILL.md are spliced in as a managed block
+# right after its own frontmatter, so the installed copy carries the live text instead of a
+# hand-maintained duplicate. No opt-in -> plain copy.
+# Tool-agnostic on purpose: agents and commands render only on Claude, which is the one tool
+# with the hosts, but a skill's body is its whole substance, so dropping an injected block
+# there would leave the other three tools with a skill missing its core table.
+craftkit_render_injected() {
+    local src="$1" out="$2"
+    local list
+    list="$(craftkit_inject_list "$src")"
+    if [[ -z "$list" ]]; then
+        cp "$src" "$out"
+        return
+    fi
+
+    local block
+    block="$(mktemp)"
+    {
+        echo "$_CRAFTKIT_INJECTED_START"
+        echo "$list" | tr ',' '\n' | while IFS= read -r r; do
+            r="$(echo "$r" | tr -d '[:space:]')"
+            [[ -z "$r" ]] && continue
+            # partials/ first: it exists only to be spliced, so a name there is
+            # unambiguous. rules/ then wins over skills/ when a name is in both.
+            if [[ -f "$PARTIALS_DIR/${r}.md" ]]; then
+                echo ""
+                craftkit_strip_frontmatter "$PARTIALS_DIR/${r}.md"
+            elif [[ -f "$RULES_DIR/${r}.md" ]]; then
+                echo ""
+                craftkit_strip_frontmatter "$RULES_DIR/${r}.md"
+            elif [[ -f "$SKILLS_DIR/${r}/SKILL.md" ]]; then
+                echo ""
+                craftkit_strip_frontmatter "$SKILLS_DIR/${r}/SKILL.md"
+            else
+                echo "    ! craftkitInject: '$r' not found in partials/, rules/ or skills/, skipped" >&2
+            fi
+        done
+        echo ""
+        echo "$_CRAFTKIT_INJECTED_END"
+    } > "$block"
+
+    awk -v blockfile="$block" '
+        BEGIN { while ((getline line < blockfile) > 0) blk = blk line "\n" }
+        NR==1 && $0=="---" { infm=1; print; next }
+        infm && $0=="---" { print; printf "\n%s", blk; infm=0; next }
+        { print }
+    ' "$src" > "$out"
+    rm -f "$block"
+}
+
 sync_adapter() {
     local adapter="$1"
     local state_file="$STATE_DIR/$adapter"
@@ -153,17 +227,25 @@ sync_adapter() {
         fi
     done
 
-    # Install or update all current skills (all adapters share SKILL.md)
+    # Install or update all current skills (all adapters share SKILL.md).
+    # Rendered first, so a skill that declares craftkitInject carries the live partial on
+    # every tool. Diffing the rendered text is also what keeps the pass idempotent: without
+    # it, a skill whose partial moved on looks unchanged and never re-syncs.
     for skill in "${current_skills[@]+"${current_skills[@]}"}"; do
         local source_file="$SKILLS_DIR/$skill/SKILL.md"
         local dest
         dest="$("get_${adapter}_dest" "$skill")"
 
-        if [[ ! -f "$dest" ]] || ! diff -q "$source_file" "$dest" &>/dev/null; then
+        local rendered
+        rendered="$(mktemp)"
+        craftkit_render_injected "$source_file" "$rendered"
+
+        if [[ ! -f "$dest" ]] || ! diff -q "$rendered" "$dest" &>/dev/null; then
             echo "    + installing: $skill"
-            "install_${adapter}_skill" "$skill" "$source_file"
+            "install_${adapter}_skill" "$skill" "$rendered"
             changed=1
         fi
+        rm -f "$rendered"
     done
 
     if [[ $changed -eq 0 ]]; then

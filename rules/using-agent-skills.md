@@ -61,6 +61,7 @@ Match natural language to the right command. **Dynamic parallel is the default w
 - Any ambiguous test query ("any tests?", "tests needed?", "should tests change?") → the platform's test skill
 - **Test intent resolves platform first.** `/fe-test` is RN/web only (jest, 93% bar, EVPMR paths): on `*.kt`/`*.java` run `/android-test`, on `*.swift`/`*.m` run `/ios-test`. Detect from the changed files, or from the project root when nothing is changed yet. Announcing `/fe-test` on a native repo is a routing error, not a near-miss.
 - "grill"/"stress-test"/"poke holes"/"challenge" an **existing** plan or decision → `/grill` (interactive rounds); no plan exists yet → `/interview`; "roast this plan doc" single-pass → `plan-roaster` agent
+- "score this run"/"how correct was that"/"what is our success rate"/"eval this" → `/eval`. It scores a *finished* deliverable, so it never substitutes for a review: "is this good?" before merge is `/parallel-review`, and `/eval` is the number after the run.
 
 **No-spawn contexts take the sequential twin, silently.** A `parallel-*` command's whole job is spawning agents, so a context that cannot spawn them cannot run one. You are in such a context when you are yourself a subagent (subagents get no Agent tool) or when a session instruction disables agent spawning. Substitute and proceed:
 
@@ -121,6 +122,7 @@ Planning & docs (general, opt-in, never auto-run; feed docs/context.md before ex
 
 General utilities (any platform)
   ├── Research a question against primary sources? ──→ /research  (background agent, cited note in repo)
+  ├── Score a finished run, correctness %? ──────────→ /eval  (eval-judge + weighted rubric + ledger)
   └── Hand this session off to a fresh agent? ───────→ /handoff  (compact state + decisions + next steps)
 
 Native Android (MVP + Core framework)          Native iOS (MVVM-C)

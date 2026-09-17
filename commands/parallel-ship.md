@@ -162,13 +162,15 @@ Verdict: READY TO MERGE / BLOCKED (<list blockers>) / INCOMPLETE (<axes unverifi
 Code is final at this point, which is the natural moment to capture the *why* and explain the *what*. Offer, never auto-run:
 
 ```
-→ Before merge, capture documentation? (both optional)
+→ Before merge, capture documentation and score the run? (all optional)
   (a) /adr  → record any architectural decision made on this branch (the why)
   (d) /docs → write engineer + stakeholder documentation for this feature
+  (e) /eval → score this run into a weighted correctness %, append to the ledger
   (n) skip
 ```
 
 - **`/adr`**: if the branch made a non-obvious, hard-to-reverse decision, run `/adr` to record it and link it into the `docs/context.md` PLANNING block. One ADR per decision; skip for reversible/local choices.
 - **`/docs`**: run `/docs` to produce the dual-audience pair (technical + stakeholder), humanized. Pulls from the PLANNING block + ADRs + the diff.
+- **`/eval`**: run `/eval` to turn this run into a number. Pass it the Phase 1 gate results and the PLANNING block, which it needs and cannot re-derive; it spawns `eval-judge`, appends a row to `docs/evals/ledger.md`, and derives the running success rate. Worth it on any branch built by a workflow, since a score with no prior rows is a data point and a hundred rows is a regression detector.
 
 Skip entirely if the user declines or the change is trivial. Do not block merge on documentation.

@@ -7,6 +7,109 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.38.0 — 2026-09-17
+
+### /eval scores a run into a weighted correctness percentage
+
+Every workflow in this repo reported findings and a verdict, and none of them reported a
+number. `READY TO MERGE` with three warnings and `READY TO MERGE` with none read the same
+in a terminal, so there was no way to tell whether a rule edit, a partial split, or a model
+upgrade had made the output better or worse. Vibes, across 14 agents.
+
+- `partials/eval-rubric.md` is the contract: five criteria (spec conformance 35, correctness
+  25, pattern adherence 20, verification 15, simplicity 5), each scored `0-5` against six
+  shared anchors, summed as `Σ (score / 5 × weight)`. `skills/eval` and `agents/eval-judge`
+  both inject it, so the scorer and the thing being scored cannot drift apart.
+- `agents/eval-judge.md` is the cold judge: it scores the **deliverable**, not the process,
+  and every deduction below 5 names its gap with `file:line`. It injects
+  `partials/grounding-claims.md` too, so an `[UNVERIFIED]` observation cannot carry a score
+  below 3. Whether the run spawned the right agents is deliberately not an axis.
+- `skills/eval/SKILL.md` orchestrates: gather diff + PLANNING acceptance criteria + gate
+  results, spawn the judge, then **recompute the weighted sum in `awk`**. Picking an anchor
+  is judgment and belongs to the model; the arithmetic is deterministic and does not, which
+  is `using-agent-skills` core behavior 7 applied to the one place a judge quietly slips.
+- Scores append to `docs/evals/ledger.md` in the repo being worked on, one row per run. The
+  evaluation success rate is **derived from those rows at read time, never stored**, per the
+  `grounding` rule's preference for derivation: a stored rate is stale the moment the next
+  row lands.
+- Two guards against a scorer that flatters. **Floors override the band**: any criterion at
+  0, or spec conformance / correctness at 2 or below, is `BLOCKED` whatever the total, because
+  an 85% that means "perfect except it does not do what was asked" is exactly what a weighted
+  average hides. **Unscorable is a gap, not a pass**: no PLANNING block means spec conformance
+  is `n/a`, the verdict is `INCOMPLETE`, and the remaining four report out of 65 points rather
+  than being reweighted up.
+- Offered as an opt-in tail of `/parallel-build` and `/parallel-ship`, which pass their gate
+  results through, since verification cannot be scored from a diff alone. Never auto-run, and
+  it never blocks a merge: deciding what a 78% means is the author's call.
+- The agent is named `eval-judge`, not `judge`, because "judge" already names the
+  fusion-panel synthesis role in `using-agent-skills` model routing.
+- `check.sh` check 31 asserts the rubric weights sum to 100 across all three copies (the partial, the README table, the awk recompute). A broken sum produces a
+  percentage that looks authoritative and is wrong, which is the worst failure a scorer has.
+
+### The context-doc redesign is recorded before it is built
+
+`docs/context.md` holds one PLANNING slot, so writing a spec for a second feature destroys the
+first one's. That happened live while this release was being built: a `/spec` run overwrote the
+shipped v1.36.0 planning block. The redesign is decided and recorded; only the records ship here.
+
+- `docs/adr/0001-intent-keyed-per-feature.md`: intent moves to one file per feature under
+  `docs/planning/`, keyed by a name the author gives `/spec`, with the branch-to-feature mapping
+  derived by globbing for `Status: active` rather than recorded. Four options weighed. Notes why
+  the drift detector was rejected as the freshness mechanism: this repo squash-merges, so a
+  recorded baseline is unreachable after merge and `cannot-verify` becomes the common answer.
+- `docs/adr/0002-derived-context-is-derived.md`: the git-derived half of the doc stops being
+  written and is derived at read time. The cache it replaces hits only when zero commits have
+  landed since the write, and its key cannot see staged work at all, so staging edits leaves the
+  freshness check reporting fresh while the doc's own staged section is wrong. Records that the
+  per-run derivation cost is unmeasured, and that the fix if it proves expensive is narrowing
+  what gets derived, never restoring the stored copy.
+- `docs/glossary.md`: five terms the redesign needs said precisely, separating `derived context`
+  from `intent`, and `stale` from `drifted` and `cannot-verify`.
+
+Neither ADR is implemented in this release. The migration is two releases, narrow first, so the
+derived doc survives long enough for its absence to be felt before it is deleted.
+
+### Skills can inject a partial, and fe-patterns has a props-drilling threshold
+
+`skills/fe-patterns` told a reader that state used by multiple Presenters should
+"lift to nearest common ancestor Entry / Context" and left it there. No threshold, so
+nothing said when props stop being cheaper than Context, and its Context example was a
+generic `TabsContext` that mapped onto no EVPMR layer. The cold `agents/fe-patterns`
+carried a thinner paraphrase of the same mapping, which is how it came to review
+component trees with no threshold to review by.
+
+- `partials/fe-state-location.md` is now the single source: the state-location mapping,
+  the 3-levels-or-a-sibling-Presenter threshold, and the Context pattern split across
+  Model (context + hooks), Entry (provider inside the ErrorBoundary) and Presenter (the
+  only consumer), plus the four rules that decide whether Context helps or hurts. Both
+  the skill and the agent inject it, so one edit moves both.
+- `skills/fe-patterns` description now front-loads the triggers ("props drilling",
+  "shared state across several components", "Context API placement"), because the old
+  wording said only "state location" and never matched how the question gets asked.
+
+### craftkitInject reaches skills, and the renderer left the adapter
+
+Widening the splice to skills is the same move v1.33.0 made for commands, with one
+difference that forced the renderer out of `adapters/claude.sh`: agents and commands
+exist only on Claude, but all four adapters install the same `SKILL.md`. A Claude-only
+splice would have shipped Cursor, Gemini and Codex a `fe-patterns` with its core table
+simply absent, the way Cursor's `parallel-review` already installs at 139 lines against
+Claude's 255.
+
+- `_claude_render_injected` and its two helpers move to `sync.sh` as
+  `craftkit_render_injected` / `craftkit_inject_list` / `craftkit_strip_frontmatter`,
+  with the marker constants. `claude.sh` keeps a one-line delegate, so the agent and
+  command paths are unchanged.
+- `sync_adapter` renders each `SKILL.md` before diffing and installing it, for every
+  adapter. Diffing the rendered text is also what keeps the pass idempotent: a skill
+  whose partial moved on would otherwise look unchanged and never re-sync.
+- `check.sh` check 5 now scans `skills/` for a misspelled or dangling inject name, since
+  an unscanned host passes vacuously and installs with its section missing.
+- `check.sh` check 30 is behavioral in both halves: the renderer must splice a partial
+  into a skill without eating its frontmatter, and `sync_adapter` must actually call it.
+  Either half alone passes vacuously, because a revert to `diff -q "$source_file"` leaves
+  the renderer present, correct, and unreached.
+
 ## v1.36.0 — 2026-09-11
 
 ### Grounding, and three features cut on measurement
