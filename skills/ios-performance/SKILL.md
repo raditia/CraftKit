@@ -13,7 +13,7 @@ alwaysApply: false
 
 ---
 
-**Context:** No `docs/context.md` required. Read the changed ViewModel/View/Fetcher and profile the actual screen before claiming a bottleneck.
+**Context:** No derived-context step required. Read the changed ViewModel/View/Fetcher and profile the actual screen before claiming a bottleneck.
 
 ---
 

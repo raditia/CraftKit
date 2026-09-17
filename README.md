@@ -1,4 +1,4 @@
-# craftkit `v1.39.0`
+# craftkit `v1.40.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -315,7 +315,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     A[/parallel-build/] --> P["Step 0: detect platform\npicks the scaffold · patterns · gates · test skills"]
-    P --> B["Context\nsequential · docs/context.md (RN/web)\nnative: sibling screen, or *-context if multi-screen"]
+    P --> B["Context\nsequential · derived into the turn (RN/web)\nnative: sibling screen, or *-context if multi-screen"]
     B --> C["Scaffold\nsequential · fe-scaffold ·or· android-scaffold ·or· ios-scaffold"]
     C --> D["Implement\nguided by the platform's patterns + performance skills"]
     D --> E["Phase 3: parallel fast gates\ntype/build ‖ lint"]
@@ -362,7 +362,7 @@ All platforms
 any non-test src + build/ship       →   + ponytail-review (over-engineering)
 3+ architecture layers changed      →   + adversarial (devil's advocate)
 auth / payment / credential paths   →   code-quality (security emphasis)
-docs/context.md has PLANNING block  →   code-quality (spec conformance: diff vs planned acceptance criteria)
+intent file resolves under docs/planning/  →   code-quality (spec conformance: diff vs planned acceptance criteria)
 test files only                     →   Phase 2 SKIPPED entirely
 ```
 
@@ -448,7 +448,7 @@ flowchart TD
 
 ### Planning pipeline: /define, before you build
 
-`/define` chains the Define→Plan phase **checkpoint-gated**: `/interview` (de-fuzz the ask) → `/spec` (PRD) → `/plan` (task breakdown), pausing for your approval between each so a bad spec never silently becomes bad tasks. It offers `/ideate` when the approach is open and `plan-roaster` before build. Output lands in the `docs/context.md` PLANNING block, which every execution skill reads, so `/parallel-build` runs with intent, not guesses.
+`/define` chains the Define→Plan phase **checkpoint-gated**: `/interview` (de-fuzz the ask) → `/spec` (PRD) → `/plan` (task breakdown), pausing for your approval between each so a bad spec never silently becomes bad tasks. It offers `/ideate` when the approach is open and `plan-roaster` before build. Output lands in the feature's intent file at `docs/planning/<slug>.md`, which every execution skill resolves, so `/parallel-build` runs with intent, not guesses.
 
 ```
 /define ──► interview ─(gate)─► spec ─(gate)─► plan ─(gate)─► [ready] ──► /parallel-build ──► /parallel-ship
@@ -605,7 +605,7 @@ Use when a task is narrower than a full workflow.
 
 | Skill | When to use | Escalate if |
 |-------|-------------|-------------|
-| [`fe-context`](skills/fe-context/SKILL.md) | Generate `docs/context.md` from branch diff | Diff spans > 10 interdependent files |
+| [`fe-context`](skills/fe-context/SKILL.md) | Derive the branch's change context from the diff, emitted into the turn, no file written | Diff spans > 10 interdependent files |
 | [`fe-scaffold`](skills/fe-scaffold/SKILL.md) | Create a new 5-file EVPMR module | Novel architecture outside EVPMR |
 | [`fe-review`](skills/fe-review/SKILL.md) | EVPMR pattern review only | Architectural conflicts with non-obvious resolution |
 | [`fe-patterns`](skills/fe-patterns/SKILL.md) | Props drilling, shared state placement (Context in Model, provider in Entry), composition patterns, hooks discipline | Novel state architecture |
@@ -615,7 +615,7 @@ Use when a task is narrower than a full workflow.
 
 ### Native mobile skills, on demand
 
-Sanitized, architecture-agnostic references. Native mobile does **not** use EVPMR or `docs/context.md` for single-screen work; read a real sibling screen first. For an internal codebase with concrete module names, drop a project-scoped override at `<repo>/.claude/skills/<name>/` (same skill name shadows the global one inside that repo).
+Sanitized, architecture-agnostic references. Native mobile does **not** use EVPMR, and takes no derived-context step for single-screen work; read a real sibling screen first. For an internal codebase with concrete module names, drop a project-scoped override at `<repo>/.claude/skills/<name>/` (same skill name shadows the global one inside that repo).
 
 The `*-review`, `*-a11y`, and `*-performance` skills below double as the source for the matching cold agents: the parallel workflows spawn those, with each skill's checklist injected live via `craftkitInject`. Edit the skill; the agent follows on the next sync.
 
@@ -660,7 +660,7 @@ The `*-review`, `*-a11y`, and `*-performance` skills below double as the source 
 
 ### Planning & docs skills, on demand
 
-The **Define → Plan → Document** layer. All opt-in, never auto-run from `/parallel-build`. `/spec` `/plan` `/adr` write a forward-planning block into `docs/context.md`, so downstream execution skills run with intent instead of guesses. `/define` chains the pre-build phases checkpoint-gated (`/interview → /spec → /plan`); `/adr` + `/docs` are offered post-build as a tail of `/parallel-ship`. Full arc: `/define` → `/parallel-build` → `/parallel-ship` (→ `/adr` + `/docs`). See [Planning pipeline](#planning-pipeline-define-before-you-build).
+The **Define → Plan → Document** layer. All opt-in, never auto-run from `/parallel-build`. `/spec` `/plan` `/adr` write the feature's intent file at `docs/planning/<slug>.md`, so downstream execution skills run with intent instead of guesses. `/define` chains the pre-build phases checkpoint-gated (`/interview → /spec → /plan`); `/adr` + `/docs` are offered post-build as a tail of `/parallel-ship`. Full arc: `/define` → `/parallel-build` → `/parallel-ship` (→ `/adr` + `/docs`). See [Planning pipeline](#planning-pipeline-define-before-you-build).
 
 | Skill | When to use | Escalate if |
 |-------|-------------|-------------|
@@ -778,13 +778,13 @@ type AsyncData<T> =
 
 Context splits in two, because the halves have opposite maintenance needs (ADR-0001, ADR-0002).
 
-**Derived context** is what git already knows: changed files, diff summary, patterns in the code. `/fe-context` writes it to `docs/context.md` (≤ 600 lines) so one diff scan serves many skills.
+**Derived context** is what git already knows: changed files, diff summary, patterns in the code. `/fe-context` derives it and emits it into the turn (≤ 600 lines), storing nothing (ADR-0002). A workflow derives once in Phase 0 and passes it down, so one diff scan still serves many skills.
 
 **Intent** is what a human decided: spec, task plan, decision pointers. Git cannot derive it, so it is stored, one file per feature at `docs/planning/<slug>.md`, with the slug named by the author and a human-owned `status:` field. The branch-to-feature mapping is **derived**, by globbing for `status: active`, so there is no index to go stale.
 
 ```mermaid
 flowchart TD
-    A["/fe-context\nreads diff · writes docs/context.md"]
+    A["/fe-context\nreads diff · emits derived context"]
     P["/spec · /plan · /adr\nwrite docs/planning/&lt;slug&gt;.md"]
     A --> B["/fe-scaffold\n5-file EVPMR module"]
     A --> C["/fe-review · /fe-patterns\n/fe-performance · /code-quality"]
@@ -798,7 +798,7 @@ flowchart TD
 |-------|--------|------|-----------|
 | L1 Rules | Always-active rule files | EVPMR, tokens, Karpathy guidelines | Never; loaded fresh each session |
 | L2 Intent | `docs/planning/<slug>.md` | What's being built, constraints, decisions | The author changes their mind, so `status:` is theirs to set |
-| L3 Derived | `docs/context.md` | Files touched by this branch, as git reports | Any commit lands, which is why ADR-0002 stops storing it |
+| L3 Derived | derived into the turn | Files touched by this branch, as git reports | Cannot be stale; nothing is stored (ADR-0002) |
 | L4 Errors | On demand | Failing tests, lint, TypeScript errors | n/a, always live |
 | L5 History | Session | Conversation context | n/a |
 

@@ -14,7 +14,7 @@ alwaysApply: false
 
 ---
 
-**Context:** `docs/context.md`, reading Summary, Key Changes, Architecture Patterns in Use. Standard load procedure in `/using-agent-skills`.
+**Context:** Derived context for the change (Summary, Key Changes, Architecture Patterns), emitted by `/fe-context`. Standard load procedure in `/using-agent-skills`.
 
 ---
 

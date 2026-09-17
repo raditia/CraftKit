@@ -42,13 +42,13 @@ If the *approach* is genuinely open (multiple viable architectures), offer `/ide
 
 Run `/spec` using the Discovery Brief (+ any `/ideate` choice) as input. Creates the feature's intent file at `docs/planning/<slug>.md` and owns its `## Spec` section.
 
-**Gate:** PRD printed, every success criterion verifiable, out-of-scope non-empty. Written to `docs/context.md`.
+**Gate:** PRD printed, every success criterion verifiable, out-of-scope non-empty. Written to `docs/planning/<slug>.md`.
 
 ## Phase 3: Plan (`/plan`)
 
 Run `/plan` against the spec. Writes the `## Task Plan` section of that same file. Route each task's **Executes via** to the platform's scaffold/test skill.
 
-**Gate:** task table printed with acceptance check + deps + executing skill per task; written to `docs/context.md`.
+**Gate:** task table printed with acceptance check + deps + executing skill per task; written to the same intent file.
 
 ## Phase 3.5: Stress-test (`plan-roaster`, offered)
 

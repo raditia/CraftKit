@@ -18,13 +18,13 @@ Detect the platform from the project root + target files, then use its column fo
 | | RN / web (EVPMR) | Android (MVP) | iOS (MVVM-C) |
 |---|---|---|---|
 | **Signal** | `package.json` + `*.tsx` | `*.gradle`, `*.kt`/`*.java` | `*.xcodeproj`/`Podfile`/`Package.swift`, `Modules/` + `*.swift` |
-| **Phase 0 context** | `/fe-context` → `docs/context.md` (required) | `/android-context` only if multi-screen | `/ios-context` only if multi-screen |
+| **Phase 0 context** | `/fe-context`, derived into the turn (required) | `/android-context` only if multi-screen | `/ios-context` only if multi-screen |
 | **Phase 1 scaffold** | `/fe-scaffold` (5-file EVPMR) | `/android-scaffold` | `/ios-scaffold` |
 | **Phase 2 patterns** | `/fe-patterns` + `/fe-performance` | `/android-patterns` + `/android-performance` | `/ios-patterns` + `/ios-performance` |
 | **Phase 3 gates** | `rtk tsc --noEmit`, `rtk lint` | `./gradlew :<module>:lintGeneralDebug` | `swiftlint lint` |
 | **Phase 6 tests** | `/fe-test`, coverage ≥ 93% | `/android-test`, no fixed bar | `/ios-test`, no fixed bar |
 
-For native, skip the EVPMR-specific steps. When Phase 0 context is skipped (single screen), read a real sibling screen first and use it as the convention baseline everywhere `docs/context.md` is referenced below.
+For native, skip the EVPMR-specific steps. When Phase 0 context is skipped (single screen), read a real sibling screen first and use it as the convention baseline everywhere derived context is referenced below.
 
 ---
 
@@ -33,9 +33,9 @@ For native, skip the EVPMR-specific steps. When Phase 0 context is skipped (sing
 Run the platform's context step from Step 0. For RN / web that is `/fe-context`:
 1. Detect base: `rtk git remote show origin | grep 'HEAD branch'`
 2. `rtk git log --oneline <base>...HEAD` + `rtk git diff <base>...HEAD`
-3. Write `docs/context.md` (≤ 600 lines): Summary, Architecture Patterns in Use, Key Changes, Test Coverage Needed
+3. Derive the context block (≤ 600 lines) into the turn: Summary, Architecture Patterns in Use, Key Changes, Test Coverage Needed. Write no file; pass it to every phase below
 
-**Gate:** `docs/context.md` exists and covers the feature scope, or, for a single native screen, the sibling screen has been read.
+**Gate:** the derived block covers the feature scope, or, for a single native screen, the sibling screen has been read.
 
 If the architecture/approach is genuinely open (not a routine feature on the platform's pattern) → offer `/ideate` before scaffold; feed the chosen shortlist in as the design decision. Opt-in, and the cost gate applies.
 
@@ -110,7 +110,7 @@ FILES:
 <content of all newly created/modified files>
 
 CONTEXT:
-<the resolved intent file's `## Spec` when one exists, plus docs/context.md Summary + Key Changes, or, for a single native screen, the sibling screen read in Phase 0>
+<the resolved intent file's `## Spec` when one exists, plus the Phase 0 derived Summary + Key Changes, or, for a single native screen, the sibling screen read in Phase 0>
 ```
 
 `adversarial` gets one extra prefix line: `This is a newly built feature. Argue the strongest case against shipping it as-is.`

@@ -23,7 +23,7 @@ craftkitInject: parallel-classifier
 
 Load context for the detected platform:
    - **RN / web:** apply standard context loading (`using-agent-skills`): freshness check (branch + commit), regenerate if stale or missing, read Summary + Key Changes
-   - **Android / iOS:** `docs/context.md` only for multi-screen branches (`/android-context`, `/ios-context`). Single screen: read a real sibling screen instead and pass that as the convention baseline
+   - **Android / iOS:** derive context only for multi-screen branches (`/android-context`, `/ios-context`). Single screen: read a real sibling screen instead and pass that as the convention baseline
 
 ---
 
@@ -68,7 +68,7 @@ DIFF:
 <full diff>
 
 CONTEXT:
-<docs/context.md Summary + Key Changes, or, for a single native screen, the sibling screen read in Phase 0>
+<the resolved intent file's `## Spec` when one exists, plus the Phase 0 derived Summary + Key Changes, or, for a single native screen, the sibling screen read in Phase 0>
 ```
 
 Spawn the set the classifier selected:

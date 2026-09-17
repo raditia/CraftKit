@@ -13,7 +13,7 @@ alwaysApply: false
 
 ---
 
-**Context:** No `docs/context.md` (iOS is not EVPMR). **Mandatory first step:** read one existing sibling feature in `Modules/<Module>/<Module>/<Feature>/` to copy exact naming, imports, and ObjC/Swift split.
+**Context:** No derived-context step (iOS is not EVPMR). **Mandatory first step:** read one existing sibling feature in `Modules/<Module>/<Module>/<Feature>/` to copy exact naming, imports, and ObjC/Swift split.
 
 ---
 

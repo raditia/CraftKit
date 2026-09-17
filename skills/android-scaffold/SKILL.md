@@ -13,7 +13,7 @@ alwaysApply: false
 
 ---
 
-**Context:** No `docs/context.md` for a single screen. **Mandatory first step:** read one existing sibling screen package in `<feature>/src/main/java/.../<screen>/` to copy exact base classes, Dagger wiring, and Kotlin/Java split.
+**Context:** No derived-context step for a single screen. **Mandatory first step:** read one existing sibling screen package in `<feature>/src/main/java/.../<screen>/` to copy exact base classes, Dagger wiring, and Kotlin/Java split.
 
 ---
 

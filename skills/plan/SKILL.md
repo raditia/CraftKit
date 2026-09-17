@@ -36,7 +36,7 @@ You have a `/spec` (or an equivalently clear ask) and need implementable units. 
 
 ---
 
-## Output: write into docs/context.md, then print
+## Output: write into the intent file, then print
 
 Update the `## Task Plan` section of the resolved intent file (leave Spec and Decisions intact):
 

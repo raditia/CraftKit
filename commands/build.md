@@ -33,11 +33,11 @@ For native, Step 1 context is optional: run `/android-context` or `/ios-context`
 Run the `/fe-context` workflow:
 1. Detect base branch: `rtk git remote show origin | grep 'HEAD branch'`
 2. Diff: `rtk git log --oneline <base>...HEAD` and `rtk git diff <base>...HEAD`
-3. Read `docs/context.md` if it exists, skipping re-generation if diff matches
-4. Write `docs/context.md` with sections: Summary, Architecture Patterns in Use, Key Changes, Test Coverage Needed
+3. Resolve the feature's intent file per `planning-resolve`
+4. Derive the change context into the turn: Summary, Architecture Patterns in Use, Key Changes, Test Coverage Needed. Write no file
 5. Hard limit: ≤ 600 lines
 
-**Gate:** `docs/context.md` exists and covers the feature scope.
+**Gate:** the derived block covers the feature scope, and intent resolved or was explicitly absent.
 
 ---
 

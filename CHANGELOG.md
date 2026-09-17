@@ -7,6 +7,39 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.40.0 — 2026-09-17
+
+### Derived context is derived, never stored
+
+Release 2 of the context split, implementing ADR-0002. `docs/context.md` recorded what git already
+knew, and the recording is what created the staleness. Its cache key was branch plus commit
+equality, so it hit only when zero commits had landed since the write, and the key could not see
+staged work at all: staging edits left the freshness check reporting fresh while the doc's own
+`Staged (uncommitted)` section was wrong. The one state the file existed to track was the state its
+key could not observe.
+
+- The three context skills (`/fe-context`, `/android-context`, `/ios-context`) now **emit** the
+  derived block into the turn and write no file. No `Generated:` timestamp and no recorded baseline
+  commit, because nothing persists to go stale against. A workflow derives once in Phase 0 and
+  passes the block down, so one diff scan still serves many skills.
+- Eight reader `**Context:**` lines, ten native opt-out declarations, the always-on loading
+  procedure, five commands, the classifier partial and the routing hook all stop naming a stored
+  doc. `docs/context.md` itself is deleted; ADR-0002 rejected keeping it as a gitignored scratch
+  cache, because two engineers debugging the same branch would then read different context.
+- The loading procedure loses its freshness check entirely. There is nothing to be fresh against,
+  which is the point: staleness stops being a thing to detect and becomes a thing that cannot occur.
+- `check.sh` check 33 greps the path itself rather than a phrase. **Release 1's narrower grep on
+  "PLANNING block" had missed two writers**, `skills/plan` and `skills/interview`, both of which
+  still wrote to the old doc under different wording. Both are fixed here, and the broader
+  invariant is what found them.
+- Check 8 is **replaced rather than kept**. It grepped `rules/` for an absolute
+  `docs/context.md` claim, which stopped being reachable the moment that filename left the rule, so
+  it became a gate that could not fail. It now asserts the always-on rule keeps its native scope
+  caveat and that at least ten native skills declare the opt-out.
+- Check 33's own first draft was too weak and the negative test caught it: the phrase it grepped
+  appears twice per generator, once in the inline plan, so renaming only the write step still
+  passed. It is now anchored to the step heading.
+
 ## v1.39.0 — 2026-09-17
 
 ### Feature intent moved out of the shared context doc

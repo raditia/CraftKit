@@ -4,7 +4,7 @@ description: Accessibility patterns for React Native and Next.js within the EVPM
 alwaysApply: false
 ---
 
-**Context:** `docs/context.md` → Summary + Key Changes only
+**Context:** Derived context: Summary + Key Changes only, emitted by `/fe-context`.
 **Commands:** `rtk tsc`, `rtk lint`
 **Model:** cheapest tier (see the plan-aware Model routing table in `using-agent-skills`). Escalate to everyday for complex focus flows spanning multiple routes
 

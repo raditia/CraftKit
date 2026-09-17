@@ -14,7 +14,7 @@ craftkitInject: fe-state-location
 
 ---
 
-**Context:** `docs/context.md`, reading Summary, Architecture Patterns in Use, Key Changes. Standard load procedure in `/using-agent-skills`.
+**Context:** Derived context for the change (Summary, Architecture Patterns, Key Changes), emitted by `/fe-context`. Standard load procedure in `/using-agent-skills`.
 
 ---
 

@@ -13,7 +13,7 @@ alwaysApply: false
 
 ---
 
-**Context:** No `docs/context.md` required. Read the changed layout/View/Composable and, if unclear, a sibling that already handles TalkBack.
+**Context:** No derived-context step required. Read the changed layout/View/Composable and, if unclear, a sibling that already handles TalkBack.
 
 ---
 

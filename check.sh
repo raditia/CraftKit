@@ -220,19 +220,26 @@ done
 [[ $_pc -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
-# 8. No always-active rule claims docs/context.md is universal.
-#    Native single-screen skills declare they do not use it. An absolute claim in
-#    an always-on rule contradicts them on every native turn.
+# 8. The native opt-out is declared where a reader will see it. ADR-0002 left
+#    the always-on rule describing a derived-context step; native single-screen
+#    skills take no such step, and an always-on rule that forgot to say so
+#    contradicts them on every native turn. The old form of this check grepped
+#    rules/ for an absolute docs/context.md claim, which stopped being reachable
+#    the moment that filename left the rule, so it is replaced rather than kept
+#    as a gate that cannot fail.
 # ---------------------------------------------------------------------------
-check "no absolute docs/context.md claim"
-_abs="$(grep -rn "docs/context.md" "$RULES_DIR" 2>/dev/null \
-    | grep -E "mandatory, not optional|no exceptions|always read .*mandatory" || true)"
-if [[ -n "$_abs" ]]; then
-    echo "$_abs" | while IFS= read -r l; do echo "    FAIL: absolute claim contradicts native skills: ${l#$REPO_DIR/}"; done
-    FAILURES=$((FAILURES + 1))
-else
-    pass
-fi
+check "native skills declare the derived-context opt-out"
+_no=0
+grep -q "native skills only on multi-screen branches" "$REPO_DIR/rules/using-agent-skills.md" \
+    || { fail "the always-on loading procedure lost its native scope caveat, so it now claims a derived-context step on native single-screen turns"; _no=1; }
+_optout=0
+for _f in "$SKILLS_DIR"/android-*/SKILL.md "$SKILLS_DIR"/ios-*/SKILL.md; do
+    grep -q "No derived-context step" "$_f" && _optout=$((_optout + 1))
+done
+# Ten of the twelve native skills are single-screen; the two context generators opt in.
+[[ $_optout -ge 10 ]] \
+    || { fail "only $_optout native skills declare the derived-context opt-out, want >= 10, so some now inherit a step they do not take"; _no=1; }
+[[ $_no -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
 # 9. README lists every agent and skill (authoring rule #3).
@@ -1400,6 +1407,31 @@ done
 grep -rn "status: active" "$REPO_DIR/partials/planning-resolve.md" >/dev/null \
     || { fail "planning-resolve no longer globs on status, so the mapping has to be recorded somewhere and will go stale"; _pl=1; }
 [[ $_pl -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 33. Derived context is derived, never stored (ADR-0002). A reader that still
+#     names the old file is reading a snapshot the generator stopped writing,
+#     which returns nothing rather than failing loudly. Release 1's narrower
+#     grep on the phrase "PLANNING block" missed two writers for exactly this
+#     reason, so this one matches the path itself.
+# ---------------------------------------------------------------------------
+check "derived context is derived, not stored"
+_dc=0
+_dc_hits="$(grep -rn "docs/context\.md" "$REPO_DIR/skills" "$REPO_DIR/commands" \
+    "$REPO_DIR/rules" "$REPO_DIR/agents" "$REPO_DIR/partials" "$REPO_DIR/hooks" 2>/dev/null \
+    | grep -v "is migrated, then deleted" || true)"
+[[ -z "$_dc_hits" ]] \
+    || { fail "source still treats docs/context.md as a stored doc: $(echo "$_dc_hits" | sed "s|$REPO_DIR/||" | cut -d: -f1-2 | tr '\n' ' ')- the generator no longer writes it, so the read silently returns nothing"; _dc=1; }
+# The three generators must emit, not write.
+for _g in fe android ios; do
+    # Heading-anchored: the phrase also appears in the inline plan, so an
+    # unanchored grep passes while the actual write step is renamed back.
+    grep -qE "^## Step [0-9]+: Emit the derived context" "$SKILLS_DIR/$_g-context/SKILL.md" \
+        || { fail "skills/$_g-context renamed its emit step; a generator that writes recreates the stale cache ADR-0002 removed"; _dc=1; }
+    grep -qE "No file written|writing no file|Write no file" "$SKILLS_DIR/$_g-context/SKILL.md" \
+        || { fail "skills/$_g-context does not state that it writes no file, so a reader cannot tell the output is not persisted"; _dc=1; }
+done
+[[ $_dc -eq 0 ]] && pass
 
 echo
 if [[ $FAILURES -eq 0 ]]; then

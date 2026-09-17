@@ -13,7 +13,7 @@ alwaysApply: false
 
 ---
 
-**Context:** `docs/context.md`, reading Summary, Architecture Patterns in Use, Changed Files. Standard load procedure in `/using-agent-skills`. Never invent requirements not in context; ask instead.
+**Context:** Derived context for the change (Summary, Architecture Patterns, Changed Files), emitted by `/fe-context`, plus the feature's intent file. Standard load procedure in `/using-agent-skills`. Never invent requirements not in the intent file; ask instead.
 
 ---
 

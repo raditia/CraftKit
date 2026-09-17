@@ -1,6 +1,6 @@
 ---
 name: ios-context
-description: Generate or update docs/context.md for an iOS branch: an MVVM-C flavored summary of changed modules, screens, coordinators, and fetchers. Optional branch-scoping doc that feeds /ios-review and /ship.
+description: Derive an iOS branch's change context from git and emit it into the turn: an MVVM-C flavored summary of changed modules, screens, coordinators, and fetchers. Writes no file. Optional branch-scoping step that feeds /ios-review and /ship.
 alwaysApply: false
 ---
 
@@ -29,7 +29,7 @@ PLAN:
 2. Collect: staged → committed-not-pushed → pushed-on-branch
 3. Map each changed file to its module + screen + MVVM-C role
 4. Surface any layer/DI/navigation violations (do not fix)
-5. Write/update docs/context.md
+5. Emit the derived context into the turn, writing no file
 6. Verify output
 → Proceeding unless redirected.
 ```
@@ -67,16 +67,14 @@ CONFLICT: file:line
 
 ---
 
-## Step 3: Write `docs/context.md`
+## Step 3: Emit the derived context
 
 ```markdown
-# iOS Feature Context
-<!-- managed by ios-context, regenerate with /ios-context -->
-**Generated:** {{ISO timestamp}}
-**Branch:** {{branch}} | **Base:** {{base}} | **Commit:** {{git rev-parse HEAD}}
+DERIVED CONTEXT (iOS, MVVM-C)
+Branch: {{branch}} | Base: {{base}} | HEAD: {{short sha}}
 
-**Baseline:** record the full `git rev-parse HEAD`, never a branch name or short sha:
-`hooks/craftkit-drift.js` resolves it and reports `cannot-verify` for anything unreachable.
+Write no file (ADR-0002). Emit this into the turn; in a workflow, derive once in Phase 0 and pass
+it down. No timestamp and no recorded baseline, because nothing persists to go stale against.
 
 
 ## Summary
@@ -113,7 +111,7 @@ Hard limit: **≤ 400 lines**. Summarize; never paste whole files.
 
 ## Step 4: Verify
 
-- [ ] `docs/context.md` written at the iOS repo root
+- [ ] No file written; the block was emitted into the turn
 - [ ] Every changed file mapped to a module + role
 - [ ] Conflicts surfaced, not silently resolved
 - [ ] No unrelated files dumped in
