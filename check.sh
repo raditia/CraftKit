@@ -1433,6 +1433,25 @@ for _g in fe android ios; do
 done
 [[ $_dc -eq 0 ]] && pass
 
+# ---------------------------------------------------------------------------
+# 34. Every parallel orchestrator passes full file contents to its agents, so
+#     the always-on claim in rules/grounding.md stays true. It shipped false for
+#     two of three: parallel-review and parallel-ship passed a diff only, while
+#     the rule told agents a gap in the payload is a gap to name. Holding read
+#     tools and no contents, they read instead, and each read is a round-trip
+#     that re-sends the agent's whole growing context. Observed at 63-75k input
+#     per agent on a three-agent review.
+# ---------------------------------------------------------------------------
+check "parallel orchestrators pass file contents, as grounding promises"
+_pc=0
+grep -q "pass full file contents" "$REPO_DIR/rules/grounding.md" \
+    || { fail "rules/grounding.md no longer promises full file contents; either restore it or drop check 34, because the two must agree"; _pc=1; }
+for _o in parallel-review parallel-ship parallel-build; do
+    grep -q "full file contents" "$REPO_DIR/commands/$_o.md" \
+        || { fail "commands/$_o.md does not pass full file contents, so its agents read files themselves and each read re-bills their whole context"; _pc=1; }
+done
+[[ $_pc -eq 0 ]] && pass
+
 echo
 if [[ $FAILURES -eq 0 ]]; then
     echo "All checks passed."

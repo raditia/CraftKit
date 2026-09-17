@@ -7,6 +7,37 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.41.0 — 2026-09-17
+
+### Parallel agents were paying for the same files repeatedly
+
+A three-agent review reported 74.6k, 64.6k and 63.6k input tokens, roughly 200k for one review.
+The cause was not prompt size: the installed cold agents are 2.6k, 0.9k and 0.8k tokens. It was
+round-trips. An agent that makes k tool calls re-sends its entire growing context k+1 times, so
+three reads on a 20k base bills about `20 + 28 + 36 + 44` rather than `44`. Reads compound.
+
+The reason they were reading is a promise the code did not keep. `rules/grounding.md` states, as an
+always-on rule, that "the parallel orchestrators pass full file contents for exactly this reason,
+so a gap in the payload is a gap to name, not to fill from memory". True of `parallel-build`, which
+says so at line 98. **False of `parallel-review` and `parallel-ship`, which passed a diff and
+nothing else.** The agents hold `Read, Grep, Glob`, could see they were missing surrounding code,
+and compensated by reading it, which is the expensive path and the one that same rule tells them
+not to take.
+
+- `parallel-review` and `parallel-ship` now pass a `CHANGED FILES (full contents):` block ahead of
+  the diff, matching `parallel-build`. Contents passed once cost once; break-even is about two
+  reads per agent, which any non-trivial change exceeds.
+- Bounded on purpose: non-test source only, skip files over ~1500 lines, and name an omitted file
+  as `not provided`. Per `grounding` the agent then reports the gap instead of filling it, and a
+  gap named is cheaper than a gap read.
+- `check.sh` check 34 ties the two halves together in both directions: the rule must keep its
+  promise, and all three orchestrators must keep it too. Either side drifting fails the gate, which
+  is the failure this shipped as.
+- Not fixed, because it is not a defect: N agents means N copies of the payload. Parallelism buys
+  wall-clock and independent-consensus findings and costs tokens linearly. Want a third of the
+  tokens, run the sequential twin `/review`, which reads each file once into one context and gives
+  up the `[CONSENSUS]` signal.
+
 ## v1.40.0 — 2026-09-17
 
 ### Derived context is derived, never stored

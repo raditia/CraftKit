@@ -67,10 +67,21 @@ Spawn **all** selected agents in **one** message: N `Agent` tool-use blocks in a
 
 **Do not wait by polling.** Never `grep`/`sleep`-loop over task output files (`tasks/*.output`) to detect completion. The harness wakes the main thread automatically when every spawned agent comes to rest, and re-invokes you with their results. Spin-loops keep running for minutes after the agents already finished. On wake, read the returned results and go straight to Phase 3.
 
-Every agent gets the same user message, prefixed `This is a pre-merge check. Be thorough.`:
+Every agent gets the same user message, prefixed `This is a pre-merge check. Be thorough.`.
+**Pass full file contents, not just the diff.** An agent holding only a diff cannot see the
+surrounding code, so it reads the files itself, and every read is a round-trip that re-sends its
+whole growing context: three reads on a 20k base bills about `20 + 28 + 36 + 44`, not `44`.
+Contents passed once cost once.
 
 ```
 This is a pre-merge check. Be thorough.
+
+CHANGED FILES (full contents):
+<path>
+```
+<entire file>
+```
+… repeat per changed non-test source file
 
 DIFF:
 <full diff>
@@ -78,6 +89,10 @@ DIFF:
 CONTEXT:
 <the resolved intent file's `## Spec` when one exists, plus the Phase 0 derived Summary + Key Changes, or, for a single native screen, the sibling screen read in Phase 0>
 ```
+
+**Bound it.** Non-test source files only, and skip any file over ~1500 lines. An omitted file is
+named in the payload as `not provided`, which per `grounding` the agent reports rather than reading
+or recalling.
 
 Spawn the set the classifier selected:
 
