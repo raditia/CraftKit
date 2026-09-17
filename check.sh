@@ -1452,6 +1452,135 @@ for _o in parallel-review parallel-ship parallel-build; do
 done
 [[ $_pc -eq 0 ]] && pass
 
+# ---------------------------------------------------------------------------
+# 35. The read cap rewrites an uncapped whole-file read and leaves everything
+#     else alone. Behavioral, because a grep cannot tell a cap that fires from
+#     one that does not, and the two failure directions cost opposite things: no
+#     cap means a 2000-line file lands whole and is re-sent every turn after,
+#     while a cap on `cat f | wc -l` makes the command report 400 and lie. The
+#     fail-open cases are here for the same reason as check 23: a hook that
+#     guesses on malformed stdin is worse than one that abstains.
+# ---------------------------------------------------------------------------
+check "the read cap fires on big reads only"
+_rc=0
+_rch="$REPO_DIR/hooks/craftkit-read-cap.js"
+if [[ ! -f "$_rch" ]]; then
+    fail "hooks/craftkit-read-cap.js is gone, so every whole-file read lands uncapped again"
+    _rc=1
+else
+    _rcx="$(mktemp -d)"
+    awk 'BEGIN{for(i=1;i<=2000;i++)print "line "i}' > "$_rcx/big.txt"
+    awk 'BEGIN{for(i=1;i<=10;i++)print "line "i}' > "$_rcx/small.txt"
+    _rcrun() { printf '%s' "$1" | node "$_rch" 2>/dev/null; }
+    # Both command shapes, because the hook shares the Bash event with rtk's own
+    # rewrite and cannot choose which updatedInput the merge applies.
+    for _shape in "cat $_rcx/big.txt" "rtk read $_rcx/big.txt"; do
+        _rcrun "{\"tool_input\":{\"command\":\"$_shape\"},\"cwd\":\"$_rcx\"}" | grep -q '\-m 800' \
+            || { fail "read cap does not fire on '$_shape', so a 2000-line file lands whole and is re-sent every turn"; _rc=1; }
+    done
+    # The cap rides on an undocumented rtk semantic: a file of n lines passes whole when
+    # n <= N and shows N/2 when n > N, measured on 0.49.0. An rtk release that changes the
+    # ratio would silently halve every big read again, so pin it here rather than in prose.
+    if command -v rtk >/dev/null 2>&1; then
+        [[ "$(rtk read -m 800 "$_rcx/big.txt" | grep -c '^line [0-9]*$')" == "400" ]] \
+            || { fail "rtk read -m 800 no longer shows 400 lines, so hooks/craftkit-read-cap.js CAP is calibrated to the wrong ratio"; _rc=1; }
+        [[ "$(rtk read -m 800 "$_rcx/small.txt" | grep -c '^line [0-9]*$')" == "10" ]] \
+            || { fail "rtk read -m 800 truncates a file under the threshold, so the cap is no longer free below it"; _rc=1; }
+    fi
+    for _skip in "cat $_rcx/small.txt" "cat $_rcx/big.txt | wc -l" "rtk read -m 400 $_rcx/big.txt" "cat $_rcx/nope.txt"; do
+        [[ "$(_rcrun "{\"tool_input\":{\"command\":\"$_skip\"},\"cwd\":\"$_rcx\"}")" == "{}" ]] \
+            || { fail "read cap rewrote '$_skip', which it must leave alone"; _rc=1; }
+    done
+    [[ "$(_rcrun 'not json')" == "{}" ]] \
+        || { fail "read cap does not fail open on malformed stdin"; _rc=1; }
+    rm -rf "$_rcx"
+fi
+[[ $_rc -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 36. The Read gate refuses a whole-file read and passes everything else, and
+#     the bulk-read carve-out is stated in both places an agent could read it.
+#     Behavioral for the same reason as check 23: a gate that returns {} is
+#     indistinguishable from no gate, and this one fails open by design.
+#     DENY, not ask, and the decision is asserted here because it is the one
+#     gate that departs from the ask-never-deny law: an ask resolves to allow
+#     under auto-accept without surfacing, so the gate read as coverage while
+#     the file landed anyway. Two skips matter more than the refusal: a read
+#     inside a subagent is the bulk-read call the gate offers, and a bounded
+#     offset/limit read is the behavior it is asking for, so refusing either
+#     would refuse its own advice.
+# ---------------------------------------------------------------------------
+check "the read gate refuses whole-file reads only"
+_rg=0
+_rgh="$REPO_DIR/hooks/gate-read-size.js"
+if ! command -v node >/dev/null 2>&1; then
+    echo "    skipped (node not on PATH)"
+elif [[ ! -f "$_rgh" ]]; then
+    fail "hooks/gate-read-size.js is gone, so a whole-file Read lands uncapped and is re-sent every turn after"
+    _rg=1
+else
+    _rgx="$(mktemp -d)"
+    awk 'BEGIN{for(i=1;i<=2000;i++)print "line "i}' > "$_rgx/big.txt"
+    awk 'BEGIN{for(i=1;i<=10;i++)print "line "i}' > "$_rgx/small.txt"
+    python3 - "$_rgx" << 'PYEOF'
+import json, sys
+rgx = sys.argv[1]
+def u(c, **kw):
+    e = {"type": "user", "message": {"role": "user", "content": c}}; e.update(kw); return e
+def a(items, **kw):
+    e = {"type": "assistant", "message": {"role": "assistant", "content": items}}; e.update(kw); return e
+read = [{"type": "tool_use", "name": "Read", "input": {"file_path": rgx + "/big.txt"}}]
+open(rgx + "/plain.jsonl", "w").write("\n".join(json.dumps(x) for x in [u("read it"), a(read)]) + "\n")
+# A subagent turn carries isSidechain, and it is the bulk-read call the gate offers.
+open(rgx + "/side.jsonl", "w").write("\n".join(json.dumps(x) for x in
+    [u("read it", isSidechain=True), a(read, isSidechain=True)]) + "\n")
+PYEOF
+    _rgrun() { printf '%s' "$1" | node "$_rgh" 2>/dev/null; }
+    # Unique per run even though this gate no longer keeps a turn budget: the ids stay
+    # distinct so a future budget cannot make the check pass once and fail every run after,
+    # which is exactly what happened while the gate still asked.
+    _rgs="rgs-$$-${RANDOM}"
+    _rgin() { printf '{"tool_input":%s,"transcript_path":"%s","session_id":"%s"}' "$1" "$_rgx/$2" "$_rgs-$3"; }
+
+    _rgrun "$(_rgin "{\"file_path\":\"$_rgx/big.txt\"}" plain.jsonl a1)" | grep -q '"permissionDecision":"deny"' \
+        || { fail "read gate does not refuse a 2000-line whole-file Read, so the file lands and is re-sent every turn after"; _rg=1; }
+    # Every large read in the turn, not just the first. The other gates spend one prompt per
+    # turn so a ten-edit turn does not train the click-through, but this one shows no prompt,
+    # so a budget here would buy nothing and let the 2nd through Nth large read land.
+    _rgrun "$(_rgin "{\"file_path\":\"$_rgx/big.txt\"}" plain.jsonl a1)" | grep -q '"permissionDecision":"deny"' \
+        || { fail "read gate refuses only the first large read of a turn, so every one after it lands whole"; _rg=1; }
+    # The refusal has to carry the way out, or it is a dead end the model retries into.
+    _reason="$(_rgrun "$(_rgin "{\"file_path\":\"$_rgx/big.txt\"}" plain.jsonl a1)")"
+    for _path in 'bulk-read' 'offset' 'limit' 'CRAFTKIT_READ_GATE=off'; do
+        case "$_reason" in
+            *"$_path"*) ;;
+            *) fail "the read gate's refusal does not name '$_path', so it refuses without offering the way through"; _rg=1 ;;
+        esac
+    done
+    for _case in "{\"file_path\":\"$_rgx/small.txt\"}|plain.jsonl|b1" \
+                 "{\"file_path\":\"$_rgx/big.txt\",\"limit\":200}|plain.jsonl|b2" \
+                 "{\"file_path\":\"$_rgx/big.txt\",\"offset\":50}|plain.jsonl|b3" \
+                 "{\"file_path\":\"$_rgx/big.png\"}|plain.jsonl|b4" \
+                 "{\"file_path\":\"$_rgx/nope.txt\"}|plain.jsonl|b5" \
+                 "{\"file_path\":\"$_rgx/big.txt\"}|side.jsonl|b6"; do
+        _ti="${_case%%|*}"; _rest="${_case#*|}"; _tr="${_rest%%|*}"; _sid="${_rest##*|}"
+        [[ "$(_rgrun "$(_rgin "$_ti" "$_tr" "$_sid")")" == "{}" ]] \
+            || { fail "read gate asks on '$_ti' ($_tr), which it must pass"; _rg=1; }
+    done
+    [[ "$(_rgrun 'not json')" == "{}" ]] \
+        || { fail "read gate does not fail open on malformed stdin"; _rg=1; }
+    rm -rf "$_rgx" "${TMPDIR:-/tmp}/craftkit-gate/$_rgs"-*.readsize
+fi
+# The carve-out has two homes because a cold agent carries the partial, not the rule, and
+# the rule is what a human reads. Either one alone leaves bulk-read looking like a violation.
+[[ -f "$REPO_DIR/agents/bulk-read.md" ]] \
+    || { fail "agents/bulk-read.md is gone, but gate-read-size.js still offers it as the cheaper path"; _rg=1; }
+for _f in rules/grounding.md partials/grounding-claims.md; do
+    grep -q 'bulk-read' "$REPO_DIR/$_f" \
+        || { fail "$_f does not name the bulk-read exception, so the one agent whose job is reading unhanded files reads as a violation of it"; _rg=1; }
+done
+[[ $_rg -eq 0 ]] && pass
+
 echo
 if [[ $FAILURES -eq 0 ]]; then
     echo "All checks passed."
