@@ -100,6 +100,7 @@ Frontend (React Native / web, EVPMR)
   ├── Designing component / hook structure? ────────→ /fe-patterns
   ├── Performance bottleneck (waterfall, bundle)? ──→ /fe-performance
   ├── Accessibility (labels, roles, focus, a11y)? ──→ /fe-a11y
+  ├── Design reads as AI-generated / template? ──────→ /fe-design
   ├── Writing or improving tests only? ────────────→ /fe-test
   ├── Review or simplify code quality? ────────────→ /code-quality
   ├── Debug a bug (reproduce → isolate → fix)? ─────→ /debug

@@ -7,6 +7,39 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.42.0 — 2026-09-17
+
+### /fe-design catches design that wears the model's defaults
+
+Craftkit covered correctness, architecture, accessibility semantics and over-engineering, and said
+nothing about whether a screen *looks* AI-generated: default gradients, glass on every surface,
+bento grids with no size logic, three feature cards that differ only by icon, dashboards carrying
+invented metrics. That was the one gap worth taking from
+[miqdadbadjuber/anti-slop](https://github.com/miqdadbadjuber/anti-slop) (MIT), whose `antislop-code`
+and `antislop-copywriting` skills duplicate the ponytail rubric and `/humanizer` respectively.
+
+- `skills/fe-design` adapts upstream's `antislop-ui` and `antislop-layoutmobile`, compressed from
+  about 43 KB to 142 lines: one line per tell, with the fix beside it. Upstream cites core rules by
+  number (`R-01`, `R-10`) without restating them, so the vendored copy **resolves those references
+  inline** rather than shipping pointers into a core that was not taken.
+- Deliberately narrower than upstream, because the overlap is real and restating it would put two
+  owners on one rule. Contrast, keyboard paths and tap targets stay with `/fe-a11y`; dead controls
+  with `/code-quality` and `/fe-review`; em dashes with `check.sh` check 19 and `/humanizer`; inline
+  styles and design tokens with the always-on `fe-rules`. Each is cited, none restated.
+- Fabricated metrics, testimonials and logos are `[ERROR]`, because they are honesty failures
+  rather than taste. Everything else is `[WARNING]` or `[SUGGESTION]` and the author decides.
+- Carries upstream's purpose test as its verdict line: swap out the logo and product name, and ask
+  whether the screen still has a character of its own.
+
+### The drift detector is kept on purpose, and now says so
+
+`hooks/craftkit-drift.js` lost its last caller when v1.40.0 removed the stored context doc, and
+ADR-0001 had already rejected it for intent. Unmarked dead config is what a later audit deletes by
+mistake, so it now carries a `ponytail:` marker naming why it stays (the
+clean/drifted/cannot-verify distinction is the hard part and check 29 tests it) and the condition
+for deleting it. Its header also cited `gate-stale-context.js` as a consumer; that hook no longer
+exists, and the false reference is corrected.
+
 ## v1.41.0 — 2026-09-17
 
 ### Parallel agents were paying for the same files repeatedly

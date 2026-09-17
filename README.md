@@ -1,4 +1,4 @@
-# craftkit `v1.41.0`
+# craftkit `v1.42.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -611,6 +611,7 @@ Use when a task is narrower than a full workflow.
 | [`fe-patterns`](skills/fe-patterns/SKILL.md) | Props drilling, shared state placement (Context in Model, provider in Entry), composition patterns, hooks discipline | Novel state architecture |
 | [`fe-performance`](skills/fe-performance/SKILL.md) | Waterfall elimination, bundle size, re-renders | Lighthouse regressions with non-obvious root cause |
 | [`fe-a11y`](skills/fe-a11y/SKILL.md) | Labels, roles, focus management, reduced motion, for RN & Next.js | Complex focus flows spanning multiple routes |
+| [`fe-design`](skills/fe-design/SKILL.md) | Visual design that reads as AI-generated: default gradients and glass, template layouts, decorative filler, invented dashboard numbers, responsive breaks. Adapted from [anti-slop](https://github.com/miqdadbadjuber/anti-slop) (MIT) | Whether a technique earns its place is contested |
 | [`fe-test`](skills/fe-test/SKILL.md) | Write/improve tests, enforcing ≥93% coverage. **RN/web only**, since native goes to `/android-test` / `/ios-test` | Can't reach 93%, root cause unclear |
 
 ### Native mobile skills, on demand
