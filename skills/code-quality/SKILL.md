@@ -7,7 +7,7 @@ alwaysApply: false
 **Commands:** `rtk lint`, `rtk tsc`, `rtk git diff`, `rtk jest`, `rtk grep "pattern" .`
 **Model:** everyday. Escalate for security-sensitive changes, architecture decisions with significant tradeoffs, or refactors > 500 lines
 
-**Context:** `docs/context.md`, reading Summary, Key Changes, Architecture Patterns in Use. Standard load procedure in `using-agent-skills`.
+**Context:** Derived context for the change (Summary, Key Changes, Architecture Patterns), emitted by the platform's context skill or passed down by the workflow. Standard load procedure in `using-agent-skills`.
 
 > For day-to-day reviews use `/parallel-review`, which runs this plus the platform's pattern review concurrently. `/review` is its sequential twin, for a small diff or where agents cannot be spawned.
 

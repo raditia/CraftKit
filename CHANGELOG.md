@@ -7,6 +7,239 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.42.0 — 2026-09-17
+
+### /fe-design catches design that wears the model's defaults
+
+Craftkit covered correctness, architecture, accessibility semantics and over-engineering, and said
+nothing about whether a screen *looks* AI-generated: default gradients, glass on every surface,
+bento grids with no size logic, three feature cards that differ only by icon, dashboards carrying
+invented metrics. That was the one gap worth taking from
+[miqdadbadjuber/anti-slop](https://github.com/miqdadbadjuber/anti-slop) (MIT), whose `antislop-code`
+and `antislop-copywriting` skills duplicate the ponytail rubric and `/humanizer` respectively.
+
+- `skills/fe-design` adapts upstream's `antislop-ui` and `antislop-layoutmobile`, compressed from
+  about 43 KB to 142 lines: one line per tell, with the fix beside it. Upstream cites core rules by
+  number (`R-01`, `R-10`) without restating them, so the vendored copy **resolves those references
+  inline** rather than shipping pointers into a core that was not taken.
+- Deliberately narrower than upstream, because the overlap is real and restating it would put two
+  owners on one rule. Contrast, keyboard paths and tap targets stay with `/fe-a11y`; dead controls
+  with `/code-quality` and `/fe-review`; em dashes with `check.sh` check 19 and `/humanizer`; inline
+  styles and design tokens with the always-on `fe-rules`. Each is cited, none restated.
+- Fabricated metrics, testimonials and logos are `[ERROR]`, because they are honesty failures
+  rather than taste. Everything else is `[WARNING]` or `[SUGGESTION]` and the author decides.
+- Carries upstream's purpose test as its verdict line: swap out the logo and product name, and ask
+  whether the screen still has a character of its own.
+
+### The drift detector is kept on purpose, and now says so
+
+`hooks/craftkit-drift.js` lost its last caller when v1.40.0 removed the stored context doc, and
+ADR-0001 had already rejected it for intent. Unmarked dead config is what a later audit deletes by
+mistake, so it now carries a `ponytail:` marker naming why it stays (the
+clean/drifted/cannot-verify distinction is the hard part and check 29 tests it) and the condition
+for deleting it. Its header also cited `gate-stale-context.js` as a consumer; that hook no longer
+exists, and the false reference is corrected.
+
+## v1.41.0 — 2026-09-17
+
+### Parallel agents were paying for the same files repeatedly
+
+A three-agent review reported 74.6k, 64.6k and 63.6k input tokens, roughly 200k for one review.
+The cause was not prompt size: the installed cold agents are 2.6k, 0.9k and 0.8k tokens. It was
+round-trips. An agent that makes k tool calls re-sends its entire growing context k+1 times, so
+three reads on a 20k base bills about `20 + 28 + 36 + 44` rather than `44`. Reads compound.
+
+The reason they were reading is a promise the code did not keep. `rules/grounding.md` states, as an
+always-on rule, that "the parallel orchestrators pass full file contents for exactly this reason,
+so a gap in the payload is a gap to name, not to fill from memory". True of `parallel-build`, which
+says so at line 98. **False of `parallel-review` and `parallel-ship`, which passed a diff and
+nothing else.** The agents hold `Read, Grep, Glob`, could see they were missing surrounding code,
+and compensated by reading it, which is the expensive path and the one that same rule tells them
+not to take.
+
+- `parallel-review` and `parallel-ship` now pass a `CHANGED FILES (full contents):` block ahead of
+  the diff, matching `parallel-build`. Contents passed once cost once; break-even is about two
+  reads per agent, which any non-trivial change exceeds.
+- Bounded on purpose: non-test source only, skip files over ~1500 lines, and name an omitted file
+  as `not provided`. Per `grounding` the agent then reports the gap instead of filling it, and a
+  gap named is cheaper than a gap read.
+- `check.sh` check 34 ties the two halves together in both directions: the rule must keep its
+  promise, and all three orchestrators must keep it too. Either side drifting fails the gate, which
+  is the failure this shipped as.
+- Not fixed, because it is not a defect: N agents means N copies of the payload. Parallelism buys
+  wall-clock and independent-consensus findings and costs tokens linearly. Want a third of the
+  tokens, run the sequential twin `/review`, which reads each file once into one context and gives
+  up the `[CONSENSUS]` signal.
+
+## v1.40.0 — 2026-09-17
+
+### Derived context is derived, never stored
+
+Release 2 of the context split, implementing ADR-0002. `docs/context.md` recorded what git already
+knew, and the recording is what created the staleness. Its cache key was branch plus commit
+equality, so it hit only when zero commits had landed since the write, and the key could not see
+staged work at all: staging edits left the freshness check reporting fresh while the doc's own
+`Staged (uncommitted)` section was wrong. The one state the file existed to track was the state its
+key could not observe.
+
+- The three context skills (`/fe-context`, `/android-context`, `/ios-context`) now **emit** the
+  derived block into the turn and write no file. No `Generated:` timestamp and no recorded baseline
+  commit, because nothing persists to go stale against. A workflow derives once in Phase 0 and
+  passes the block down, so one diff scan still serves many skills.
+- Eight reader `**Context:**` lines, ten native opt-out declarations, the always-on loading
+  procedure, five commands, the classifier partial and the routing hook all stop naming a stored
+  doc. `docs/context.md` itself is deleted; ADR-0002 rejected keeping it as a gitignored scratch
+  cache, because two engineers debugging the same branch would then read different context.
+- The loading procedure loses its freshness check entirely. There is nothing to be fresh against,
+  which is the point: staleness stops being a thing to detect and becomes a thing that cannot occur.
+- `check.sh` check 33 greps the path itself rather than a phrase. **Release 1's narrower grep on
+  "PLANNING block" had missed two writers**, `skills/plan` and `skills/interview`, both of which
+  still wrote to the old doc under different wording. Both are fixed here, and the broader
+  invariant is what found them.
+- Check 8 is **replaced rather than kept**. It grepped `rules/` for an absolute
+  `docs/context.md` claim, which stopped being reachable the moment that filename left the rule, so
+  it became a gate that could not fail. It now asserts the always-on rule keeps its native scope
+  caveat and that at least ten native skills declare the opt-out.
+- Check 33's own first draft was too weak and the negative test caught it: the phrase it grepped
+  appears twice per generator, once in the inline plan, so renaming only the write step still
+  passed. It is now anchored to the step heading.
+
+## v1.39.0 — 2026-09-17
+
+### Feature intent moved out of the shared context doc
+
+`docs/context.md` carried one PLANNING block, so it could describe one feature. Writing a spec
+for a second one destroyed the first, which is not a hypothetical: it happened while v1.38.0 was
+being built, when a `/spec` run overwrote the shipped v1.36.0 block. Worse than the overwrite,
+`/fe-context` preserved that block verbatim while regenerating the derived sections around it, so
+the file could hold feature A's intent beside branch B's changed-file list and read as
+authoritative. This is release 1 of ADR-0001; ADR-0002 (derived context stops being stored) is
+release 2.
+
+- Intent now lives at `docs/planning/<slug>.md`, one file per feature. The slug is named by the
+  author at `/spec` time, not derived from the branch, because a branch name breaks on rename and
+  has no answer on `main`. Distinct filenames mean parallel merges cannot collide in generated
+  content and no feature can overwrite a sibling's spec.
+- `partials/planning-resolve.md` is the single resolver, injected into `/spec` `/plan` `/adr`
+  `/docs` `/eval`. The branch-to-feature mapping stays **derived**, globbed from `status: active`,
+  so there is no index to go stale. Two candidates resolve by matching against the diff, and the
+  author is asked only when the diff intersects two or none: matching is a fact, choosing between
+  real candidates is a decision.
+- `status:` is human-owned (`active` / `shipped` / `abandoned`) and no check maintains it. Intent
+  goes stale when a person changes their mind, not when code moves. The drift detector was
+  considered and rejected here: this repo squash-merges, so a recorded baseline is unreachable
+  after merge and `cannot-verify` would be the common answer rather than the edge case.
+- `/fe-context` no longer preserves the block. A legacy one is **migrated**, not copied through.
+- `check.sh` check 32 is the release-completion condition ADR-0001 named: no source file may
+  reference the shared block, the generator's template may not carry the marker, and every intent
+  skill must inject the one resolver. All three branches were confirmed to fail before passing.
+- The live block was migrated rather than deleted, into
+  `docs/planning/eval-correctness.md` (`status: shipped`). The redesign dogfoods itself:
+  `docs/planning/context-intent-split.md` is the active intent file for this very change.
+
+## v1.38.0 — 2026-09-17
+
+### /eval scores a run into a weighted correctness percentage
+
+Every workflow in this repo reported findings and a verdict, and none of them reported a
+number. `READY TO MERGE` with three warnings and `READY TO MERGE` with none read the same
+in a terminal, so there was no way to tell whether a rule edit, a partial split, or a model
+upgrade had made the output better or worse. Vibes, across 14 agents.
+
+- `partials/eval-rubric.md` is the contract: five criteria (spec conformance 35, correctness
+  25, pattern adherence 20, verification 15, simplicity 5), each scored `0-5` against six
+  shared anchors, summed as `Σ (score / 5 × weight)`. `skills/eval` and `agents/eval-judge`
+  both inject it, so the scorer and the thing being scored cannot drift apart.
+- `agents/eval-judge.md` is the cold judge: it scores the **deliverable**, not the process,
+  and every deduction below 5 names its gap with `file:line`. It injects
+  `partials/grounding-claims.md` too, so an `[UNVERIFIED]` observation cannot carry a score
+  below 3. Whether the run spawned the right agents is deliberately not an axis.
+- `skills/eval/SKILL.md` orchestrates: gather diff + PLANNING acceptance criteria + gate
+  results, spawn the judge, then **recompute the weighted sum in `awk`**. Picking an anchor
+  is judgment and belongs to the model; the arithmetic is deterministic and does not, which
+  is `using-agent-skills` core behavior 7 applied to the one place a judge quietly slips.
+- Scores append to `docs/evals/ledger.md` in the repo being worked on, one row per run. The
+  evaluation success rate is **derived from those rows at read time, never stored**, per the
+  `grounding` rule's preference for derivation: a stored rate is stale the moment the next
+  row lands.
+- Two guards against a scorer that flatters. **Floors override the band**: any criterion at
+  0, or spec conformance / correctness at 2 or below, is `BLOCKED` whatever the total, because
+  an 85% that means "perfect except it does not do what was asked" is exactly what a weighted
+  average hides. **Unscorable is a gap, not a pass**: no PLANNING block means spec conformance
+  is `n/a`, the verdict is `INCOMPLETE`, and the remaining four report out of 65 points rather
+  than being reweighted up.
+- Offered as an opt-in tail of `/parallel-build` and `/parallel-ship`, which pass their gate
+  results through, since verification cannot be scored from a diff alone. Never auto-run, and
+  it never blocks a merge: deciding what a 78% means is the author's call.
+- The agent is named `eval-judge`, not `judge`, because "judge" already names the
+  fusion-panel synthesis role in `using-agent-skills` model routing.
+- `check.sh` check 31 asserts the rubric weights sum to 100 across all three copies (the partial, the README table, the awk recompute). A broken sum produces a
+  percentage that looks authoritative and is wrong, which is the worst failure a scorer has.
+
+### The context-doc redesign is recorded before it is built
+
+`docs/context.md` holds one PLANNING slot, so writing a spec for a second feature destroys the
+first one's. That happened live while this release was being built: a `/spec` run overwrote the
+shipped v1.36.0 planning block. The redesign is decided and recorded; only the records ship here.
+
+- `docs/adr/0001-intent-keyed-per-feature.md`: intent moves to one file per feature under
+  `docs/planning/`, keyed by a name the author gives `/spec`, with the branch-to-feature mapping
+  derived by globbing for `Status: active` rather than recorded. Four options weighed. Notes why
+  the drift detector was rejected as the freshness mechanism: this repo squash-merges, so a
+  recorded baseline is unreachable after merge and `cannot-verify` becomes the common answer.
+- `docs/adr/0002-derived-context-is-derived.md`: the git-derived half of the doc stops being
+  written and is derived at read time. The cache it replaces hits only when zero commits have
+  landed since the write, and its key cannot see staged work at all, so staging edits leaves the
+  freshness check reporting fresh while the doc's own staged section is wrong. Records that the
+  per-run derivation cost is unmeasured, and that the fix if it proves expensive is narrowing
+  what gets derived, never restoring the stored copy.
+- `docs/glossary.md`: five terms the redesign needs said precisely, separating `derived context`
+  from `intent`, and `stale` from `drifted` and `cannot-verify`.
+
+Neither ADR is implemented in this release. The migration is two releases, narrow first, so the
+derived doc survives long enough for its absence to be felt before it is deleted.
+
+### Skills can inject a partial, and fe-patterns has a props-drilling threshold
+
+`skills/fe-patterns` told a reader that state used by multiple Presenters should
+"lift to nearest common ancestor Entry / Context" and left it there. No threshold, so
+nothing said when props stop being cheaper than Context, and its Context example was a
+generic `TabsContext` that mapped onto no EVPMR layer. The cold `agents/fe-patterns`
+carried a thinner paraphrase of the same mapping, which is how it came to review
+component trees with no threshold to review by.
+
+- `partials/fe-state-location.md` is now the single source: the state-location mapping,
+  the 3-levels-or-a-sibling-Presenter threshold, and the Context pattern split across
+  Model (context + hooks), Entry (provider inside the ErrorBoundary) and Presenter (the
+  only consumer), plus the four rules that decide whether Context helps or hurts. Both
+  the skill and the agent inject it, so one edit moves both.
+- `skills/fe-patterns` description now front-loads the triggers ("props drilling",
+  "shared state across several components", "Context API placement"), because the old
+  wording said only "state location" and never matched how the question gets asked.
+
+### craftkitInject reaches skills, and the renderer left the adapter
+
+Widening the splice to skills is the same move v1.33.0 made for commands, with one
+difference that forced the renderer out of `adapters/claude.sh`: agents and commands
+exist only on Claude, but all four adapters install the same `SKILL.md`. A Claude-only
+splice would have shipped Cursor, Gemini and Codex a `fe-patterns` with its core table
+simply absent, the way Cursor's `parallel-review` already installs at 139 lines against
+Claude's 255.
+
+- `_claude_render_injected` and its two helpers move to `sync.sh` as
+  `craftkit_render_injected` / `craftkit_inject_list` / `craftkit_strip_frontmatter`,
+  with the marker constants. `claude.sh` keeps a one-line delegate, so the agent and
+  command paths are unchanged.
+- `sync_adapter` renders each `SKILL.md` before diffing and installing it, for every
+  adapter. Diffing the rendered text is also what keeps the pass idempotent: a skill
+  whose partial moved on would otherwise look unchanged and never re-sync.
+- `check.sh` check 5 now scans `skills/` for a misspelled or dangling inject name, since
+  an unscanned host passes vacuously and installs with its section missing.
+- `check.sh` check 30 is behavioral in both halves: the renderer must splice a partial
+  into a skill without eating its frontmatter, and `sync_adapter` must actually call it.
+  Either half alone passes vacuously, because a revert to `diff -q "$source_file"` leaves
+  the renderer present, correct, and unreached.
+
 ## v1.36.0 — 2026-09-11
 
 ### Grounding, and three features cut on measurement

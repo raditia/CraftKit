@@ -15,7 +15,7 @@ alwaysApply: false
 
 ---
 
-**Context:** No `docs/context.md`. Read the changed ViewModel(s) and one existing spec in `Modules/<Module>/Tests/<Feature>/` to copy the Quick/Nimble style and the existing mocks.
+**Context:** No derived-context step. Read the changed ViewModel(s) and one existing spec in `Modules/<Module>/Tests/<Feature>/` to copy the Quick/Nimble style and the existing mocks.
 
 ---
 

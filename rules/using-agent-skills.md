@@ -61,6 +61,7 @@ Match natural language to the right command. **Dynamic parallel is the default w
 - Any ambiguous test query ("any tests?", "tests needed?", "should tests change?") → the platform's test skill
 - **Test intent resolves platform first.** `/fe-test` is RN/web only (jest, 93% bar, EVPMR paths): on `*.kt`/`*.java` run `/android-test`, on `*.swift`/`*.m` run `/ios-test`. Detect from the changed files, or from the project root when nothing is changed yet. Announcing `/fe-test` on a native repo is a routing error, not a near-miss.
 - "grill"/"stress-test"/"poke holes"/"challenge" an **existing** plan or decision → `/grill` (interactive rounds); no plan exists yet → `/interview`; "roast this plan doc" single-pass → `plan-roaster` agent
+- "score this run"/"how correct was that"/"what is our success rate"/"eval this" → `/eval`. It scores a *finished* deliverable, so it never substitutes for a review: "is this good?" before merge is `/parallel-review`, and `/eval` is the number after the run.
 
 **No-spawn contexts take the sequential twin, silently.** A `parallel-*` command's whole job is spawning agents, so a context that cannot spawn them cannot run one. You are in such a context when you are yourself a subagent (subagents get no Agent tool) or when a session instruction disables agent spawning. Substitute and proceed:
 
@@ -89,7 +90,7 @@ Announce the command you actually ran (`Running /build …`), not the one you co
 
 ### Individual skills (use when task is narrower than a full workflow)
 
-**Platform first.** Classify the codebase before the task: React Native / web (EVPMR, `*.tsx`, `package.json`) → `fe-*`. Native Android (`*.kt/*.java`, Gradle, MVP) → `android-*`. Native iOS (`*.swift/*.m`, `Modules/`, MVVM-C) → `ios-*`. Native mobile does **not** use EVPMR or `docs/context.md` for single-screen work; read a real sibling instead.
+**Platform first.** Classify the codebase before the task: React Native / web (EVPMR, `*.tsx`, `package.json`) → `fe-*`. Native Android (`*.kt/*.java`, Gradle, MVP) → `android-*`. Native iOS (`*.swift/*.m`, `Modules/`, MVVM-C) → `ios-*`. Native mobile does **not** use EVPMR, and takes no derived-context step for single-screen work; read a real sibling instead.
 
 ```
 Frontend (React Native / web, EVPMR)
@@ -99,6 +100,7 @@ Frontend (React Native / web, EVPMR)
   ├── Designing component / hook structure? ────────→ /fe-patterns
   ├── Performance bottleneck (waterfall, bundle)? ──→ /fe-performance
   ├── Accessibility (labels, roles, focus, a11y)? ──→ /fe-a11y
+  ├── Design reads as AI-generated / template? ──────→ /fe-design
   ├── Writing or improving tests only? ────────────→ /fe-test
   ├── Review or simplify code quality? ────────────→ /code-quality
   ├── Debug a bug (reproduce → isolate → fix)? ─────→ /debug
@@ -108,7 +110,7 @@ Frontend (React Native / web, EVPMR)
   ├── Whole-repo bloat scan? ───────────────────────→ /ponytail-audit
   └── List all deliberate shortcuts (ponytail:)? ───→ /ponytail-debt
 
-Planning & docs (general, opt-in, never auto-run; feed docs/context.md before execution)
+Planning & docs (general, opt-in, never auto-run; write the feature's intent file before execution)
   ├── Ask underspecified, de-fuzz before building? → /interview
   ├── Widen the approach, need OPTIONS? ───────────→ /ideate
   ├── Write a PRD / spec before coding? ────────────→ /spec
@@ -121,6 +123,7 @@ Planning & docs (general, opt-in, never auto-run; feed docs/context.md before ex
 
 General utilities (any platform)
   ├── Research a question against primary sources? ──→ /research  (background agent, cited note in repo)
+  ├── Score a finished run, correctness %? ──────────→ /eval  (eval-judge + weighted rubric + ledger)
   └── Hand this session off to a fresh agent? ───────→ /handoff  (compact state + decisions + next steps)
 
 Native Android (MVP + Core framework)          Native iOS (MVVM-C)
@@ -145,30 +148,16 @@ The diff-reading, platform-detecting agent-selection procedure used by `/paralle
 
 ## Standard context loading
 
-**Scope: RN/web skills, and native skills only on multi-screen branches.** A native single-screen task has no `docs/context.md` by design: the ten `{android,ios}-*` skills say so in their own **Context:** line, and that wins. There, the baseline is a real sibling screen read from the same module; skip this procedure entirely rather than generating a doc to satisfy it.
+**Scope: RN/web skills, and native skills only on multi-screen branches.** A native single-screen task takes no derived-context step by design: the ten `{android,ios}-*` skills say so in their own **Context:** line, and that wins. There, the baseline is a real sibling screen read from the same module.
 
-Where it does apply, every skill follows this on start, not repeated per skill:
-1. Find project root: nearest `package.json` (RN/web), `settings.gradle` (Android), or `*.xcodeproj`/`Package.swift` (iOS) going up from CWD
-2. Freshness check, run both in parallel:
-   ```bash
-   rtk git branch --show-current
-   rtk git rev-parse HEAD
-   ```
-   Then read the `**Branch:**` and `**Commit:**` fields from the `docs/context.md` header (first 5 lines). The generator is the platform's context skill: `/fe-context`, `/android-context`, or `/ios-context`.
-   - If `docs/context.md` missing → run that skill, then continue
-   - If branch mismatch OR commit mismatch → regenerate with that skill, then continue
-   - If both match → context is fresh, proceed
+Context comes in two halves with opposite handling (ADR-0001, ADR-0002):
 
-   **A commit match is not proof the doc still holds.** The recorded commit goes unreachable the moment its branch is squash-merged, rebased or amended, and a doc pinned to a commit nobody can resolve is not fresh. Claude Code installs a detector that separates the three answers; the other three tools install no hooks, so the check is conditional:
-   ```bash
-   D="$HOME/.claude/hooks/craftkit-drift.js"
-   [ -f "$D" ] && node -e 'const {drift}=require(process.argv[1]);
-   const r=drift(process.cwd(), process.argv[2], []); console.log(r.state, "|", r.reason)' "$D" "<recorded commit>" \
-     || echo "cannot-verify | no drift detector on this tool"
-   ```
-   `clean` → proceed · `drifted` → the named files are suspect, so regenerate · `cannot-verify` → say so and treat the doc as unverified, never as fresh. Per `grounding`, a claim resting on a cannot-verify doc is `[UNVERIFIED]` and cannot back an `[ERROR]` finding or a code edit.
-3. **Read `docs/context.md`**, required wherever this procedure applies. Read only the sections the skill specifies (see each skill's **Context:** line); at minimum: Summary + Key Changes
-4. If context conflicts with code → `CONFUSION: docs/context.md says X but code shows Y. Options: A) ... B) ... → Which?`
+1. **Find project root:** nearest `package.json` (RN/web), `settings.gradle` (Android), or `*.xcodeproj`/`Package.swift` (iOS) going up from CWD.
+2. **Derive the change context.** Run the platform's context skill (`/fe-context`, `/android-context`, `/ios-context`), which reads git and **emits** the block into the turn. Nothing is stored, so there is no freshness check, no regeneration step, and no staleness to detect: the output describes the working tree as it stands when asked. Read only the sections the skill specifies (see each skill's **Context:** line); at minimum Summary + Key Changes.
+
+   **Derive once per workflow.** An orchestrator derives in Phase 0 and passes the block to every skill and agent below it. Re-deriving the same diff per skill is the same content paid for twice.
+3. **Resolve intent.** A feature's spec, task plan and decision pointers live in `docs/planning/<slug>.md`, one file per feature, found by globbing for `status: active` rather than by any recorded mapping. Skills that need intent inject `planning-resolve`, which carries the full rule including what to do when two files resolve. Freshness does not apply: intent goes stale when a human changes their mind, so its `status` field is human-owned and no check maintains it.
+4. If derived context conflicts with the code → `CONFUSION: the diff shows X but the code reads Y. Options: A) ... B) ... → Which?`
 
 ---
 
@@ -315,7 +304,7 @@ Authoring/updating craftkit content (rules, skills, commands, agents) is **repo-
 6. Modifying code orthogonal to the task
 7. Removing things you don't fully understand
 8. Skipping verification because "it looks right"
-9. Skipping the `docs/context.md` read where standard context loading applies; or, on a native single-screen task, generating one instead of reading a sibling screen
+9. Skipping the derived-context step where standard context loading applies; or, on a native single-screen task, deriving one instead of reading a sibling screen
 10. Context flooding: loading entire files not relevant to the current task
 11. **Skipping skill classification before responding.** Always check skills first; always announce match or no-match; never silently bypass this gate
 

@@ -23,7 +23,7 @@ craftkitInject: parallel-classifier
 
 Load context for the detected platform:
    - **RN / web:** apply standard context loading (`using-agent-skills`): freshness check (branch + commit), regenerate if stale or missing, read Summary + Key Changes
-   - **Android / iOS:** `docs/context.md` only for multi-screen branches (`/android-context`, `/ios-context`). Single screen: read a real sibling screen instead and pass that as the convention baseline
+   - **Android / iOS:** derive context only for multi-screen branches (`/android-context`, `/ios-context`). Single screen: read a real sibling screen instead and pass that as the convention baseline
 
 ---
 
@@ -67,17 +67,32 @@ Spawn **all** selected agents in **one** message: N `Agent` tool-use blocks in a
 
 **Do not wait by polling.** Never `grep`/`sleep`-loop over task output files (`tasks/*.output`) to detect completion. The harness wakes the main thread automatically when every spawned agent comes to rest, and re-invokes you with their results. Spin-loops keep running for minutes after the agents already finished. On wake, read the returned results and go straight to Phase 3.
 
-Every agent gets the same user message, prefixed `This is a pre-merge check. Be thorough.`:
+Every agent gets the same user message, prefixed `This is a pre-merge check. Be thorough.`.
+**Pass full file contents, not just the diff.** An agent holding only a diff cannot see the
+surrounding code, so it reads the files itself, and every read is a round-trip that re-sends its
+whole growing context: three reads on a 20k base bills about `20 + 28 + 36 + 44`, not `44`.
+Contents passed once cost once.
 
 ```
 This is a pre-merge check. Be thorough.
+
+CHANGED FILES (full contents):
+<path>
+```
+<entire file>
+```
+… repeat per changed non-test source file
 
 DIFF:
 <full diff>
 
 CONTEXT:
-<docs/context.md Summary + Key Changes, or, for a single native screen, the sibling screen read in Phase 0>
+<the resolved intent file's `## Spec` when one exists, plus the Phase 0 derived Summary + Key Changes, or, for a single native screen, the sibling screen read in Phase 0>
 ```
+
+**Bound it.** Non-test source files only, and skip any file over ~1500 lines. An omitted file is
+named in the payload as `not provided`, which per `grounding` the agent reports rather than reading
+or recalling.
 
 Spawn the set the classifier selected:
 
@@ -162,13 +177,15 @@ Verdict: READY TO MERGE / BLOCKED (<list blockers>) / INCOMPLETE (<axes unverifi
 Code is final at this point, which is the natural moment to capture the *why* and explain the *what*. Offer, never auto-run:
 
 ```
-→ Before merge, capture documentation? (both optional)
+→ Before merge, capture documentation and score the run? (all optional)
   (a) /adr  → record any architectural decision made on this branch (the why)
   (d) /docs → write engineer + stakeholder documentation for this feature
+  (e) /eval → score this run into a weighted correctness %, append to the ledger
   (n) skip
 ```
 
-- **`/adr`**: if the branch made a non-obvious, hard-to-reverse decision, run `/adr` to record it and link it into the `docs/context.md` PLANNING block. One ADR per decision; skip for reversible/local choices.
-- **`/docs`**: run `/docs` to produce the dual-audience pair (technical + stakeholder), humanized. Pulls from the PLANNING block + ADRs + the diff.
+- **`/adr`**: if the branch made a non-obvious, hard-to-reverse decision, run `/adr` to record it and link it into the feature's `docs/planning/` intent file. One ADR per decision; skip for reversible/local choices.
+- **`/docs`**: run `/docs` to produce the dual-audience pair (technical + stakeholder), humanized. Pulls from the intent file + ADRs + the diff.
+- **`/eval`**: run `/eval` to turn this run into a number. Pass it the Phase 1 gate results and the resolved intent file, which it needs and cannot re-derive; it spawns `eval-judge`, appends a row to `docs/evals/ledger.md`, and derives the running success rate. Worth it on any branch built by a workflow, since a score with no prior rows is a data point and a hundred rows is a regression detector.
 
 Skip entirely if the user declines or the change is trivial. Do not block merge on documentation.

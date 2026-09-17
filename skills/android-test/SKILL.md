@@ -15,7 +15,7 @@ alwaysApply: false
 
 ---
 
-**Context:** No `docs/context.md`. Read the changed Presenter(s) and one existing sibling test in `src/test/...` to copy the MockK style and shared fixtures.
+**Context:** No derived-context step. Read the changed Presenter(s) and one existing sibling test in `src/test/...` to copy the MockK style and shared fixtures.
 
 ---
 

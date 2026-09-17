@@ -18,7 +18,7 @@ alwaysApply: false
 
 ---
 
-**Context:** `docs/context.md`, reading Summary, Test Coverage Needed. Standard load procedure in `/using-agent-skills`.
+**Context:** Derived context for the change (Summary, Test Coverage Needed), emitted by `/fe-context`. Standard load procedure in `/using-agent-skills`.
 
 ---
 

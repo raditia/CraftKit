@@ -13,7 +13,7 @@ alwaysApply: false
 
 ---
 
-**Context:** No `docs/context.md` required. Read the changed `…View.swift` / `…ViewController.swift` and, if unclear, a sibling that already handles VoiceOver.
+**Context:** No derived-context step required. Read the changed `…View.swift` / `…ViewController.swift` and, if unclear, a sibling that already handles VoiceOver.
 
 ---
 

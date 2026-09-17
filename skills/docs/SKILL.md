@@ -2,6 +2,7 @@
 name: docs
 description: Produce feature documentation in two registers from one source of truth, a technical version for engineers and a non-technical version for stakeholders, as Confluence-paste-ready markdown, then run both through /humanizer to strip AI-writing tells. Use after a feature ships or a spec is settled. Adapted from addyosmani/agent-skills documentation (MIT).
 alwaysApply: false
+craftkitInject: planning-resolve
 ---
 
 **Model:** cheapest for the draft. Escalate to everyday if technical accuracy depends on subtle system behavior. The `/humanizer` pass runs on its own model.
@@ -15,7 +16,7 @@ alwaysApply: false
 
 A feature is built or a spec is settled and two audiences need it: engineers who will maintain/extend it, and stakeholders (PM, support, leadership) who need to understand what it does and why, without the code.
 
-Source of truth, in priority order: the `docs/context.md` PLANNING block (`/spec` + `/plan`), any `docs/adr/*`, then the actual code/diff. Read them before writing; do not invent capabilities.
+Source of truth, in priority order: the resolved intent file's `## Spec` and `## Task Plan` (`/spec` + `/plan`), any `docs/adr/*`, then the actual code/diff. Read them before writing; do not invent capabilities.
 
 ---
 

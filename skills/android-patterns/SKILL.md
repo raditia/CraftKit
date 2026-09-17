@@ -15,7 +15,7 @@ alwaysApply: false
 
 ---
 
-**Context:** No `docs/context.md` for single-screen work. Read one real sibling screen package under `<feature>/src/main/java/.../<screen>/` to confirm exact naming and base classes before acting.
+**Context:** No derived-context step for single-screen work. Read one real sibling screen package under `<feature>/src/main/java/.../<screen>/` to confirm exact naming and base classes before acting.
 
 ---
 

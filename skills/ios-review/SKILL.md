@@ -13,7 +13,7 @@ alwaysApply: false
 
 ---
 
-**Context:** No `docs/context.md` (iOS is not EVPMR). Read the changed files plus, when a violation is unclear, the matching sibling feature in `Modules/<Module>/<Module>/` to confirm the established convention.
+**Context:** No derived-context step (iOS is not EVPMR). Read the changed files plus, when a violation is unclear, the matching sibling feature in `Modules/<Module>/<Module>/` to confirm the established convention.
 
 ---
 

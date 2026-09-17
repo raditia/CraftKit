@@ -62,4 +62,4 @@ OPEN QUESTIONS   <anything still <95%, flagged, not invented>
 → Next: /spec to turn this into a PRD.
 ```
 
-Offer to persist the brief into `docs/context.md` (see `/spec` for the forward-planning block). Do not write it silently; ask.
+Offer to hand the brief to `/spec`, which creates the feature's intent file at `docs/planning/<slug>.md`. `/interview` writes no file itself; do not persist silently, ask.

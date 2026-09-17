@@ -59,7 +59,7 @@ Route each parked one: option space still open → `/ideate`; needs a working th
 - **Glossary.** When a fuzzy term gets a precise canonical meaning, update `docs/glossary.md` at that moment, never batched. One line per term: `- **Term**: definition.` Glossary holds language only, zero implementation detail. If the user's usage conflicts with an existing entry, challenge immediately: "glossary defines *cancellation* as X, you seem to mean Y. Which?"
 - **ADRs.** When a settled decision is (a) hard to reverse, (b) surprising without context, AND (c) a real tradeoff, offer `/adr`. All three or skip.
 
-Note: `docs/glossary.md` is a standalone file, not part of `docs/context.md`, which `/fe-context` regenerates.
+Note: `docs/glossary.md` is a standalone file. It is neither derived context nor a feature's intent file, so nothing regenerates or overwrites it.
 
 ---
 

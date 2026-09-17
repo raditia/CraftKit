@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 // Shared drift detector: has a file changed since the baseline a context doc was written
-// against? Consumed by gate-stale-context.js and by the *-context skills' freshness step,
-// so both answer the question the same way.
+// against? Answers clean / drifted / cannot-verify, never guessing clean when it cannot see.
+//
+// ponytail: retained with no caller. ADR-0002 removed the stored context doc and with it the
+// freshness check that called this, and ADR-0001 rejected it for intent (this repo squash-merges,
+// so a recorded baseline is unreachable after merge and cannot-verify would be the common
+// answer). Kept deliberately: the clean/drifted/cannot-verify distinction is the hard part and is
+// tested by check.sh check 29, so re-deriving it later costs more than keeping it. Its previous
+// consumer gate-stale-context.js no longer exists. remove: if nothing calls it by the time a
+// third release needs a baseline comparison, delete it with check 29 and its README row.
 //
 // One `git diff --name-only <baseline> -- <paths>` does the whole job, rather than a
 // hash-object/rev-parse pair per file: diff honors .gitattributes clean filters (a

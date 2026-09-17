@@ -1,13 +1,14 @@
 ---
 name: spec
-description: Turn a discovery brief or clear ask into a PRD before coding: objective, users, scope, constraints, boundaries, acceptance criteria. Writes a forward-planning block into docs/context.md so downstream skills execute with intent, not guesses. Adapted from addyosmani/agent-skills spec-driven-development (MIT).
+description: Turn a discovery brief or clear ask into a PRD before coding: objective, users, scope, constraints, boundaries, acceptance criteria. Writes the feature's intent file under docs/planning/ so downstream skills execute with intent, not guesses. Adapted from addyosmani/agent-skills spec-driven-development (MIT).
 alwaysApply: false
+craftkitInject: planning-resolve
 ---
 
 **Model:** everyday. Escalate when the feature is hard to reverse (schema, public API, payment/auth surface) per the karpathy hard-to-reverse gate.
 
 > **Core behaviors:** Surface assumptions. STOP and ask when confused; never invent requirements. Simplicity first (YAGNI on scope). See `/using-agent-skills`.
-> **Forward, not backward.** `/spec` defines what *will* be built. `/fe-context` documents what *was* changed (from the diff). They meet in `docs/context.md`, where `/spec` writes the forward block and `/fe-context` preserves it.
+> **Forward, not backward.** `/spec` defines what *will* be built, and owns `docs/planning/<slug>.md`. `/fe-context` documents what *was* changed, derived from the diff. They no longer share a file: intent is stored per feature, derived context is not stored at all (ADR-0001, ADR-0002).
 
 ---
 
@@ -42,18 +43,29 @@ Every success criterion must be verifiable. If you can't name how it's checked, 
 
 ---
 
-## Write the forward-planning block into docs/context.md
+## Write the feature's intent file
 
-`docs/context.md` is the single source of truth all fe-* skills read. `/spec` owns a delimited **PLANNING** block there; `/plan` and `/adr` append into the same block. `/fe-context` preserves it verbatim on regenerate.
+`/spec` **creates** the feature's intent file and owns its `## Spec` section. Nothing else creates
+it; `/plan` and `/adr` fill their own sections in the same file (see the resolution partial above
+for the shape and the `status` field).
 
-Create `docs/context.md` (and `docs/`) if absent, where a header-only stub is fine; `/fe-context` fills the backward sections later. Insert/replace this block:
+**Ask the author for the slug.** It is the durable key for this feature, so it is named, never
+derived: a branch name breaks on rename and has no answer on `main`. One or three kebab words.
+
+Create `docs/planning/` if absent, then write `docs/planning/<slug>.md`:
 
 ```markdown
-<!-- BEGIN PLANNING: managed by /spec /plan /adr; preserved by /fe-context -->
-## Planning (forward)
+---
+slug: {{slug}}
+status: active
+created: {{ISO date}}
+---
+
+# {{feature}}
+
+## Spec
 **Updated:** {{ISO timestamp}} · **By:** /spec
 
-### Spec: {{feature}}
 - **Objective:** …
 - **Users & job:** …
 - **Success:** …
@@ -63,23 +75,25 @@ Create `docs/context.md` (and `docs/`) if absent, where a header-only stub is fi
 - **Key decisions:** …
 - **Acceptance:** …
 
-### Task Plan
-_(filled by /plan)_
+## Task Plan
+_(owned by /plan)_
 
-### Decisions
-_(appended by /adr)_
-<!-- END PLANNING -->
+## Decisions
+_(pointers appended by /adr)_
 ```
 
-Keep the block inside the 600-line budget `/fe-context` enforces, so summarize, don't paste. If the block already exists, update the `### Spec` subsection only; leave Plan/Decisions intact.
+Summarize rather than paste; an intent file past ~200 lines is a spec nobody rereads. If the file
+already exists, update `## Spec` only and leave Task Plan and Decisions intact.
 
----
+**Tell the author to commit it on the feature branch now.** An uncommitted intent file survives
+`git checkout` and follows them onto other branches, which is exactly the ambiguity the per-feature
+layout exists to remove.
 
 ## Output
 
 Print the PRD to the user, then confirm the write:
 ```
-SPEC: <feature>  ·  written to docs/context.md PLANNING block
+SPEC: <feature>  ·  written to docs/planning/<slug>.md  (status: active)
 Verifiable success criteria: <N>   Out-of-scope items: <N>   Open questions: <N>
 → Next: /plan to break this into tasks · optionally /ideate if approach still open.
 ```

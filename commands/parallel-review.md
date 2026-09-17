@@ -23,7 +23,7 @@ craftkitInject: parallel-classifier
 
 Load context for the detected platform:
    - **RN / web:** apply standard context loading (`using-agent-skills`): freshness check (branch + commit), regenerate if stale or missing, read Summary + Key Changes
-   - **Android / iOS:** `docs/context.md` only for multi-screen branches (`/android-context`, `/ios-context`). Single screen: read a real sibling screen instead and pass that as the convention baseline
+   - **Android / iOS:** derive context only for multi-screen branches (`/android-context`, `/ios-context`). Single screen: read a real sibling screen instead and pass that as the convention baseline
 
 ---
 
@@ -61,15 +61,30 @@ Spawn **all** selected agents in **one** message: N `Agent` tool-use blocks in a
 
 **Do not wait by polling.** Never `grep`/`sleep`-loop over task output files (`tasks/*.output`) to detect completion. The harness wakes the main thread automatically when every spawned agent comes to rest, and re-invokes you with their results. Spin-loops keep running for minutes after the agents already finished (observed: agents done in <2 min, poll loop burned 12 min more). On wake, read the returned results and go straight to Phase 3.
 
-Every agent gets the same user message:
+Every agent gets the same user message. **Pass full file contents, not just the diff.** An agent
+holding only a diff cannot see the surrounding code, so it reads the files itself, and every read
+is a round-trip that re-sends its whole growing context: three reads on a 20k base bills about
+`20 + 28 + 36 + 44`, not `44`. Contents passed once cost once. Break-even is roughly two reads per
+agent, which any non-trivial change exceeds.
 
 ```
+CHANGED FILES (full contents):
+<path>
+```
+<entire file>
+```
+… repeat per changed non-test source file
+
 DIFF:
 <full diff>
 
 CONTEXT:
-<docs/context.md Summary + Key Changes, or, for a single native screen, the sibling screen read in Phase 0>
+<the resolved intent file's `## Spec` when one exists, plus the Phase 0 derived Summary + Key Changes, or, for a single native screen, the sibling screen read in Phase 0>
 ```
+
+**Bound it.** Non-test source files only, and skip any file over ~1500 lines. An omitted file is
+named in the payload as `not provided`, which per `grounding` the agent reports rather than reading
+or recalling. A gap the agent names is cheaper than a gap it fills.
 
 Spawn the set the classifier selected:
 

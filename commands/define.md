@@ -1,6 +1,6 @@
 ---
 name: define
-description: Checkpoint-gated pre-build planning pipeline that chains /interview → /spec → /plan (offering /ideate and plan-roaster where useful) so an underspecified feature ask becomes a reviewed spec + task plan in one invocation. Pauses for your approval between phases. Writes the forward-planning block into docs/context.md. Use before building a feature whose scope, approach, or tasks aren't yet clear.
+description: Checkpoint-gated pre-build planning pipeline that chains /interview → /spec → /plan (offering /ideate and plan-roaster where useful) so an underspecified feature ask becomes a reviewed spec + task plan in one invocation. Pauses for your approval between phases. Writes the feature's intent file under docs/planning/. Use before building a feature whose scope, approach, or tasks aren't yet clear.
 ---
 
 **Model:** everyday. Escalate the spec phase for hard-to-reverse features (schema, public API, payment/auth).
@@ -40,15 +40,15 @@ If the *approach* is genuinely open (multiple viable architectures), offer `/ide
 
 ## Phase 2: Spec (`/spec`)
 
-Run `/spec` using the Discovery Brief (+ any `/ideate` choice) as input. Writes the `### Spec` subsection of the `docs/context.md` PLANNING block.
+Run `/spec` using the Discovery Brief (+ any `/ideate` choice) as input. Creates the feature's intent file at `docs/planning/<slug>.md` and owns its `## Spec` section.
 
-**Gate:** PRD printed, every success criterion verifiable, out-of-scope non-empty. Written to `docs/context.md`.
+**Gate:** PRD printed, every success criterion verifiable, out-of-scope non-empty. Written to `docs/planning/<slug>.md`.
 
 ## Phase 3: Plan (`/plan`)
 
-Run `/plan` against the spec. Writes the `### Task Plan` subsection. Route each task's **Executes via** to the platform's scaffold/test skill.
+Run `/plan` against the spec. Writes the `## Task Plan` section of that same file. Route each task's **Executes via** to the platform's scaffold/test skill.
 
-**Gate:** task table printed with acceptance check + deps + executing skill per task; written to `docs/context.md`.
+**Gate:** task table printed with acceptance check + deps + executing skill per task; written to the same intent file.
 
 ## Phase 3.5: Stress-test (`plan-roaster`, offered)
 
@@ -62,8 +62,8 @@ Offer to spawn the `plan-roaster` agent (`subagent_type: "plan-roaster"`, pass t
 DEFINE COMPLETE
 ──────────────────────────────
 Discovery:  <confidence>%  (or "ask was clear, skipped")
-Spec:       docs/context.md, <N> verifiable criteria, <M> out-of-scope
-Plan:       <T> tasks · critical path <D> deep · <P> parallelizable
+Spec:       docs/planning/<slug>.md, <N> verifiable criteria, <M> out-of-scope
+Plan:       <T> tasks · critical path <D> deep · <P> parallelizable  (same file)
 Roaster:    <score>/10  (or "skipped")
 → Next: /parallel-build to execute · adr/docs offered at /parallel-ship
 ```

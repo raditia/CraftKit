@@ -158,6 +158,12 @@ done
 for a in "$REPO_DIR"/agents/*.md; do
     [[ -f "$a" ]] && _inj_scan "agents/$(basename "$a")" "$a"
 done
+# Skills joined the host list in v1.37.0 (the skills pass renders for every adapter). An
+# unscanned host is the same vacuous pass as before: the skill installs with its core
+# section simply absent, and no sync reports it.
+for _s in "$SKILLS_DIR"/*/SKILL.md; do
+    [[ -f "$_s" ]] && _inj_scan "skills/$(basename "$(dirname "$_s")")/SKILL.md" "$_s"
+done
 for _p in "$PARTIALS_DIR"/*.md; do
     [[ -f "$_p" ]] || continue
     _pn="$(basename "$_p" .md)"
@@ -214,19 +220,26 @@ done
 [[ $_pc -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
-# 8. No always-active rule claims docs/context.md is universal.
-#    Native single-screen skills declare they do not use it. An absolute claim in
-#    an always-on rule contradicts them on every native turn.
+# 8. The native opt-out is declared where a reader will see it. ADR-0002 left
+#    the always-on rule describing a derived-context step; native single-screen
+#    skills take no such step, and an always-on rule that forgot to say so
+#    contradicts them on every native turn. The old form of this check grepped
+#    rules/ for an absolute docs/context.md claim, which stopped being reachable
+#    the moment that filename left the rule, so it is replaced rather than kept
+#    as a gate that cannot fail.
 # ---------------------------------------------------------------------------
-check "no absolute docs/context.md claim"
-_abs="$(grep -rn "docs/context.md" "$RULES_DIR" 2>/dev/null \
-    | grep -E "mandatory, not optional|no exceptions|always read .*mandatory" || true)"
-if [[ -n "$_abs" ]]; then
-    echo "$_abs" | while IFS= read -r l; do echo "    FAIL: absolute claim contradicts native skills: ${l#$REPO_DIR/}"; done
-    FAILURES=$((FAILURES + 1))
-else
-    pass
-fi
+check "native skills declare the derived-context opt-out"
+_no=0
+grep -q "native skills only on multi-screen branches" "$REPO_DIR/rules/using-agent-skills.md" \
+    || { fail "the always-on loading procedure lost its native scope caveat, so it now claims a derived-context step on native single-screen turns"; _no=1; }
+_optout=0
+for _f in "$SKILLS_DIR"/android-*/SKILL.md "$SKILLS_DIR"/ios-*/SKILL.md; do
+    grep -q "No derived-context step" "$_f" && _optout=$((_optout + 1))
+done
+# Ten of the twelve native skills are single-screen; the two context generators opt in.
+[[ $_optout -ge 10 ]] \
+    || { fail "only $_optout native skills declare the derived-context opt-out, want >= 10, so some now inherit a step they do not take"; _no=1; }
+[[ $_no -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
 # 9. README lists every agent and skill (authoring rule #3).
@@ -1258,6 +1271,186 @@ console.log(drift(process.argv[2], "HEAD", ["a.txt"]).state);' "$REPO_DIR/hooks/
     rm -rf "$_ddx" "$_nogit"
     [[ $_dd -eq 0 ]] && pass
 fi
+
+# ---------------------------------------------------------------------------
+# 30. A skill's craftkitInject renders, on every tool. Agents and commands render
+#     only through the Claude adapter, which is correct: they are the one tool with
+#     those hosts. A skill is different, because all four adapters install the same
+#     SKILL.md, so leaving the splice in claude.sh would ship Cursor, Gemini and
+#     Codex a skill with its core section missing and nothing would say so. Cursor's
+#     parallel-review proved the shape: 139 lines against Claude's 255.
+#     Two halves, because either alone passes vacuously. The renderer must splice,
+#     and the skills pass must call it: a revert to `diff -q "$source_file"` leaves
+#     the renderer present, correct, and unreached.
+# ---------------------------------------------------------------------------
+check "a skill's craftkitInject renders for every tool"
+_si=0
+_six="$(mktemp -d)"
+mkdir -p "$_six/partials" "$_six/rules" "$_six/skills/probe"
+cat > "$_six/partials/probe-partial.md" <<'EOF'
+---
+name: probe-partial
+description: fixture
+---
+
+PROBE-PARTIAL-BODY
+EOF
+cat > "$_six/skills/probe/SKILL.md" <<'EOF'
+---
+name: probe
+craftkitInject: probe-partial
+---
+
+PROBE-SKILL-BODY
+EOF
+{
+    echo "PARTIALS_DIR='$_six/partials'; RULES_DIR='$_six/rules'; SKILLS_DIR='$_six/skills'"
+    sed -n '/^_CRAFTKIT_INJECTED_START=/p;/^_CRAFTKIT_INJECTED_END=/p' "$REPO_DIR/sync.sh"
+    sed -n '/^craftkit_inject_list() {/,/^}/p' "$REPO_DIR/sync.sh"
+    sed -n '/^craftkit_strip_frontmatter() {/,/^}/p' "$REPO_DIR/sync.sh"
+    sed -n '/^craftkit_render_injected() {/,/^}/p' "$REPO_DIR/sync.sh"
+    echo 'craftkit_render_injected "$1" "$2"'
+} > "$_six/render.sh"
+if bash "$_six/render.sh" "$_six/skills/probe/SKILL.md" "$_six/out.md" 2>/dev/null; then
+    grep -q 'PROBE-PARTIAL-BODY' "$_six/out.md" \
+        || { fail "the shared renderer does not splice a partial into a skill, so an injecting skill installs without its core section"; _si=1; }
+    grep -q 'PROBE-SKILL-BODY' "$_six/out.md" \
+        || { fail "the shared renderer drops the skill's own body while splicing"; _si=1; }
+    [[ "$(head -1 "$_six/out.md")" == "---" ]] \
+        || { fail "the shared renderer splices above the frontmatter, so the skill loses its name and never registers"; _si=1; }
+    grep -q 'name: probe-partial' "$_six/out.md" \
+        && { fail "the shared renderer splices the partial's frontmatter as body text"; _si=1; }
+else
+    fail "sync.sh no longer exposes craftkit_render_injected as a tool-agnostic function, so only Claude can render an injected skill"
+    _si=1
+fi
+# The skills pass has to reach it. Structural on purpose: the loop's job is choosing what
+# to diff and install, and only the source text says which of the two it passes on.
+_skills_loop="$(awk '/^sync_adapter\(\) \{/,/^\}/' "$REPO_DIR/sync.sh")"
+case "$_skills_loop" in
+    *'craftkit_render_injected "$source_file" "$rendered"'*) : ;;
+    *) fail "sync_adapter installs SKILL.md without rendering, so a skill's craftkitInject is silently dropped on every tool"; _si=1 ;;
+esac
+case "$_skills_loop" in
+    *'"install_${adapter}_skill" "$skill" "$rendered"'*) : ;;
+    *) fail "sync_adapter renders but installs the raw source, so the rendered block never reaches any tool"; _si=1 ;;
+esac
+rm -rf "$_six"
+[[ $_si -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 31. The eval rubric's weights sum to 100, in both places they are written.
+#     A percentage is only meaningful against a known total, so a weight edit
+#     that lands on 95 or 110 produces a score that looks authoritative and is
+#     wrong, silently, forever. The README repeats the table for the reader, so
+#     it is checked against the partial the judge actually scores by: a reader
+#     trusting a stale README is the same defect one layer out.
+# ---------------------------------------------------------------------------
+check "eval rubric weights sum to 100, partial and README agree"
+_ev=0
+_ev_weights() {
+    awk -F'|' '
+        $2 ~ /^ *(Spec conformance|Correctness|Pattern adherence|Verification|Simplicity) *$/ &&
+        $3 ~ /^ *[0-9]+ *$/ { s += $3; n++ }
+        END { print s " " n }
+    ' "$1"
+}
+_ev_p="$(_ev_weights "$REPO_DIR/partials/eval-rubric.md")"
+_ev_r="$(_ev_weights "$REPO_DIR/README.md")"
+[[ "$_ev_p" == "100 5" ]] \
+    || { fail "partials/eval-rubric.md weights read '$_ev_p' (want '100 5'), so /eval reports a percentage against the wrong total"; _ev=1; }
+[[ "$_ev_r" == "100 5" ]] \
+    || { fail "the eval rubric table in README.md reads '$_ev_r' (want '100 5'), so the documented weights differ from the ones the judge scores by"; _ev=1; }
+# The awk recompute in skills/eval is the third copy of the weights, and the one that
+# produces the number, so it is the copy that matters most and the easiest to miss.
+_ev_awk="$(awk -F'[()]' '/s\*[0-9]+ \+ c\*[0-9]+/{print $0}' "$REPO_DIR/skills/eval/SKILL.md")"
+case "$_ev_awk" in
+    *"s*35 + c*25 + p*20 + v*15 + x*5"*) : ;;
+    *) fail "the awk recompute in skills/eval/SKILL.md no longer carries the rubric weights 35/25/20/15/5, so /eval computes a total the rubric does not describe"; _ev=1 ;;
+esac
+# The partial is the single source only while both hosts inject it.
+for _evh in "$REPO_DIR/skills/eval/SKILL.md" "$REPO_DIR/agents/eval-judge.md"; do
+    grep -q '^craftkitInject:.*eval-rubric' "$_evh" \
+        || { fail "$(basename "$(dirname "$_evh")")/$(basename "$_evh") no longer injects eval-rubric, so it scores by a copied rubric that will drift"; _ev=1; }
+done
+[[ $_ev -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 32. Intent lives per feature, and every reader of it resolves the same way.
+#     ADR-0001 names this as the release-completion condition: while any skill
+#     still writes the old shared PLANNING block, intent has two possible homes
+#     and a missed writer splits it across both silently, which is worse than
+#     the single-slot bug because it is quiet rather than destructive.
+# ---------------------------------------------------------------------------
+check "intent is per-feature, and its readers share one resolver"
+_pl=0
+# The old shared block. Its phrase is what every writer and reader used to say.
+_pl_hits="$(grep -rln "PLANNING block" "$REPO_DIR/skills" "$REPO_DIR/commands" \
+    "$REPO_DIR/partials" "$REPO_DIR/rules" "$REPO_DIR/agents" 2>/dev/null || true)"
+[[ -z "$_pl_hits" ]] \
+    || { fail "still writing or reading the shared PLANNING block: $(echo "$_pl_hits" | tr '\n' ' ')- intent then has two homes and a missed writer splits it silently"; _pl=1; }
+# The generator must not carry the marker in its own output template, or it
+# recreates the shared block on the next regenerate.
+_pl_tmpl="$(awk '/^```markdown/,/^```$/' "$REPO_DIR/skills/fe-context/SKILL.md")"
+case "$_pl_tmpl" in
+    *"BEGIN PLANNING"*) fail "skills/fe-context still emits a BEGIN PLANNING marker in its template, so regenerating recreates the shared intent slot"; _pl=1 ;;
+esac
+# One resolver, injected by everything that touches intent. A second copy of the
+# glob rule is how two skills come to disagree about which feature is active.
+[[ -f "$REPO_DIR/partials/planning-resolve.md" ]] \
+    || { fail "partials/planning-resolve.md is missing, so each intent skill resolves the active feature its own way"; _pl=1; }
+for _pls in spec plan adr docs eval; do
+    grep -q '^craftkitInject:.*planning-resolve' "$REPO_DIR/skills/$_pls/SKILL.md" \
+        || { fail "skills/$_pls does not inject planning-resolve, so it resolves the active feature by its own rule"; _pl=1; }
+done
+# Nothing may record the branch-to-feature mapping; it is derived (ADR-0001).
+grep -rn "status: active" "$REPO_DIR/partials/planning-resolve.md" >/dev/null \
+    || { fail "planning-resolve no longer globs on status, so the mapping has to be recorded somewhere and will go stale"; _pl=1; }
+[[ $_pl -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 33. Derived context is derived, never stored (ADR-0002). A reader that still
+#     names the old file is reading a snapshot the generator stopped writing,
+#     which returns nothing rather than failing loudly. Release 1's narrower
+#     grep on the phrase "PLANNING block" missed two writers for exactly this
+#     reason, so this one matches the path itself.
+# ---------------------------------------------------------------------------
+check "derived context is derived, not stored"
+_dc=0
+_dc_hits="$(grep -rn "docs/context\.md" "$REPO_DIR/skills" "$REPO_DIR/commands" \
+    "$REPO_DIR/rules" "$REPO_DIR/agents" "$REPO_DIR/partials" "$REPO_DIR/hooks" 2>/dev/null \
+    | grep -v "is migrated, then deleted" || true)"
+[[ -z "$_dc_hits" ]] \
+    || { fail "source still treats docs/context.md as a stored doc: $(echo "$_dc_hits" | sed "s|$REPO_DIR/||" | cut -d: -f1-2 | tr '\n' ' ')- the generator no longer writes it, so the read silently returns nothing"; _dc=1; }
+# The three generators must emit, not write.
+for _g in fe android ios; do
+    # Heading-anchored: the phrase also appears in the inline plan, so an
+    # unanchored grep passes while the actual write step is renamed back.
+    grep -qE "^## Step [0-9]+: Emit the derived context" "$SKILLS_DIR/$_g-context/SKILL.md" \
+        || { fail "skills/$_g-context renamed its emit step; a generator that writes recreates the stale cache ADR-0002 removed"; _dc=1; }
+    grep -qE "No file written|writing no file|Write no file" "$SKILLS_DIR/$_g-context/SKILL.md" \
+        || { fail "skills/$_g-context does not state that it writes no file, so a reader cannot tell the output is not persisted"; _dc=1; }
+done
+[[ $_dc -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 34. Every parallel orchestrator passes full file contents to its agents, so
+#     the always-on claim in rules/grounding.md stays true. It shipped false for
+#     two of three: parallel-review and parallel-ship passed a diff only, while
+#     the rule told agents a gap in the payload is a gap to name. Holding read
+#     tools and no contents, they read instead, and each read is a round-trip
+#     that re-sends the agent's whole growing context. Observed at 63-75k input
+#     per agent on a three-agent review.
+# ---------------------------------------------------------------------------
+check "parallel orchestrators pass file contents, as grounding promises"
+_pc=0
+grep -q "pass full file contents" "$REPO_DIR/rules/grounding.md" \
+    || { fail "rules/grounding.md no longer promises full file contents; either restore it or drop check 34, because the two must agree"; _pc=1; }
+for _o in parallel-review parallel-ship parallel-build; do
+    grep -q "full file contents" "$REPO_DIR/commands/$_o.md" \
+        || { fail "commands/$_o.md does not pass full file contents, so its agents read files themselves and each read re-bills their whole context"; _pc=1; }
+done
+[[ $_pc -eq 0 ]] && pass
 
 echo
 if [[ $FAILURES -eq 0 ]]; then

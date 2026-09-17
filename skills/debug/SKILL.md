@@ -13,7 +13,7 @@ alwaysApply: false
 
 ---
 
-**Context:** `docs/context.md`, reading Summary, Key Changes, Known Issues, Conflicts/Ambiguities. Standard load procedure in `/using-agent-skills`.
+**Context:** Derived context for the change (Summary, Key Changes, Known Issues, Conflicts/Ambiguities), emitted by the platform's context skill. Standard load procedure in `/using-agent-skills`.
 
 ---
 

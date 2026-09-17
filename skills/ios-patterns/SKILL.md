@@ -15,7 +15,7 @@ alwaysApply: false
 
 ---
 
-**Context:** No `docs/context.md`, since iOS modules are not EVPMR. Instead, read one real sibling feature in `Modules/<Module>/<Module>/<Feature>/` to confirm exact naming and imports before acting.
+**Context:** No derived-context step, since iOS modules are not EVPMR. Instead, read one real sibling feature in `Modules/<Module>/<Module>/<Feature>/` to confirm exact naming and imports before acting.
 
 ---
 

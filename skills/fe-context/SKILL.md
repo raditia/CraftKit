@@ -1,6 +1,6 @@
 ---
 name: fe-context
-description: Generate or update docs/context.md from staged/committed/pushed branch changes. Run this before any other fe-* skill.
+description: Derive the branch's change context from git and emit it into the turn: staged, committed and pushed changes, mapped to EVPMR layers. Writes no file. Run at the start of any other fe-* skill, or once in a workflow's Phase 0 and pass the result down.
 alwaysApply: false
 ---
 
@@ -15,14 +15,14 @@ alwaysApply: false
 
 # Feature Context Engineering
 
-Feed the right information at the right time. `docs/context.md` is the single source of truth for what is being developed on this branch. All other skills read it instead of re-scanning the project.
+Feed the right information at the right time. This skill derives what the branch changed, from git, **into the turn**. It stores nothing (ADR-0002): a recorded git fact is stale the moment the next commit lands, and the cache it replaced could not see staged work at all. Intent lives per feature under `docs/planning/` (ADR-0001), which this skill does not touch.
 
 ## Context hierarchy
 
 | Level | What | Where |
 |-------|------|--------|
 | 1. Rules | Project conventions (EVPMR, Token styling, RTK) | Skills files |
-| 2. Spec | What's being built, constraints, key decisions | `docs/context.md` |
+| 2. Intent | What's being built, constraints, key decisions | `docs/planning/<slug>.md` |
 | 3. Source | Only files touched by this branch | Diff output |
 | 4. Errors | Failing tests, lint errors, TypeScript errors | On demand |
 | 5. History | Conversation; compact when switching major tasks | Session |
@@ -41,7 +41,7 @@ PLAN:
 3. Collect: staged → committed-not-pushed → pushed-on-branch
 4. Analyse diff, map to hierarchy levels
 5. Surface any conflicts or ambiguities
-6. Write/update docs/context.md
+6. Emit the derived context into the turn, writing no file
 7. Verify output
 → Proceeding unless redirected.
 ```
@@ -107,78 +107,70 @@ If requirements are missing or ambiguous, stop and ask; do not invent.
 
 ---
 
-## Step 5: Write or update `docs/context.md`
+## Step 5: Emit the derived context
 
-Create `docs/` if needed. If file exists, update changed sections and preserve manually added notes.
+**Write no file.** Emit the block below into the turn, for the skill or workflow that asked. In a
+workflow, derive once in Phase 0 and pass it down; a per-skill re-derivation of the same diff is
+the same content paid for twice.
 
-**Preserve the forward-planning block.** If a `<!-- BEGIN PLANNING … -->` … `<!-- END PLANNING -->` block exists (written by `/spec` `/plan` `/adr`), copy it through verbatim; never regenerate or drop it. It holds the forward spec/tasks/decisions the backward diff sections below complement.
+Keep it under ~600 lines / ~800 tokens. Summarize aggressively; never paste whole files.
 
 ```markdown
-# Feature Context
-<!-- managed by fe-context, regenerate with /fe-context -->
-<!-- L1=rules(skills) L2=this file L3=source-files L4=errors/tests -->
-**Generated:** {{ISO timestamp}}
-**Branch:** {{branch}} | **Base:** {{base}} | **Commit:** {{git rev-parse HEAD}} | **Budget:** ~{{lines}} lines (limit: 600)
+DERIVED CONTEXT
+Branch: {{branch}} | Base: {{base}} | HEAD: {{short sha}}
 
-**Baseline:** record the full `git rev-parse HEAD`, never a branch name or short sha:
-`hooks/craftkit-drift.js` resolves it and reports `cannot-verify` for anything unreachable.
-
-
----
-
-## L2: Feature Summary
+## Feature Summary
 {{2-4 sentences: what is being built, user-facing purpose, scope}}
 
-## L2: Constraints & Key Decisions
-{{bullets: non-obvious decisions or constraints from this branch}}
-
-## L3: Changed Files
-
+## Changed Files
 ### A. Staged (uncommitted)
 | File | Change | Role |
 |------|--------|------|
-
 ### B. Committed, not pushed
 | File | Change | Role |
 |------|--------|------|
-
 ### C. Pushed on branch
 | File | Change | Role |
 |------|--------|------|
 
-## L3: Key Changes
+## Key Changes
 {{bullets with file refs: what was added, modified, removed}}
 
-## L2: Architecture Patterns in Use
+## Architecture Patterns in Use
 - **Structure:** {{which Entry/View/Presenter/Model/Resource files involved}}
 - **State:** {{hooks, React Query, Redux usage}}
 - **Styling:** {{Token values and StyleSheet patterns in play}}
 - **Tracking:** {{tracker events being added}}
 
-## L4: Known Issues
+## Known Issues
 {{lint errors, TypeScript errors, failing tests. Empty if none.}}
 
-## L2: Conflicts / Ambiguities
+## Conflicts / Ambiguities
 {{Unresolved conflicts surfaced above. Not silently fixed.}}
 
-## L3: Test Coverage Needed
-{{Files/functions that are new or changed and lack tests}}
-
-## L2: Suggested Skill Updates
-{{Patterns observed in the diff not yet covered by any skill}}
+## Test Coverage Needed
+{{new or changed files and functions that lack tests}}
 ```
+
+No `Generated:` timestamp and no recorded baseline commit, because nothing persists to go stale
+against. Freshness is not a property this output can lack: it is derived from the working tree as
+it stands when asked.
+
+**A legacy `docs/context.md` is migrated, then deleted.** Move any `<!-- BEGIN PLANNING -->` block
+into the feature's intent file (ADR-0001), then remove the file. Leaving it behind means the next
+reader trusts a snapshot nobody refreshes.
 
 ---
 
 ## Step 6: Verify
 
-- [ ] `docs/context.md` written at the correct project root
 - [ ] All three layers (A/B/C) represented or noted as empty
 - [ ] Conflicts in the Conflicts section, not silently resolved
-- [ ] Context budget ≤ 600 lines; summarize aggressively if over
+- [ ] Under ~600 lines; summarize aggressively if over
 - [ ] No unrelated files dumped in
+- [ ] No file written
 
-Report: path written, layers covered, conflict count, line count.
+Report: layers covered, conflict count, line count.
 
 ---
 
@@ -186,7 +178,7 @@ Report: path written, layers covered, conflict count, line count.
 
 | Anti-pattern | Problem | Fix |
 |---|---|---|
-| Context starvation | Acting without loading context → wrong patterns | Load docs/context.md before any task |
+| Context starvation | Acting without deriving context → wrong patterns | Derive at the start of the task |
 | Context flooding | Loading entire files not relevant to the task | Selective include: only diff-relevant content |
-| Stale context | Using context.md from a different task | Re-run /fe-context when switching tasks |
+| Storing the output | A recorded git fact is stale on the next commit, and cannot see staged work | Emit into the turn; write no file (ADR-0002) |
 | Silent confusion | Guessing when context conflicts with code | Surface with CONFUSION: format, wait for answer |

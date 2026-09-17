@@ -13,7 +13,7 @@ alwaysApply: false
 
 ---
 
-**Context:** No `docs/context.md` (single-screen). Read the changed files plus, when a violation is unclear, the matching sibling screen to confirm the established convention.
+**Context:** No derived-context step (single-screen). Read the changed files plus, when a violation is unclear, the matching sibling screen to confirm the established convention.
 
 ---
 
