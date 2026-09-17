@@ -29,6 +29,8 @@ Applies to `/fe-review`, `/android-review`, `/ios-review`, `/code-quality`, `/po
 
 A cold agent reviews the content it was given. When a file it needs was not provided, it reports `not provided` and reviews the rest, rather than reading a possibly-different version or recalling one. The parallel orchestrators pass full file contents for exactly this reason, so a gap in the payload is a gap to name, not to fill from memory.
 
+**One agent inverts this, and only one.** `bulk-read` is spawned precisely to read a file the caller withheld, because a file read whole by the caller is re-sent on every turn after while the agent's context is discarded. Its bullets carry `file:line`, so a claim built on them stays reproducible, and they answer questions rather than justify edits: an edit needs text the editor actually read, so when a line must change `bulk-read` names the range and the caller reads that slice, which `gate-read-size.js` never refuses. Every other cold agent still reports `not provided`. The same exception is stated in `partials/grounding-claims.md`, the copy agents actually carry, and `check.sh` holds the two together.
+
 ## Staleness is a state, not a guess
 
 Three outcomes, and the third is not the first:

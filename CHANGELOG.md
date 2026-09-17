@@ -7,6 +7,86 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.44.0 — 2026-09-17
+
+### The Read path gets a gate, and a cold reader to delegate to
+
+v1.43.0 capped the Bash read path, but `rtk hook claude` only intercepts `Bash`, so the Read
+tool, the larger channel, still had nothing on it. A file read whole is re-sent on every turn
+for the rest of the session, which is what makes one careless read keep costing.
+
+- `hooks/gate-read-size.js` refuses a whole-file `Read` past 800 lines, and the refusal names the
+  ways through: spawn `bulk-read`, or pass `offset` and `limit`, which is never refused at any
+  size. A read inside a subagent always passes, since that is the `bulk-read` call the refusal
+  offers, and `Grep` is never gated, so finding the range costs nothing.
+- **It is the one gate that denies rather than asks, and the reason is measured.** An `ask`
+  resolves to allow under auto-accept without surfacing anything: the first cut fired on an
+  810-line read, wrote its turn stamp, and the file landed whole regardless, so the gate read as
+  coverage while doing nothing. A deny reason, by contrast, is delivered to the model, which is
+  the only channel that can carry the cheaper path. The refusal is also a different kind of claim
+  than the other three make: they judge whether a skill applies, which a human should be able to
+  overrule, while this asserts a line count and proposes a route.
+- **Truncating the Read path, the way the Bash cap truncates, is unsafe.** Injecting a `limit`
+  through `updatedInput` was the obvious move and is wrong: rtk prints `[N more lines]` inside its
+  own output, while the Read tool prints nothing at all, so the model would hold 800 lines of a
+  2000-line file with no sign the file continued. A silent partial read produces confident claims
+  about code that was never in context, which costs more than a complete read does.
+- It keeps **no once-per-turn budget**, unlike the other three. Theirs exists so a ten-edit turn
+  does not cost ten prompts and train the click-through. This one shows no prompt, so a budget
+  would buy nothing and let the 2nd through Nth large read of a turn land whole.
+- `agents/bulk-read.md` (sonnet) reads the paths it is given, answers one question, and returns
+  bullets each anchored to `file:line`. The file enters its context and not the caller's, and its
+  context is discarded on return.
+- **`bulk-read` bullets answer questions and cannot back a code edit.** When the answer is that a
+  line must change, it names the range and the caller reads that slice, which a bounded read never
+  gates. That keeps `rules/grounding.md` intact rather than loosening it: a claim still rests on
+  text someone read, and the `file:line` anchor keeps it reproducible.
+- The carve-out is stated twice on purpose. `rules/grounding.md` and `partials/grounding-claims.md`
+  both said a cold agent reports `not provided` rather than reading, and a cold agent carries the
+  partial while a human reads the rule, so either one alone would leave `bulk-read` looking like a
+  violation of it. `check.sh` check 36 holds both.
+- `hooks/craftkit-filesize.js` now owns `BIG_LINES` and the line probe both read-path hooks share,
+  the same reason `craftkit-platform.js` is shared: two copies of "how big is big" would let one
+  path truncate a file the other waved through.
+- `check.sh` check 36 is behavioral. Beyond the ask, it pins the two skips that matter most, a
+  subagent read and a bounded `offset`/`limit` read, because gating either would refuse the gate's
+  own advice. It also asserts that the refusal names `bulk-read`, `offset`, `limit` and the escape
+  hatch, because a refusal with no way out is a dead end the model retries into. Its session ids
+  stay unique per run: while the gate still asked, `onceInTurn` stamps outliving the process in
+  `os.tmpdir()` meant a fixed id spent the one ask on the first run, and every run after saw a
+  gate that appeared never to fire. The check caught that on its own second run.
+
+## v1.43.0 — 2026-09-17
+
+### A whole-file read gets the line cap rtk already supported
+
+`rtk hook claude` rewrites `cat F` into `rtk read F` on every Bash call, but passes no flags at
+any size, so a 2000-line file still landed whole and was re-sent on every turn after. The filter
+machinery was installed and switched off.
+
+- `hooks/craftkit-read-cap.js` adds `-m 800` to a bare `cat F` or `rtk read F` over 800 lines. It
+  is the one `PreToolUse` hook that rewrites rather than refuses, so a skipped rewrite leaves
+  today's behavior and nothing here can block a call.
+- **`rtk read -m N` is not a plain cap**, which the first cut of this got wrong. Measured on rtk
+  0.49.0: a file of n lines passes whole when n is at or under N, and shows exactly N/2 when it is
+  over. So one constant is both threshold and flag value, nothing under 800 lines changes at all,
+  and the model sees 400 lines of anything past it. `check.sh` check 35 pins the ratio, because an
+  rtk release that changed it would silently halve every big read again.
+- **`-m` and not `-l`.** Measured before writing: the `-l` filters strip comments and nothing
+  else, 10577 to 5506 bytes on `craftkit-routing.js` at `minimal` and a no-op on markdown. They
+  delete exactly the non-obvious `why` comments and every `ponytail:` / `flag:` marker that
+  `karpathy-guidelines` makes contract, whereas truncation loses a tail that rtk names in its own
+  output (`[340 more lines]`). A named tail is recoverable; a stripped marker is not.
+- Both command shapes match on purpose. The hook shares the `Bash` event with rtk's own rewrite,
+  and which of two `updatedInput` results Claude Code applies is not ours to pick, so matching one
+  shape would mean firing on one merge order only. If rtk's rewrite wins, the read is uncapped and
+  behavior equals today.
+- Any shell metacharacter leaves the command alone, because `cat f | wc -l` capped at 400 reports
+  400. Escape hatch: `CRAFTKIT_READ_CAP=off`.
+- `check.sh` check 35 holds both directions behaviorally: the cap fires on both big-read shapes,
+  and skips a small file, a piped read, an already-capped read, a missing file, and malformed
+  stdin.
+
 ## v1.42.0 — 2026-09-17
 
 ### /fe-design catches design that wears the model's defaults

@@ -22,9 +22,12 @@ _CRAFTKIT_HOOKS=(
     "gate-verify-on-stop.js%Stop%%CraftKit verify gate..."
     "gate-announce-honored.js%Stop%%CraftKit announce gate..."
     "craftkit-platform-rules.js%SessionStart%%CraftKit platform rules..."
+    "craftkit-read-cap.js%PreToolUse%Bash%CraftKit read cap..."
+    "gate-read-size.js%PreToolUse%Read%CraftKit read gate..."
     "craftkit-transcript.js%-%%"
     "craftkit-platform.js%-%%"
     "craftkit-drift.js%-%%"
+    "craftkit-filesize.js%-%%"
 )
 _CLAUDE_SECTION_START="<!-- BEGIN CRAFTKIT (managed: do not edit manually) -->"
 _CLAUDE_SECTION_END="<!-- END CRAFTKIT -->"
