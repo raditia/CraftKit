@@ -54,8 +54,6 @@ installed `xlsx` skill (a CSV with the same columns where that skill is unavaila
 outside the repo unless the developer names a path, since it is a view of `.tests.md`, rebuilt on
 every export, and never committed.
 
-Publishing to a Lark bitable is not in this release.
-
 ## Output
 
 ```

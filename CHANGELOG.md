@@ -9,7 +9,7 @@ from the README header and this file's matching `## <version>` section for the r
 
 ## v1.46.0 — 2026-09-24
 
-### Test cases and external sources become first-class feature context
+### Test cases become first-class feature context; external sources get an honest drift check
 
 Skills only saw git, so requirements that lived in Figma and Lark reached a build by memory or not
 at all, and nothing tied a test to the requirement it was meant to prove.
@@ -23,7 +23,8 @@ at all, and nothing tied a test to the requirement it was meant to prove.
   drafts are unverified, cases never come from the diff. Injected into `/plan` (task rows gain a
   `TCs` column), the three platform test skills (one test per automatable case, titled with its
   ID), `/eval` (and the `eval-judge` template, since the judge is a cold agent), and the build
-  orchestrators, whose gates now list approved cases with no test.
+  orchestrators and `/parallel-ship`, whose gates now list approved cases with no test and block
+  on any missing. The `/eval` rubric's Spec conformance criterion counts approved cases too.
 - **`partials/external-sources.md`.** Checks each source's marker once per workflow and fetches
   content only on drift; reports `clean`, `drifted` or `cannot-verify`, never a guess. v1 trusts
   only Figma's REST `version`, and only where a company token is already set. Figma node hashes
@@ -36,6 +37,12 @@ at all, and nothing tied a test to the requirement it was meant to prove.
   documents `sources:`, and is now injected into `build`, `parallel-build`, `parallel-review`,
   `parallel-ship` and `team-build`, which cited it without carrying it.
 - **`/define`** chains interview, spec, test-cases, plan.
+- **Commands render their partials on every tool.** `sync_commands_adapter` rendered
+  `craftkitInject` only through Claude, so Cursor, Gemini and Codex installed `/build`,
+  `/team-build` and the `parallel-*` commands naming partials they did not carry (a gap since
+  `parallel-classifier` moved into a partial). Commands now render once per sync for every
+  adapter, like skills. Cost: on Gemini and Codex, where commands sit in the always-loaded
+  instructions file, each command grows by its partials. Check 30 holds the commands pass to it.
 - **Latency, per v1.45.0.** No new hooks, so the Gateway adds nothing per prompt. Source marker
   reads run in the same message as Phase 0's git reads, with every Lark source in one batch
   call, so a workflow waits on its slowest source rather than all of them; drifted content is

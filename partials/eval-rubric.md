@@ -9,7 +9,7 @@ A deliverable is scored on five criteria, each `0-5`, each carrying a fixed weig
 
 | Criterion | Weight | Scored on |
 |---|---:|---|
-| Spec conformance | 35 | Every acceptance criterion in the feature's `docs/planning/` intent file is actually implemented, not approximated |
+| Spec conformance | 35 | Every acceptance criterion in the feature's `docs/planning/` intent file, and every approved test case, is actually implemented, not approximated |
 | Correctness | 25 | Logic holds on the inputs it claims to handle: edge cases, error paths, no crash or data-loss path |
 | Pattern adherence | 20 | The platform contract holds: EVPMR layers (RN/web), MVP + Core (Android), MVVM-C (iOS) |
 | Verification | 15 | Tests cover the changed paths and pass; type/lint gates clean |

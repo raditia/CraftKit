@@ -25,7 +25,7 @@ created: 2026-09-24
      `cannot-verify` for that source and otherwise behaves as before (git-only). With no slug
      passed in, a context skill skips the sources step entirely, so standalone output is
      unchanged.
-  3. `/plan` maps every task to at least one approved TC id; `/build`, `/parallel-build` treat
+  3. `/plan` covers every approved TC with at least one task and cites approved ids only; `/build`, `/parallel-build` treat
      only `approved` TCs as requirements and list `draft` / `needs-review` ones as unverified.
   4. Each approved TC with `automation: jest|junit|quick` gets exactly one test, named with the
      TC id, in `/fe-test`, `/android-test`, `/ios-test`; `manual` TCs are listed, not tested.
@@ -44,8 +44,8 @@ created: 2026-09-24
     cannot-verify), scoped fetch, git-only fallback. Marker checks run once per workflow in
     Phase 0 (cheap metadata only); content is fetched only on drift, to stay inside Figma MCP
     rate limits. Injected into `fe-context`, `android-context`, `ios-context`, `spec`, `plan`,
-    `fe-design`, and the build orchestrators. Context skills receive slug + sources from the
-    caller and never resolve intent themselves.
+    `fe-design` and `test-cases`; the build orchestrators reach it through the context skill they
+    run. Context skills receive slug + sources from the caller and never resolve intent themselves.
   - New `/test-cases` skill: generate from sources, re-review on drift (sole `seen` writer after
     `/spec`), export Excel via the installed `xlsx` skill.
   - `planning-resolve` injected into every intent reader that lacks it today: `build`,
@@ -150,11 +150,11 @@ created: 2026-09-24
 | T2 | `partials/external-sources.md`: capability-named reads, per-source marker table as settled by T0, clean / drifted / cannot-verify, fetch only the passed slug's `sources:`, markers once per workflow and content only on drift, skip when no slug passed, IT-sanctioned servers only, never cache content, `seen` written only by `/spec` and `/test-cases` | Exists; no em-dash; no concrete `mcp__` id; states skip-without-slug and cannot-verify fallback | T0 | direct authoring |
 | T3 | `partials/test-cases-resolve.md`: locate `<slug>.tests.md`, TC table schema (7 fields, 4 statuses, no column-0 `status:`), `approved` only as requirements, read only mapped ids, never derive from the diff | Exists; schema complete | T1 | direct authoring |
 | T4 | New `skills/test-cases/SKILL.md`: generate from sources (cite or mark `inferred`), drift re-review to `needs-review` then bump `seen` on confirm, Excel via `xlsx` skill; injects T1-T3 | Name matches dir; injections render on `sync.sh`; criteria 1, 6, 8 each have a step | T1, T2, T3 | direct authoring |
-| T5 | Inject `external-sources` into `fe-context`, `android-context`, `ios-context` (slug from caller, no resolver), `spec`, `plan`, `fe-design`; `/spec` template writes `sources:` with first `seen` | Hosts list it; context skills still write no file (check.sh:1449) | T2 | direct authoring |
+| T5 | Inject `external-sources` into `fe-context`, `android-context`, `ios-context` (slug from caller, no resolver), `spec`, `plan`, `fe-design`; `/spec` template writes `sources:` with first `seen` | Hosts list it; context skills still write no file (check 33) | T2 | direct authoring |
 | T6 | Inject `planning-resolve` into `build`, `parallel-build`, `parallel-review`, `parallel-ship`, `team-build`; inject `test-cases-resolve` into `plan` (task rows gain a `TCs` column), `fe-test` / `android-test` / `ios-test` (one test per automatable TC, titled with its id), `eval` (+ `TEST CASES:` in the judge template), `build` / `parallel-build` / `team-build` (test-case gate line); `planning-resolve` also into the 3 test skills for standalone runs | Every host injects its partials; build gates list missing TC ids | T1, T3 | direct authoring |
 | T7 | `/define` chain: interview, spec, test-cases, plan (new gate) | `commands/define.md` has the phase and gate | T4 | direct authoring |
 | T8 | Routing: rule tree + tiebreaker (TC documents to `/test-cases`, test code to platform test skill), `hooks/craftkit-routing.js` | `sync.sh` drift guard passes; hook advertises `/test-cases` | T4 | direct authoring |
-| T9 | `check.sh`: (a) behavioral resolver fixture excludes `*.tests.md`; (b) extend the check-32 host list (check.sh:1422) to the 5 orchestrators; (c) context skills inject `external-sources` but not `planning-resolve`; (d) no concrete `mcp__` id in `skills/`, `commands/`, `partials/`; (e) every TC consumer injects `test-cases-resolve` | Each fails on a deliberately broken copy, then passes | T1, T2, T5, T6 | direct authoring + `bash check.sh` |
+| T9 | `check.sh`: (a) behavioral resolver fixture excludes `*.tests.md`; (b) extend the check-32 host list to the 5 orchestrators; (c) context skills inject `external-sources` but not `planning-resolve`; (d) no concrete `mcp__` id in `skills/`, `commands/`, `partials/`; (e) every TC consumer injects `test-cases-resolve` | Each fails on a deliberately broken copy, then passes | T1, T2, T5, T6 | direct authoring + `bash check.sh` |
 | T10 | README (skills table, tree, partials, and the Gateway / Orchestrator naming + runtime map below in the architecture section), spec `## Spec` gains the same map as a Key decision, `CHANGELOG.md` v1.46.0, version in `package.json` + README header | Version-agreement, README-coverage and anchor-link checks pass; map marks unbuilt parts | T4, T7, T8 | direct authoring |
 | T11 | Full verify | `bash check.sh` exits 0; `bash sync.sh` `Sync complete.`, second run all `(up to date)` | T0-T10 | `bash check.sh`, `bash sync.sh` |
 
@@ -190,7 +190,7 @@ flowchart TD
     A["Agents · agents/*.md\ncold reviewers · Claude only"]
     M["MCP servers via the host's client\nFigma · Lark\n(external-sources)"]
     ST[("Repo state, per feature\ndocs/planning/&lt;slug&gt;.md: intent + sources\ndocs/planning/&lt;slug&gt;.tests.md: test cases")]
-    V["Published views\nExcel now · Lark bitable planned"]
+    V["Published view\nExcel export"]
 
     D -- sync --> GW
     R -- routes each prompt --> O

@@ -178,7 +178,7 @@ Five namespaces, one source of truth:
 | `skills/` | On demand | Slash command or natural language |
 | `commands/` | On demand | Slash command or natural language |
 | `agents/` | Spawned by an orchestrator | `subagent_type:`, never directly (Claude only) |
-| `partials/` | Only as a splice into a skill, command or agent | Never, since it ships inside its host file (every tool for a skill, Claude only for a command or agent) |
+| `partials/` | Only as a splice into a skill, command or agent | Never, since it ships inside its host file (every tool for a skill or command, Claude only for an agent) |
 
 ### At runtime: Gateway, Orchestrators, state
 
@@ -187,7 +187,7 @@ layers act inside each AI tool:
 
 | Role | What | Where |
 |------|------|-------|
-| **CraftKit Gateway** | Every prompt and tool call passes through it: **Router** (`craftkit-routing.js`, UserPromptSubmit), **Loader** (`craftkit-platform-rules.js`, SessionStart), **Guards** (`gate-skill-first`, `gate-read-size`, `craftkit-read-cap`, PreToolUse), **Exit gates** (`gate-verify-on-stop`, `gate-announce-honored`, Stop) | `hooks/`, Claude Code only. Cursor, Gemini and Codex get the routing rule as text: advisory, not enforced |
+| **CraftKit Gateway** | Every prompt and tool call passes through it ([full table](#enforcement-gates-hooks-that-refuse)): **Router** (`craftkit-routing.js`, UserPromptSubmit), **Loader** (`craftkit-platform-rules.js`, SessionStart), **Guards** (`gate-skill-first`, `gate-read-size`, `craftkit-read-cap`, PreToolUse), **Exit gates** (`gate-verify-on-stop`, `gate-announce-honored`, Stop) | `hooks/`, Claude Code only. Cursor, Gemini and Codex get the routing rule as text: advisory, not enforced |
 | **Orchestrators** | Run a workflow: resolve the feature once in Phase 0, pass the slug down, spawn skills and agents | `commands/*.md` |
 | **Skills and agents** | Do one job; skills reach Figma and Lark through the host's MCP client | `skills/`, `agents/` (Claude only) |
 
@@ -209,7 +209,7 @@ flowchart TD
     A["Agents · agents/*.md\ncold reviewers · Claude only"]
     M["MCP servers via the host's client\nFigma · Lark\n(external-sources)"]
     ST[("Repo state, per feature\ndocs/planning/&lt;slug&gt;.md: intent + sources\ndocs/planning/&lt;slug&gt;.tests.md: test cases")]
-    V["Published views\nExcel now · Lark bitable planned"]
+    V["Published view\nExcel export"]
 
     D -- sync --> GW
     R -- routes each prompt --> O
@@ -747,7 +747,7 @@ Cold, read-only sub-agents (`Read, Grep, Glob`) with a fixed system prompt and m
 Things to know when writing agents:
 
 - **Agents are cold copies.** They don't inherit rules, skills, or session context, so everything they need goes in `agents/<name>.md`.
-- **Use `craftkitInject` instead of copying text.** Put `craftkitInject: <name>` in a skill's, agent's or command's frontmatter and sync splices in `partials/<name>.md`, `rules/<name>.md` or `skills/<name>/SKILL.md` (first match), fresh on every pull. Skills render on all four tools; agents and commands on Claude Code only.
+- **Use `craftkitInject` instead of copying text.** Put `craftkitInject: <name>` in a skill's, agent's or command's frontmatter and sync splices in `partials/<name>.md`, `rules/<name>.md` or `skills/<name>/SKILL.md` (first match), fresh on every pull. Skills and commands render on all four tools; agents on Claude Code only.
 - **`partials/` is shared text that loads nowhere by itself.** It only arrives spliced into a host, so a procedure several commands share costs nothing in sessions that don't run them.
 - **CI runs `check.sh`** on every PR and push to `main`, on macOS (bash 3.2) and Ubuntu (bash 5).
 

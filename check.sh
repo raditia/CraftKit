@@ -1355,6 +1355,14 @@ case "$_skills_loop" in
     *'"install_${adapter}_skill" "$skill" "$rendered"'*) : ;;
     *) fail "sync_adapter renders but installs the raw source, so the rendered block never reaches any tool"; _si=1 ;;
 esac
+# Commands install on all four tools, so the commands pass renders for all of them too:
+# rendering only through Claude left Cursor, Gemini and Codex a /build that names
+# planning-resolve without carrying it.
+_cmds_loop="$(awk '/^sync_commands_adapter\(\) \{/,/^\}/' "$REPO_DIR/sync.sh")"
+case "$_cmds_loop" in
+    *'craftkit_render_injected "$source_file" "$rendered"'*'"install_${adapter}_command" "$cmd" "$rendered"'*) : ;;
+    *) fail "sync_commands_adapter installs commands unrendered, so on Cursor, Gemini and Codex a command names partials it does not carry"; _si=1 ;;
+esac
 rm -rf "$_six"
 [[ $_si -eq 0 ]] && pass
 
@@ -1464,7 +1472,7 @@ done
 # template itself must carry the cases.
 grep -q '^TEST CASES:' "$SKILLS_DIR/eval/SKILL.md" \
     || { fail "skills/eval's judge template has no TEST CASES field, so eval-judge scores without the approved cases"; _tc=1; }
-for _tcc in build parallel-build team-build; do
+for _tcc in build parallel-build parallel-ship team-build; do
     grep -q '^craftkitInject:.*test-cases-resolve' "$COMMANDS_DIR/$_tcc.md" \
         || { fail "commands/$_tcc does not inject test-cases-resolve, so it builds to test cases by its own rule"; _tc=1; }
 done

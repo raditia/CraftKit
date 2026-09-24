@@ -95,7 +95,7 @@ Each test must protect a **rule** (why the behavior matters), not just assert a 
 
 ## Approved test cases
 
-When the feature has test cases (`test-cases-resolve` above), every approved case with Automation `junit` gets exactly one test, titled with its ID: `` @Test fun `TC-003 …`() ``. List `manual` cases in the report instead of testing them. Coverage of the diff below still applies on top.
+When the feature has test cases (`test-cases-resolve` above), every approved case with Automation `junit` gets exactly one test, titled with its ID: `` @Test fun `TC-003 …`() ``. List `manual` cases in the report instead of testing them. Coverage of the diff below still applies on top. Run standalone with two active intent files, skip test cases and say so instead of asking, so writing tests never waits on planning hygiene.
 
 ## Workflow
 

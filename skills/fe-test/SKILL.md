@@ -85,7 +85,7 @@ Never `setTimeout` + assertion, which is flaky.
 
 ## Approved test cases
 
-When the feature has test cases (`test-cases-resolve` above), every approved case with Automation `jest` gets exactly one test, titled with its ID: `it('TC-003: …')`. List `manual` cases in the report instead of testing them. Coverage of the diff below still applies on top.
+When the feature has test cases (`test-cases-resolve` above), every approved case with Automation `jest` gets exactly one test, titled with its ID: `it('TC-003: …')`. List `manual` cases in the report instead of testing them. Coverage of the diff below still applies on top. Run standalone with two active intent files, skip test cases and say so instead of asking, so writing tests never waits on planning hygiene.
 
 ## Workflow
 

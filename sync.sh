@@ -387,20 +387,18 @@ sync_commands_adapter() {
         local source_file="$COMMANDS_DIR/${cmd}.md"
         local dest
         dest="$("get_${adapter}_command_dest" "$cmd")"
-        # Same currency hook as agents: an adapter that TRANSFORMS a command on install
-        # must be diffed against the rendered output, or a command whose injected partial
-        # changed looks unchanged and never re-syncs.
-        local cmp_src="$source_file" cmp_tmp=""
-        if declare -f "effective_${adapter}_command_source" >/dev/null 2>&1; then
-            cmp_src="$("effective_${adapter}_command_source" "$cmd" "$source_file")"
-            cmp_tmp="$cmp_src"
-        fi
-        if [[ ! -f "$dest" ]] || ! diff -q "$cmp_src" "$dest" &>/dev/null; then
+        # Rendered for every adapter, as skills are: Cursor, Gemini and Codex install commands
+        # too, and a command naming a partial it does not carry is a dangling instruction there.
+        # Diffing the rendered text keeps the pass idempotent when only a partial moved on.
+        local rendered
+        rendered="$(mktemp)"
+        craftkit_render_injected "$source_file" "$rendered"
+        if [[ ! -f "$dest" ]] || ! diff -q "$rendered" "$dest" &>/dev/null; then
             echo "    + command: $cmd"
-            "install_${adapter}_command" "$cmd" "$source_file"
+            "install_${adapter}_command" "$cmd" "$rendered"
             changed=1
         fi
-        [[ -n "$cmp_tmp" ]] && rm -f "$cmp_tmp"
+        rm -f "$rendered"
     done
 
     [[ $changed -eq 0 ]] && echo "    commands: (up to date)"

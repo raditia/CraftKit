@@ -1,7 +1,7 @@
 ---
 name: parallel-ship
 description: Dynamic parallel pre-merge check with platform-routed gates (type/build + lint first, then test with coverage running alongside classifier-selected agents). Supports RN/web, Android, and iOS.
-craftkitInject: parallel-classifier, planning-resolve
+craftkitInject: parallel-classifier, planning-resolve, test-cases-resolve
 ---
 
 **Commands:** `rtk git diff`, plus the platform's type/lint/test tooling (see Phase 1)
@@ -148,6 +148,7 @@ PARALLEL SHIP COMPLETE
 Platform:  <RN/web | Android | iOS>
 Phase 1:   type/build PASS | lint PASS | test PASS (N tests)
            Coverage: Lines N% / Branches N% / Functions N% / Statements N%  (native: actual, or "not measured")
+Test cases: N approved · N tested · N manual · missing [TC ids] (or "no test cases"); any missing → BLOCKED
 Agents:    ran [list] | skipped [agent + reason, if any]
 Rollback:  <flag key>: OFF path verified <how> | n-a (no flag in diff)
 

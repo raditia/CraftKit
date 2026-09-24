@@ -8,7 +8,7 @@ description: How a skill checks the active feature's Figma and Lark sources for 
 Run this only when your caller passed a slug, or your own skill resolved one. With no slug, skip
 it without comment: the output is then exactly what it was before sources existed.
 
-1. Read `sources:` from the frontmatter of `docs/planning/<slug>.md`. None listed → skip.
+1. Read `sources:` from the frontmatter of `docs/planning/<slug>.md` (for `/spec`, the pointers the author just gave). None listed → skip.
 2. Read **markers only**, once per workflow, all in one message: every read in parallel, and all
    Lark sources in a single batch metadata call. The caller runs these beside its own git reads,
    so the wait is the slowest call, not the sum. Figma MCP calls are rate-limited per seat.
@@ -27,7 +27,7 @@ it without comment: the output is then exactly what it was before sources existe
 | Figma file | `version` | Figma REST `GET /v1/files/:key/meta`, only with a company token already in the environment | use, optional |
 | Figma node, or Lark without those tools | content hash | none | `cannot-verify` until reproducible hashes are proven (`docs/research/lark-figma-mcp-revisions.md`) |
 
-Tool names differ per host, so find the tool by what it does, not by a name you remember.
+A row whose v1 column is `cannot-verify` is reported as such without calling anything. Tool names differ per host, so find the tool by what it does, not by a name you remember.
 
 ### Outcomes
 
