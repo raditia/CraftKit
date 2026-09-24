@@ -159,15 +159,39 @@ bash sync.sh    # distribute; a second consecutive run must report no work
 Every `git pull` triggers a sync that installs rules, skills, commands, and agents into each AI tool:
 
 ```mermaid
-flowchart TD
-    A[git pull] --> B[post-merge hook]
-    B --> C[sync.sh]
-    C --> T["RTK\ntoken-filter proxy (ensure_tools)\ncaveman = plugin, not synced"]
-    C --> R["rules/*.md\nalways-on · every session"]
-    C --> S["skills/*/SKILL.md\non-demand slash commands"]
-    C --> M["commands/*.md\nworkflow orchestrators"]
-    C --> G["agents/*.md\ncold sub-agents · Claude only"]
-    C --> P["partials/*.md\nspliced into skills/commands/agents\nnever loaded on its own"]
+flowchart TB
+    subgraph S1["STAGE 1 · CONTENT"]
+        direction LR
+        c1["rules/"] ~~~ c2["skills/"] ~~~ c3["commands/"] ~~~ c4["agents/"] ~~~ c5["partials/<br/>spliced in, never alone"]
+    end
+    subgraph S2["STAGE 2 · DISTRIBUTE"]
+        direction LR
+        pull["git pull<br/>post-merge hook"] --> sync["sync.sh<br/>idempotent · check.sh gates every change"]
+    end
+    subgraph S3["STAGE 3 · TOOLS · one adapter each"]
+        direction LR
+        t1["Claude Code"] ~~~ t2["Cursor"] ~~~ t3["Gemini CLI"] ~~~ t4["Codex CLI"]
+    end
+    subgraph S4["STAGE 4 · SESSION GATES · hooks enforce on Claude Code, the same rules are advisory text elsewhere"]
+        direction LR
+        g1["routing<br/>+ model tier"] --- g2["skill-first"] --- g3["read-size"] --- g4["verify-on-stop"] --- g5["announce"]
+    end
+    subgraph S5["STAGE 5 · OUTPUT"]
+        out["Verified change, shipped"]
+    end
+    S1 --> S2 --> S3 --> S4 --> S5
+
+    classDef n fill:#ffffff,stroke:#c9c9c9,color:#1f1f1f
+    classDef key fill:#d6efff,stroke:#0a84ff,color:#0b3d66
+    classDef ok fill:#ffffff,stroke:#1a9e3a,color:#137a2c
+    class c1,c2,c3,c4,c5,pull,t1,t2,t3,t4 n
+    class sync,g1,g2,g3,g4,g5 key
+    class out ok
+    style S1 fill:#fafafa,stroke:#ececec,color:#8a8a8a
+    style S2 fill:#fafafa,stroke:#ececec,color:#8a8a8a
+    style S3 fill:#fafafa,stroke:#ececec,color:#8a8a8a
+    style S4 fill:#eef8ff,stroke:#b8dcf7,color:#5a7a92
+    style S5 fill:#fafafa,stroke:#ececec,color:#8a8a8a
 ```
 
 Five namespaces, one source of truth:
@@ -194,31 +218,41 @@ layers act inside each AI tool:
 The Gateway does not see MCP calls. Per-feature state lives in the repo, never in a tool:
 
 ```mermaid
-flowchart TD
-    subgraph INSTALL["Install time"]
-        D["Distributor\nsync.sh + adapters/"]
+flowchart TB
+    subgraph R1["INSTALL TIME"]
+        D["Distributor<br/>sync.sh + adapters/"]
     end
-    subgraph GW["CraftKit Gateway · hooks/ · Claude Code only"]
-        R["Router\ncraftkit-routing.js\nUserPromptSubmit"]
-        L["Loader\ncraftkit-platform-rules.js\nSessionStart"]
-        G["Guards\ngate-skill-first · gate-read-size · read-cap\nPreToolUse"]
-        X["Exit gates\ngate-verify-on-stop · gate-announce-honored\nStop"]
+    subgraph GW["CRAFTKIT GATEWAY · hooks/ · Claude Code only · does not see MCP calls"]
+        direction LR
+        R["Router<br/>UserPromptSubmit"] ~~~ L["Loader<br/>SessionStart"] ~~~ G["Guards<br/>PreToolUse"] ~~~ X["Exit gates<br/>Stop"]
     end
-    O["Orchestrators · commands/*.md\n/define · /parallel-build · /build · /team-build\n/parallel-review · /parallel-ship · /fix · /ship\nPhase 0: resolve slug once + approved test cases, pass down"]
-    S["Skills · skills/*\n/spec · /test-cases · /plan · /fe-test · /eval · context skills"]
-    A["Agents · agents/*.md\ncold reviewers · Claude only"]
-    M["MCP servers via the host's client\nFigma · Lark\n(external-sources)"]
-    ST[("Repo state, per feature\ndocs/planning/&lt;slug&gt;.md: intent + sources\ndocs/planning/&lt;slug&gt;.tests.md: test cases")]
-    V["Published view\nExcel export"]
+    subgraph R3["ORCHESTRATORS · commands/*.md"]
+        O["/define · /parallel-build · /build · /team-build<br/>/parallel-review · /parallel-ship · /fix · /ship<br/>Phase 0: resolve slug once + approved test cases, pass down"]
+    end
+    subgraph R4["WORKERS"]
+        direction LR
+        S["Skills · skills/*<br/>/spec · /test-cases · /plan · /fe-test · /eval"] ~~~ A["Agents · agents/*.md<br/>cold reviewers · Claude only"] ~~~ M["MCP via the host's client<br/>Figma · Lark"]
+    end
+    subgraph R5["STATE · in the repo, per feature"]
+        direction LR
+        ST1[("docs/planning/&lt;slug&gt;.md<br/>intent + sources: pointers")] ~~~ ST2[("docs/planning/&lt;slug&gt;.tests.md<br/>test cases · repo is master")] ~~~ V["Published view<br/>Excel export"]
+    end
+    R1 -- sync --> GW
+    GW -- routes each prompt --> R3
+    R3 --> R4
+    R4 <--> R5
 
-    D -- sync --> GW
-    R -- routes each prompt --> O
-    O --> S
-    O --> A
-    S --> M
-    S <--> ST
-    A -. reads .-> ST
-    S --> V
+    classDef n fill:#ffffff,stroke:#c9c9c9,color:#1f1f1f
+    classDef key fill:#d6efff,stroke:#0a84ff,color:#0b3d66
+    classDef ok fill:#ffffff,stroke:#1a9e3a,color:#137a2c
+    class D,O,S,A,M,V n
+    class R,L,G,X key
+    class ST1,ST2 ok
+    style R1 fill:#fafafa,stroke:#ececec,color:#8a8a8a
+    style GW fill:#eef8ff,stroke:#b8dcf7,color:#5a7a92
+    style R3 fill:#fafafa,stroke:#ececec,color:#8a8a8a
+    style R4 fill:#fafafa,stroke:#ececec,color:#8a8a8a
+    style R5 fill:#fafafa,stroke:#ececec,color:#8a8a8a
 ```
 
 ### Where files land per AI tool
@@ -369,6 +403,47 @@ flowchart TD
     G -->|ERROR found| J
 ```
 
+#### How findings become one verdict
+
+Every review agent reads the same files in the same message and shares nothing, so agreement between them is evidence:
+
+```mermaid
+flowchart LR
+    subgraph P1["1 · INDEPENDENT REVIEW · same files, one message, no shared state"]
+        direction TB
+        a1["code-quality"] ~~~ a2["platform review"] ~~~ a3["platform a11y"] ~~~ a4["ponytail · performance"] ~~~ adv["adversarial<br/>argues against shipping<br/>feeds BLIND SPOTS"]
+    end
+    subgraph P2["2 · MERGE"]
+        dd["Deduplicate by file:line<br/>skipped agent → coverage-gap warning"]
+    end
+    subgraph P3["3 · RANK BY AGREEMENT"]
+        direction TB
+        k1["CONSENSUS<br/>2+ agents, independently · fix first"] ~~~ k2["Standard<br/>one agent"] ~~~ k3["UNIQUE<br/>uncorroborated · kept, lower confidence"] ~~~ k4["Contradiction<br/>state both, judge by evidence, never average"] ~~~ k5["BLIND SPOTS<br/>what the whole panel missed"]
+    end
+    subgraph P4["4 · VERDICT"]
+        direction TB
+        v1["READY TO MERGE<br/>no errors, gates pass"] ~~~ v2["BLOCKED (list)<br/>an error, a failed gate, or a missing test case"] ~~~ v3["INCOMPLETE<br/>an agent failed to run · never ready"] ~~~ note["UNVERIFIED claims cannot back an ERROR,<br/>so an unproven finding cannot block a merge"]
+    end
+    P1 --> P2 --> P3 --> P4
+
+    classDef n fill:#ffffff,stroke:#c9c9c9,color:#1f1f1f
+    classDef key fill:#d6efff,stroke:#0a84ff,color:#0b3d66
+    classDef ok fill:#e3f9d9,stroke:#1a9e3a,color:#137a2c
+    classDef bad fill:#ffffff,stroke:#d6336c,color:#b0214f
+    classDef dash fill:#ffffff,stroke:#8a8a8a,color:#1f1f1f,stroke-dasharray:4 3
+    classDef quiet fill:#fafafa,stroke:#fafafa,color:#8a8a8a
+    class a1,a2,a3,a4,k2 n
+    class adv,k4,k5,v2 bad
+    class dd,v3 key
+    class k1,v1 ok
+    class k3 dash
+    class note quiet
+    style P1 fill:#fafafa,stroke:#ececec,color:#8a8a8a
+    style P2 fill:#fafafa,stroke:#ececec,color:#8a8a8a
+    style P3 fill:#fafafa,stroke:#ececec,color:#8a8a8a
+    style P4 fill:#fafafa,stroke:#ececec,color:#8a8a8a
+```
+
 ---
 
 ### How the classifier picks agents
@@ -492,9 +567,50 @@ flowchart TD
 
 `/define` runs `/interview` (de-fuzz the ask) → `/spec` (PRD) → `/test-cases` (QA cases from Figma/Lark, approved by you) → `/plan` (tasks), pausing for your approval after each, so a bad spec can't quietly turn into bad tasks. It offers `/ideate` when the approach is open and `plan-roaster` before build. The result goes into `docs/planning/<slug>.md`, which every execution skill reads.
 
+```mermaid
+flowchart LR
+    subgraph DEF["Define · /define"]
+        direction TB
+        d1["interview"] --> d2["spec"] --> d3["test-cases"] --> d4["plan"]
+    end
+    subgraph BLD["Build · /parallel-build"]
+        direction TB
+        b1["platform routing"] --> b2["scaffold + implement"] --> b3["type + lint gates"] --> b4["parallel agents + tests"]
+    end
+    subgraph REV["Review · /parallel-review · in parallel, read-only"]
+        direction TB
+        r1["code-quality"] ~~~ r2["platform reviewers"] ~~~ r3["a11y reviewers"] ~~~ r4["adversarial (3+ layers)"]
+    end
+    subgraph SHP["Ship · /parallel-ship · pre-merge"]
+        direction TB
+        s1["coverage gate<br/>RN/web ≥ 93%"] ~~~ s2["perf + ponytail agents"] ~~~ s3["feature-flag rollback"] ~~~ s4["test-case trace<br/>cases approved in Define<br/>missing one = BLOCKED"]
+    end
+    DEF --> BLD --> REV --> SHP
+    SHP -. "opt-in tail" .-> tail["/adr · /docs · /eval"]
+
+    classDef n fill:#ffffff,stroke:#c9c9c9,color:#1f1f1f
+    classDef ok fill:#ffffff,stroke:#1a9e3a,color:#137a2c
+    class d1,d2,d4,b1,b2,b3,b4,r1,r2,r3,r4,s1,s2,s3,tail n
+    class d3,s4 ok
+    style DEF fill:#eef8ff,stroke:#0a84ff,color:#0b3d66
+    style BLD fill:#eef8ff,stroke:#0a84ff,color:#0b3d66
+    style REV fill:#eef8ff,stroke:#0a84ff,color:#0b3d66
+    style SHP fill:#eef8ff,stroke:#0a84ff,color:#0b3d66
 ```
-/define ──► interview ─(gate)─► spec ─(gate)─► test-cases ─(gate)─► plan ─(gate)─► [ready] ──► /parallel-build ──► /parallel-ship
-            de-fuzz             PRD            QA cases             tasks                      build               └─► offers /adr + /docs
+
+```mermaid
+flowchart LR
+    subgraph FIX["Separate path for bugs · /fix"]
+        direction LR
+        f1["failing test first"] --> f2["isolate"] --> f3["hypothesize"] --> f4["fix"] --> f5["regression test"]
+    end
+    classDef n fill:#ffffff,stroke:#c9c9c9,color:#1f1f1f
+    classDef key fill:#d6efff,stroke:#0a84ff,color:#0b3d66
+    classDef ok fill:#ffffff,stroke:#1a9e3a,color:#137a2c
+    class f2,f3,f4 n
+    class f1 key
+    class f5 ok
+    style FIX fill:#fafafa,stroke:#ececec,color:#8a8a8a
 ```
 
 It stops at a reviewed plan. `/adr` and `/docs` come later, offered at the end of `/parallel-ship` once the code is final. Each planning skill also runs on its own. To challenge a plan you already have, use `/grill` (interactive) or the `plan-roaster` agent (one shot).
