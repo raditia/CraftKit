@@ -1419,14 +1419,56 @@ esac
 # glob rule is how two skills come to disagree about which feature is active.
 [[ -f "$REPO_DIR/partials/planning-resolve.md" ]] \
     || { fail "partials/planning-resolve.md is missing, so each intent skill resolves the active feature its own way"; _pl=1; }
-for _pls in spec plan adr docs eval; do
+for _pls in spec plan adr docs eval fe-test android-test ios-test; do
     grep -q '^craftkitInject:.*planning-resolve' "$REPO_DIR/skills/$_pls/SKILL.md" \
         || { fail "skills/$_pls does not inject planning-resolve, so it resolves the active feature by its own rule"; _pl=1; }
 done
+# The orchestrators name "the resolved intent file" to their agents, so they must carry the
+# resolver too; citing it by name without injecting it left each to improvise the glob.
+for _plc in build parallel-build parallel-review parallel-ship team-build; do
+    grep -q '^craftkitInject:.*planning-resolve' "$COMMANDS_DIR/$_plc.md" \
+        || { fail "commands/$_plc does not inject planning-resolve, so it resolves the active feature by its own rule"; _pl=1; }
+done
+# Behavioral: a feature's .tests.md sits beside its intent file, so the resolver's own glob
+# must still find exactly one candidate, even if a status: line reaches column 0 there.
+_pl_glob="$(grep -m1 '^rtk grep -l "^status: active"' "$REPO_DIR/partials/planning-resolve.md" | sed 's/^rtk //')"
+_pl_fx="$(mktemp -d)"
+mkdir -p "$_pl_fx/docs/planning"
+printf -- '---\nslug: a\nstatus: active\n---\n' > "$_pl_fx/docs/planning/a.md"
+printf -- '---\nfeature: a\n---\nstatus: active\n' > "$_pl_fx/docs/planning/a.tests.md"
+_pl_n="$(cd "$_pl_fx" && bash -c "$_pl_glob" | grep -c . || true)"
+rm -rf "$_pl_fx"
+[[ -n "$_pl_glob" && "$_pl_n" == "1" ]] \
+    || { fail "planning-resolve's glob found ${_pl_n:-no} candidates for one feature with a .tests.md beside it, so every feature with test cases resolves as ambiguous"; _pl=1; }
 # Nothing may record the branch-to-feature mapping; it is derived (ADR-0001).
 grep -rn "status: active" "$REPO_DIR/partials/planning-resolve.md" >/dev/null \
     || { fail "planning-resolve no longer globs on status, so the mapping has to be recorded somewhere and will go stale"; _pl=1; }
 [[ $_pl -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 32b. Test cases have one reader contract. Every skill that builds, plans, tests or
+#      scores against a feature's test cases injects the same partial, so "approved
+#      only" and "never derived from the diff" cannot drift between consumers.
+# ---------------------------------------------------------------------------
+check "test-case consumers share one contract"
+_tc=0
+[[ -f "$PARTIALS_DIR/test-cases-resolve.md" ]] \
+    || { fail "partials/test-cases-resolve.md is missing, so each consumer decides which test cases count on its own"; _tc=1; }
+grep -q "never from the diff" "$PARTIALS_DIR/test-cases-resolve.md" 2>/dev/null \
+    || { fail "test-cases-resolve no longer forbids deriving cases from the diff, so tests can be rewritten to confirm the implementation"; _tc=1; }
+for _tcs in plan fe-test android-test ios-test eval; do
+    grep -q '^craftkitInject:.*test-cases-resolve' "$SKILLS_DIR/$_tcs/SKILL.md" \
+        || { fail "skills/$_tcs does not inject test-cases-resolve, so it reads test cases by its own rule"; _tc=1; }
+done
+# The judge is a cold agent: injecting into /eval alone never reaches it, so the spawn
+# template itself must carry the cases.
+grep -q '^TEST CASES:' "$SKILLS_DIR/eval/SKILL.md" \
+    || { fail "skills/eval's judge template has no TEST CASES field, so eval-judge scores without the approved cases"; _tc=1; }
+for _tcc in build parallel-build team-build; do
+    grep -q '^craftkitInject:.*test-cases-resolve' "$COMMANDS_DIR/$_tcc.md" \
+        || { fail "commands/$_tcc does not inject test-cases-resolve, so it builds to test cases by its own rule"; _tc=1; }
+done
+[[ $_tc -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
 # 33. Derived context is derived, never stored (ADR-0002). A reader that still

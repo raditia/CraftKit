@@ -2,6 +2,7 @@
 name: ios-test
 description: Write or improve Quick + Nimble unit tests for an iOS ViewModel: mock dependencies via the Dependency struct and the …Action protocol, assert on captured values.
 alwaysApply: false
+craftkitInject: planning-resolve, test-cases-resolve
 ---
 
 **Commands:** `git diff <base>...HEAD`, `bazelisk test //Modules/<Module>:<Module>TestsBundle`, `swiftlint lint --path <file>`
@@ -99,6 +100,10 @@ Map cases from the diff, max 3 bullets per file, with the rest emerging from run
 Each `it` comment must state **why** the behavior matters (the rule being protected), not just what it asserts.
 
 ---
+
+## Approved test cases
+
+When the feature has test cases (`test-cases-resolve` above), every approved case with Automation `quick` gets exactly one test, titled with its ID: `it("TC-003: …")`. List `manual` cases in the report instead of testing them. Coverage of the diff below still applies on top.
 
 ## Workflow
 

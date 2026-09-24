@@ -1,6 +1,6 @@
 ---
 slug: context-intent-split
-status: active
+status: shipped
 created: 2026-09-17
 ---
 

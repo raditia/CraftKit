@@ -51,7 +51,7 @@ created: 2026-09-24
   - `planning-resolve` injected into every intent reader that lacks it today: `build`,
     `parallel-build`, `parallel-review`, `parallel-ship`, `team-build`.
   - `partials/test-cases-resolve.md`: how a consumer finds and filters approved TCs; injected
-    into `plan`, the three platform test skills, `build` / `parallel-build`, `eval`.
+    into `plan`, the three platform test skills, `build` / `parallel-build` / `team-build`, `eval` (and the `eval-judge` spawn template, since the judge is a cold agent). The three test skills also inject `planning-resolve`, so a standalone `/fe-test` finds its own feature.
   - `/define` chain becomes interview, spec, test-cases, plan.
   - Slug resolved once in Phase 0 and passed down to every skill and agent.
   - Routing (rule + hook), README, CHANGELOG, version bump.
@@ -141,17 +141,51 @@ created: 2026-09-24
 | T3 | `partials/test-cases-resolve.md`: locate `<slug>.tests.md`, TC table schema (7 fields, 4 statuses, no column-0 `status:`), `approved` only as requirements, read only mapped ids, never derive from the diff | Exists; schema complete | T1 | direct authoring |
 | T4 | New `skills/test-cases/SKILL.md`: generate from sources (cite or mark `inferred`), drift re-review to `needs-review` then bump `seen` on confirm, Excel via `xlsx` skill; injects T1-T3 | Name matches dir; injections render on `sync.sh`; criteria 1, 6, 8 each have a step | T1, T2, T3 | direct authoring |
 | T5 | Inject `external-sources` into `fe-context`, `android-context`, `ios-context` (slug from caller, no resolver), `spec`, `plan`, `fe-design`; `/spec` template writes `sources:` with first `seen` | Hosts list it; context skills still write no file (check.sh:1449) | T2 | direct authoring |
-| T6 | Inject `planning-resolve` into `build`, `parallel-build`, `parallel-review`, `parallel-ship`, `team-build`; inject `test-cases-resolve` into `plan` (task rows gain a `TCs` column), `fe-test` / `android-test` / `ios-test` (one test per automatable TC, titled with its id), `eval`, `build` / `parallel-build` / `team-build` | Every host injects its partials | T1, T3 | direct authoring |
+| T6 | Inject `planning-resolve` into `build`, `parallel-build`, `parallel-review`, `parallel-ship`, `team-build`; inject `test-cases-resolve` into `plan` (task rows gain a `TCs` column), `fe-test` / `android-test` / `ios-test` (one test per automatable TC, titled with its id), `eval` (+ `TEST CASES:` in the judge template), `build` / `parallel-build` / `team-build` (test-case gate line); `planning-resolve` also into the 3 test skills for standalone runs | Every host injects its partials; build gates list missing TC ids | T1, T3 | direct authoring |
 | T7 | `/define` chain: interview, spec, test-cases, plan (new gate) | `commands/define.md` has the phase and gate | T4 | direct authoring |
 | T8 | Routing: rule tree + tiebreaker (TC documents to `/test-cases`, test code to platform test skill), `hooks/craftkit-routing.js` | `sync.sh` drift guard passes; hook advertises `/test-cases` | T4 | direct authoring |
 | T9 | `check.sh`: (a) behavioral resolver fixture excludes `*.tests.md`; (b) extend the check-32 host list (check.sh:1422) to the 5 orchestrators; (c) context skills inject `external-sources` but not `planning-resolve`; (d) no concrete `mcp__` id in `skills/`, `commands/`, `partials/`; (e) every TC consumer injects `test-cases-resolve` | Each fails on a deliberately broken copy, then passes | T1, T2, T5, T6 | direct authoring + `bash check.sh` |
-| T10 | README (skills table, tree, partials), `CHANGELOG.md` v1.46.0, version in `package.json` + README header | Version-agreement and README-coverage checks pass | T4, T7, T8 | direct authoring |
+| T10 | README (skills table, tree, partials, and the Gateway / Orchestrator naming + runtime map below in the architecture section), spec `## Spec` gains the same map as a Key decision, `CHANGELOG.md` v1.46.0, version in `package.json` + README header | Version-agreement, README-coverage and anchor-link checks pass; map marks unbuilt parts | T4, T7, T8 | direct authoring |
 | T11 | Full verify | `bash check.sh` exits 0; `bash sync.sh` `Sync complete.`, second run all `(up to date)` | T0-T10 | `bash check.sh`, `bash sync.sh` |
 
 **Parallelizable now:** T0, T1
 **Critical path:** T0 → T2 → T4 → T8 → T10 → T11 (6 deep)
 **Spec criteria verified by `/eval` on a real feature run, not check.sh** (prose behavior): 1, 3, 4, 5, 6, 7 (isolation is by construction in T2, not mechanically checkable).
 **Deferred to v1.47:** bitable publish + QA-feedback import, gated on T0.
+
+### Runtime map (source for T10)
+
+Names: **CraftKit Gateway** = `hooks/` (Claude only): Router (`craftkit-routing.js`,
+UserPromptSubmit), Loader (`craftkit-platform-rules.js`, SessionStart), Guards (`gate-skill-first`,
+`gate-read-size`, `craftkit-read-cap`, PreToolUse), Exit gates (`gate-verify-on-stop`,
+`gate-announce-honored`, Stop). **Orchestrators** = `commands/*.md`. **Distributor** = `sync.sh` +
+`adapters/` (install time only). Cursor, Gemini and Codex have no Gateway: they get the routing rule
+text, advisory not enforced. The Gateway does not see MCP calls today; a PreToolUse Guard on Lark
+write tools is the candidate confirm-enforcer for v1.47.
+
+```
+ INSTALL TIME                     RUNTIME (inside each agent host)
+ sync.sh + adapters/  ──sync──►
+ (Distributor)        ┌─ CRAFTKIT GATEWAY (hooks/, Claude only) ─────────────────────────────┐
+                      │ Router      craftkit-routing.js         UserPromptSubmit             │
+                      │ Loader      craftkit-platform-rules.js  SessionStart                 │
+                      │ Guards      gate-skill-first · gate-read-size · read-cap  PreToolUse │
+                      │ Exit gates  gate-verify-on-stop · gate-announce-honored  Stop        │
+                      └───────────────┬──────────────────────────────────────────────────────┘
+                                      ▼ routes each prompt to
+            ORCHESTRATORS  commands/*.md
+            /define · /parallel-build · /build · /team-build · /parallel-review · /parallel-ship · /fix · /ship
+              │ Phase 0: resolve slug once (planning-resolve), approved TCs (test-cases-resolve), pass down
+              ├──► SKILLS  skills/*   /spec · /test-cases* · /plan · /fe-test · /eval · context skills
+              │        └──► MCP servers via the host's client: Figma · Lark   (external-sources*)
+              └──► AGENTS  agents/*.md  cold reviewers (Claude only)
+                                      │ read / write
+            STATE (repo, per feature)  docs/planning/<slug>.md        intent + sources: pointers + seen
+                                       docs/planning/<slug>.tests.md  test cases (repo is master)
+            VIEWS (published)          Excel now · Lark bitable in v1.47
+
+ * = planned, not built yet (T2, T4, T5)
+```
 
 ## Decisions
 _(pointers appended by /adr)_

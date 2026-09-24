@@ -1,6 +1,7 @@
 ---
 name: team-build
 description: Experimental agent-teams build where this session acts as team lead (escalated model) coordinating everyday-model teammates through a shared task list. Teammates implement files in parallel and message each other directly. Platform-routed (RN/web EVPMR, Android MVP, iOS MVVM-C).
+craftkitInject: planning-resolve, test-cases-resolve
 ---
 
 **Commands:** platform gates, see Phase 5
@@ -47,6 +48,7 @@ FE reviewer teammate is spawned **from the `fe-review` agent definition** (`"spa
 
 Scaffold **before** spawning the team, because the scaffold's file list *is* the ownership map, and letting teammates scaffold concurrently invites file conflicts.
 
+- Resolve the intent file per `planning-resolve` and its test cases per `test-cases-resolve`, once. Each teammate's task carries its own approved TC rows and the slug, never the whole file.
 - FE: `/fe-context` then `/fe-scaffold` (surface assumptions first).
 - Native: read a real sibling screen; `/android-context` / `/ios-context` only for multi-screen scope. Then the platform scaffold skill.
 
@@ -134,6 +136,8 @@ Reviewer: findings only, severity labels per `using-agent-skills`, never edits f
 | FE | `rtk tsc --noEmit` + `rtk lint` + `rtk test --testPathPattern="<feature>" --coverage` (≥93% all four metrics) |
 | Android | `./gradlew :<module>:lintGeneralDebug` + `./gradlew :<module>:testGeneralDebugUnitTest` |
 | iOS | `swiftlint` + `bazelisk test //Modules/<M>:<M>TestsBundle` |
+
+Approved test cases: every one with an automatable Automation value has its test, titled with its ID; list any missing by ID, which blocks the gate.
 
 Teammates verified their own files; the lead verifies the **integration**, so gates run on the whole feature, not per-file.
 

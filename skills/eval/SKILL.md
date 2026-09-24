@@ -2,7 +2,7 @@
 name: eval
 description: Score a finished agentic run into a weighted correctness percentage. Spawns the eval-judge agent over the deliverable, recomputes the arithmetic deterministically, appends the score to docs/evals/ledger.md, and derives the running evaluation success rate. Use after a build or ship run, or when asked "how correct was that", "score this run", "what is our success rate".
 alwaysApply: false
-craftkitInject: eval-rubric, planning-resolve
+craftkitInject: eval-rubric, planning-resolve, test-cases-resolve
 ---
 
 **Commands:** `rtk git diff`, `rtk git rev-parse --short HEAD`, `awk` for the weighted sum
@@ -26,7 +26,7 @@ rtk git rev-parse --short HEAD                      # commit for the ledger row
 rtk git diff <base>...HEAD                          # the deliverable
 ```
 
-Then the acceptance criteria: resolve the active intent file per the partial above and read its `## Spec`. No intent file means Spec conformance is unscorable, which the rubric handles as `n/a` plus `INCOMPLETE`. Do not substitute the commit messages or your own reading of intent for acceptance criteria, because a spec you invented is a spec the run cannot fail.
+Then the acceptance criteria: resolve the active intent file per the partial above and read its `## Spec`, plus the approved rows of its test cases per `test-cases-resolve`, which are acceptance criteria too. No intent file means Spec conformance is unscorable, which the rubric handles as `n/a` plus `INCOMPLETE`. Do not substitute the commit messages or your own reading of intent for acceptance criteria, because a spec you invented is a spec the run cannot fail.
 
 Gate results come from the run being scored: the `PHASE 1` block of a `/parallel-build` or `/parallel-ship` that just finished, or, when `/eval` is invoked standalone, run the platform's type/lint/test row yourself first. Verification cannot be scored from a diff alone.
 
@@ -43,6 +43,9 @@ COMMIT: <short sha>
 
 ACCEPTANCE CRITERIA:
 <the intent file's ## Spec, verbatim, or: none found>
+
+TEST CASES:
+<the approved rows of <slug>.tests.md, verbatim, or: none found>
 
 GATES:
 type/build: PASS | FAIL | n-a

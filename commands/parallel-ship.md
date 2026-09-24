@@ -1,7 +1,7 @@
 ---
 name: parallel-ship
 description: Dynamic parallel pre-merge check with platform-routed gates (type/build + lint first, then test with coverage running alongside classifier-selected agents). Supports RN/web, Android, and iOS.
-craftkitInject: parallel-classifier
+craftkitInject: parallel-classifier, planning-resolve
 ---
 
 **Commands:** `rtk git diff`, plus the platform's type/lint/test tooling (see Phase 1)

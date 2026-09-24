@@ -1,7 +1,7 @@
 ---
 name: parallel-build
 description: Dynamic parallel build workflow with platform-routed context + scaffold + implement, then classifier-selected validation agents running concurrently. Supports RN/web (EVPMR), Android (MVP), and iOS (MVVM-C).
-craftkitInject: parallel-classifier
+craftkitInject: parallel-classifier, planning-resolve, test-cases-resolve
 ---
 
 **Commands:** `rtk git diff`, plus the platform's type/lint/test tooling (see Step 0)
@@ -34,6 +34,7 @@ Run the platform's context step from Step 0. For RN / web that is `/fe-context`:
 1. Detect base: `rtk git remote show origin | grep 'HEAD branch'`
 2. `rtk git log --oneline <base>...HEAD` + `rtk git diff <base>...HEAD`
 3. Derive the context block (≤ 600 lines) into the turn: Summary, Architecture Patterns in Use, Key Changes, Test Coverage Needed. Write no file; pass it to every phase below
+4. Resolve the intent file per `planning-resolve` and its test cases per `test-cases-resolve`, once; pass the slug and the approved cases to every phase below
 
 **Gate:** the derived block covers the feature scope, or, for a single native screen, the sibling screen has been read.
 
@@ -150,7 +151,7 @@ Native has no `*-patterns` cold agent, because the platform's patterns skill alr
 
 Run the platform's test skill from Step 0: tests covering all new code paths, authored while the Phase 5 agents ran. Bring them in line with any Phase 5 fixes, then run them.
 
-**Gate:** All tests pass. RN / web: coverage ≥ 93% on Lines, Branches, Functions, Statements. Android / iOS: no fixed bar unless the team set one, so report the module's actual coverage, or state that it isn't measured.
+**Gate:** All tests pass. Approved test cases: every one with an automatable Automation value has its test, titled with its ID; list any missing by ID, which blocks the gate. RN / web: coverage ≥ 93% on Lines, Branches, Functions, Statements. Android / iOS: no fixed bar unless the team set one, so report the module's actual coverage, or state that it isn't measured.
 
 ---
 
@@ -175,6 +176,7 @@ FINDINGS (from validation)
   1. concern → scenario → consequence
 
 Tests:     PASS (N tests, N new)
+Test cases: N approved · N tested · N manual · missing [TC ids] (or "no test cases")
 Coverage:  Lines N% / Branches N% / Functions N% / Statements N%  (native: actual, or "not measured")
 Verdict:   DONE / BLOCKED (<list blockers>) / INCOMPLETE (<axes unverified due to skipped agents>)
 ```
