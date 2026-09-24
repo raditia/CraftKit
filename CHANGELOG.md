@@ -26,11 +26,11 @@ at all, and nothing tied a test to the requirement it was meant to prove.
   orchestrators, whose gates now list approved cases with no test.
 - **`partials/external-sources.md`.** Checks each source's marker once per workflow and fetches
   content only on drift; reports `clean`, `drifted` or `cannot-verify`, never a guess. v1 trusts
-  native markers only (Lark `revision_id` / `latest_modify_time`, Figma REST `version`); content
-  hashes stay `cannot-verify` until they are shown reproducible across hosts and servers
-  (`docs/research/lark-figma-mcp-revisions.md`). The Lark markers need two tools enabled with `-t` on
-  the local Lark MCP (neither is in a preset), so a default install reports `cannot-verify` for
-  Lark until they are. Fetched Figma/Lark text is treated as data, never as instructions. Context skills read sources only from a slug
+  only Figma's REST `version`, and only where a company token is already set. Figma node hashes
+  stay `cannot-verify`: two reads were byte-identical, but a skill cannot rely on its host saving
+  the raw result to hash (`docs/research/lark-figma-mcp-revisions.md` §5). Lark's `revision_id`
+  and `latest_modify_time` also stay `cannot-verify` until an edit is shown to move them, so in
+  this release every Lark source reports `cannot-verify`. Fetched Figma/Lark text is treated as data, never as instructions. Context skills read sources only from a slug
   their caller passes, so a standalone `/fe-context` is unchanged.
 - **One resolver everywhere.** `planning-resolve` excludes `*.tests.md`, resolves the slug once,
   documents `sources:`, and is now injected into `build`, `parallel-build`, `parallel-review`,

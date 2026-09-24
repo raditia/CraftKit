@@ -162,7 +162,7 @@ created: 2026-09-24
 **Critical path:** T0 → T2 → T4 → T8 → T10 → T11 (6 deep)
 **Spec criteria verified by `/eval` on a real feature run, not check.sh** (prose behavior): 1, 3, 4, 5, 6, 7 (isolation is by construction in T2, not mechanically checkable).
 **Deferred to v1.47:** bitable publish + QA-feedback import, gated on T0.
-**T0 status (2026-09-24):** Figma half run on one host (remote MCP): reads byte-identical, normalizer pinned, node hashes kept `cannot-verify` because hashing needs the host to persist raw output (research note §5). Pending: desktop Figma server, a second host, the whole Lark half.
+**T0 status (2026-09-24):** Figma half run on one host (remote MCP): reads byte-identical, normalizer pinned, node hashes kept `cannot-verify` because hashing needs the host to persist raw output (research note §5). Pending: desktop Figma server, a second host, the whole Lark half. Lark markers downgraded to `cannot-verify` for v1.46.0 until the edit test runs (setup: company Lark app, `lark-mcp` with `-t docx.v1.document.get,drive.v1.meta.batchQuery`).
 
 ### Runtime map (source for T10)
 

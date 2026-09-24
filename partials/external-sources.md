@@ -22,8 +22,8 @@ it without comment: the output is then exactly what it was before sources existe
 
 | Source | Marker | Read it with | v1 |
 |---|---|---|---|
-| Lark docx | `revision_id` | the Lark doc-metadata read (`docx.v1.document.get`, enabled on the local Lark MCP with `-t`) | use |
-| Lark, any doc type | `latest_modify_time` | the Lark drive metadata batch read (`drive.v1.meta.batchQuery`, `-t`) | use |
+| Lark docx | `revision_id` | the Lark doc-metadata read (`docx.v1.document.get`, enabled on the local Lark MCP with `-t`) | `cannot-verify` until an edit is shown to move it |
+| Lark, any doc type | `latest_modify_time` | the Lark drive metadata batch read (`drive.v1.meta.batchQuery`, `-t`) | `cannot-verify` until an edit is shown to move it |
 | Figma file | `version` | Figma REST `GET /v1/files/:key/meta`, only with a company token already in the environment | use, optional |
 | Figma node, or Lark without those tools | content hash | none | `cannot-verify` until reproducible hashes are proven (`docs/research/lark-figma-mcp-revisions.md`) |
 
