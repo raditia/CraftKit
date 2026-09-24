@@ -1,6 +1,6 @@
 ---
 slug: mcp-context
-status: active
+status: shipped
 created: 2026-09-24
 ---
 
