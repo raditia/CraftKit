@@ -150,3 +150,41 @@ All from https://developers.figma.com/docs/rest-api/file-endpoints/ unless noted
 | Figma node | none native; diff node JSON across `version` | No | two `GET /v1/files/:key/nodes` calls (Tier 1) |
 
 Two caveats carry across the table. Lark's `revision_id` is a sound change detector, but it does not make writes safe: no documented write rejects a stale revision (section 2.1), so "changed since X" can be checked at read time, and a check-then-write still races. Figma's `version` equality check is sound for "changed at all", but without documented bump granularity it can't tell you how much changed (section 3.2).
+
+## 5. T0 spike: is a content hash reproducible? (2026-09-24)
+
+Run from Claude Code against the remote Figma MCP (`mcp.figma.com`), company Organization plan, Dev
+seat. One frame in a company design file (key and name withheld: this repo is public), read with
+`get_metadata` twice, back to back, with no edits between.
+
+| Check | Result |
+|---|---|
+| Raw response bytes | Identical (sha256 `7e8b7701…1a458a` both reads) |
+| Response shape | JSON array of 3 text parts: a `Currently selected nodes` block (82 chars), the node XML (77,337 chars), a fixed tool hint (234 chars) |
+| Normalized hash (XML part only, whitespace stripped) | Identical (`064fccd7…` both reads) |
+
+Pinned normalizer, applied to the saved tool-result file:
+
+```bash
+jq -r '.[] | .text | select(startswith("<"))' <result-file> | tr -d ' \t\r\n' | shasum -a 256
+```
+
+Findings:
+
+- **The raw response is not a safe hash input.** Its first part echoes the user's live Figma
+  selection, so a raw hash reports drift whenever the selection changes. Only the XML part is.
+- **The hash was computable only because the output was saved to disk.** Claude Code writes a
+  tool result to a file when it exceeds the context budget; a small result exists only in model
+  context, and the agent would have to re-emit it into a shell, which is lossy. So the hash is
+  reliable only where the host persists the raw result, which is not a property any skill can
+  rely on across Claude Code, Cursor, Gemini CLI and Codex CLI.
+- **`get_metadata` XML carries positions and sizes**, so a layout nudge is reported as drift.
+  That is arguably a real design change, but it is noisier than a content edit.
+
+Not yet run: the desktop Figma MCP server, a second host, and the Lark half (no Lark MCP is
+connected in this session; `revision_id` / `latest_modify_time` movement on edit is still
+unconfirmed).
+
+**Decision for v1.46.0:** Figma node hashes stay `cannot-verify`. The one-host result is stable,
+but the second finding means a skill cannot know whether its host saved the raw bytes, and the
+T0 bar was identical hashes across hosts and both servers.
