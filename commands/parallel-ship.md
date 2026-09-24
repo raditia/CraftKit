@@ -1,6 +1,6 @@
 ---
 name: parallel-ship
-description: Dynamic parallel pre-merge check with platform-routed Phase 1 gates (type/build + lint + test with coverage), then classifier-selected agents running concurrently. Supports RN/web, Android, and iOS.
+description: Dynamic parallel pre-merge check with platform-routed gates (type/build + lint first, then test with coverage running alongside classifier-selected agents). Supports RN/web, Android, and iOS.
 craftkitInject: parallel-classifier
 ---
 
@@ -29,9 +29,9 @@ Load context for the detected platform:
 
 ## Phase 1: Fast gates (all in parallel)
 
-Run the detected platform's row simultaneously as parallel Bash calls:
+The gates split by cost. Type/build and lint finish in seconds and run first, as parallel Bash calls; a failure there stops the run before any agent tokens are spent. The test suite is the slowest gate and nothing the agents do depends on it, so it launches in the **same message** as the Phase 2 agents rather than before them, and wall-clock becomes the slower of the two instead of their sum. The price: a branch whose tests fail has still paid for its agent review, whose findings are reported alongside the failure.
 
-| Platform | Type/build | Lint | Test (with coverage) |
+| Platform | Type/build | Lint | Test (with coverage), launched in Phase 2 |
 |----------|-----------|------|----------------------|
 | RN / web | `rtk tsc --noEmit` | `rtk lint <changed-files>` | `rtk test --testPathPattern="<feature-path>" --coverage` |
 | Android | n/a (Gradle compiles as part of test) | `./gradlew :<module>:lintGeneralDebug` | `./gradlew :<module>:testGeneralDebugUnitTest` (+ `jacocoTestReport` if the module has it) |
@@ -41,15 +41,13 @@ Run the detected platform's row simultaneously as parallel Bash calls:
 - **RN / web:** Lines, Branches, Functions, Statements all ≥ 93%. Below threshold → BLOCKED.
 - **Android / iOS:** no fixed bar unless the team set one. Report the module's actual coverage; if it isn't measurable, say so rather than implying a pass.
 
-**Gate:** All gates for the platform must pass, and the platform's coverage rule must be satisfied. If any fail → report immediately, skip Phase 2.
+**Gate:** Type/build and lint must pass before Phase 1.5. If either fails → report immediately, skip Phase 2. Tests and the coverage rule are judged when their run returns in Phase 2; a failure there makes the verdict BLOCKED whatever the agents found.
 
 ```
 PHASE 1  (platform: <RN/web | Android | iOS>)
 type/build: PASS / FAIL / n-a
 lint:       PASS / FAIL
-test:       PASS / FAIL (N tests)
-coverage:   Lines N% / Branches N% / Functions N% / Statements N% → PASS / FAIL
-            (native: actual module coverage, or "not measured")
+test:       launched with Phase 2
 → Proceeding to classification / BLOCKED: fix above first
 ```
 
@@ -61,11 +59,19 @@ Apply the parallel workflow classifier injected above. Announce selected agents 
 
 ---
 
-## Phase 2: Dynamic parallel agents
+## Phase 2: Tests + dynamic parallel agents
 
-Spawn **all** selected agents in **one** message: N `Agent` tool-use blocks in a single response, never in sequential waves. They are independent (cold, read-only, no shared state) and must run concurrently; splitting them across turns serializes the slow ones behind the fast ones and is a defect. Agent definitions live in `agents/`, and the harness loads their system prompt and tool restrictions automatically. Each agent is cold, so pass content as the user message.
+In **one** message: the platform's test command from Phase 1 as a Bash call with `run_in_background: true`, plus N `Agent` tool-use blocks for every selected agent, never in sequential waves. A test-only diff that selects no agents still runs the test command here. When the tests return, report the test and coverage lines from the Phase 1 box:
 
-**Do not wait by polling.** Never `grep`/`sleep`-loop over task output files (`tasks/*.output`) to detect completion. The harness wakes the main thread automatically when every spawned agent comes to rest, and re-invokes you with their results. Spin-loops keep running for minutes after the agents already finished. On wake, read the returned results and go straight to Phase 3.
+```
+test:       PASS / FAIL (N tests)
+coverage:   Lines N% / Branches N% / Functions N% / Statements N% → PASS / FAIL
+            (native: actual module coverage, or "not measured")
+```
+
+The agents are independent (cold, read-only, no shared state) and must run concurrently; splitting them across turns serializes the slow ones behind the fast ones and is a defect. Agent definitions live in `agents/`, and the harness loads their system prompt and tool restrictions automatically. Each agent is cold, so pass content as the user message.
+
+**Do not wait by polling.** Never `grep`/`sleep`-loop over task output files (`tasks/*.output`) to detect completion. The harness wakes the main thread automatically when every spawned agent and the background test run come to rest, and re-invokes you with their results. Spin-loops keep running for minutes after the agents already finished. On wake, read the returned results and go straight to Phase 3.
 
 Every agent gets the same user message, prefixed `This is a pre-merge check. Be thorough.`.
 **Pass full file contents, not just the diff.** An agent holding only a diff cannot see the

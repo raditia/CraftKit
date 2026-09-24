@@ -99,6 +99,8 @@ Spawn **all** selected agents in **one** message: N `Agent` tool-use blocks in a
 
 **Do not wait by polling.** Never `grep`/`sleep`-loop over task output files (`tasks/*.output`) to detect completion. The harness wakes the main thread automatically when every spawned agent comes to rest, and re-invokes you with their results. Spin-loops keep running for minutes after the agents already finished. On wake, read the returned results and go straight to synthesis.
 
+**Write tests while they run.** The agents are read-only and the implementation is already type-clean, so the main thread starts Phase 6 authoring right after spawning, instead of idling until they return. Author the test files only; the test run waits for synthesis, because an `[ERROR]` fix can change the code under test. A fix that does touch tested behavior costs a few test edits, which is less than a full agent round of idle time.
+
 Every agent gets the same user message. Not the whole context doc: shipping all of it to
 six agents duplicated up to 600 lines six times. The `### Spec` subsection stays because
 the classifier asks `code-quality` to check spec conformance against it, which is the one
@@ -140,13 +142,13 @@ Native has no `*-patterns` cold agent, because the platform's patterns skill alr
 - `[UNIQUE]`: notable finding from one agent only → preserve, note lower confidence
 - Adversarial findings → **blind spots** block (what review agents missed as a whole)
 
-**Gate (Phase 5):** No `[ERROR]` findings (consensus or single-agent) remain before proceeding to tests.
+**Gate (Phase 5):** No `[ERROR]` findings (consensus or single-agent) remain before the tests run.
 
 ---
 
-## Phase 6: Tests (sequential)
+## Phase 6: Tests (authored during Phase 5, run after it)
 
-Run the platform's test skill from Step 0 and write tests covering all new code paths.
+Run the platform's test skill from Step 0: tests covering all new code paths, authored while the Phase 5 agents ran. Bring them in line with any Phase 5 fixes, then run them.
 
 **Gate:** All tests pass. RN / web: coverage ≥ 93% on Lines, Branches, Functions, Statements. Android / iOS: no fixed bar unless the team set one, so report the module's actual coverage, or state that it isn't measured.
 
