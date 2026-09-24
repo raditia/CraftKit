@@ -2,7 +2,7 @@
 name: plan
 description: Decompose a spec into small, verifiable, dependency-ordered tasks, each with an acceptance check and the skill that executes it. Writes the task plan into the feature's docs/planning/ intent file. Offers a plan-roaster stress-test before build. Adapted from addyosmani/agent-skills planning-and-task-breakdown (MIT).
 alwaysApply: false
-craftkitInject: planning-resolve
+craftkitInject: planning-resolve, test-cases-resolve, external-sources
 ---
 
 **Model:** everyday. Escalate when the dependency graph is large or tasks touch > 5 interdependent files.
@@ -18,8 +18,8 @@ You have a `/spec` (or an equivalently clear ask) and need implementable units. 
 
 ## Method
 
-1. **Read the spec** from the resolved intent file's `## Spec` section, or inline.
-2. **Derive tasks from acceptance criteria.** Each criterion becomes one or more tasks. A task with no acceptance check is not a task; either give it one or drop it.
+1. **Read the spec** from the resolved intent file's `## Spec` section, or inline, and check its sources per `external-sources`. A drifted source means the spec may be stale: say so before planning on it.
+2. **Derive tasks from acceptance criteria and approved test cases.** Each criterion becomes one or more tasks, and every approved test case is covered by at least one task. A task with no acceptance check is not a task; either give it one or drop it.
 3. **Size to verifiable units.** Each task is small enough to build + verify in one pass. If a task can't state its own done-check, split it.
 4. **Order by dependency.** A task lists what must land first. Mark tasks with no unmet dependency as parallelizable.
 5. **Route each task** by naming the skill/command that executes it (`/fe-scaffold`, `/fe-test`, `/android-scaffold`, …). Planning that doesn't say *who executes* is a wish list.
@@ -32,6 +32,7 @@ You have a `/spec` (or an equivalently clear ask) and need implementable units. 
 | **Task** | Imperative, one line. |
 | **Acceptance** | The check that proves it's done (test passes, tsc clean, renders X). |
 | **Depends on** | Task IDs, or `none`. |
+| **TCs** | Approved test-case IDs the task satisfies, or `none` when the feature has no test cases. Drafts are never cited. |
 | **Executes via** | Skill/command that does the work. |
 
 ---
@@ -44,10 +45,10 @@ Update the `## Task Plan` section of the resolved intent file (leave Spec and De
 ## Task Plan
 **Updated:** {{ISO timestamp}} · **By:** /plan
 
-| ID | Task | Acceptance | Depends on | Executes via |
-|----|------|-----------|-----------|--------------|
-| T1 | … | … | none | /fe-scaffold |
-| T2 | … | … | T1 | /fe-test |
+| ID | Task | Acceptance | Depends on | TCs | Executes via |
+|----|------|-----------|-----------|-----|--------------|
+| T1 | … | … | none | TC-001 | /fe-scaffold |
+| T2 | … | … | T1 | TC-001, TC-002 | /fe-test |
 
 **Parallelizable now:** T1, T3
 **Critical path:** T1 → T2 → T5

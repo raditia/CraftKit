@@ -59,6 +59,7 @@ Match natural language to the right command. **Dynamic parallel is the default w
 - Merge intent ("ready to merge", "can I merge", "ship") → `/parallel-ship` over `/parallel-review`
 - Coverage mentioned + failing/CI context → `/fix`; coverage mentioned + authoring/update context → the platform's test skill
 - Any ambiguous test query ("any tests?", "tests needed?", "should tests change?") → the platform's test skill
+- **Test-case documents vs test code.** Title/steps/expected, QA test cases, test scenarios, Excel/Lark test sheets → `/test-cases`. Writing or fixing test code → the platform's test skill.
 - **Test intent resolves platform first.** `/fe-test` is RN/web only (jest, 93% bar, EVPMR paths): on `*.kt`/`*.java` run `/android-test`, on `*.swift`/`*.m` run `/ios-test`. Detect from the changed files, or from the project root when nothing is changed yet. Announcing `/fe-test` on a native repo is a routing error, not a near-miss.
 - "grill"/"stress-test"/"poke holes"/"challenge" an **existing** plan or decision → `/grill` (interactive rounds); no plan exists yet → `/interview`; "roast this plan doc" single-pass → `plan-roaster` agent
 - "score this run"/"how correct was that"/"what is our success rate"/"eval this" → `/eval`. It scores a *finished* deliverable, so it never substitutes for a review: "is this good?" before merge is `/parallel-review`, and `/eval` is the number after the run.
@@ -114,12 +115,13 @@ Planning & docs (general, opt-in, never auto-run; write the feature's intent fil
   ├── Ask underspecified, de-fuzz before building? → /interview
   ├── Widen the approach, need OPTIONS? ───────────→ /ideate
   ├── Write a PRD / spec before coding? ────────────→ /spec
+  ├── Test-case documents from Figma/Lark (steps, expected)? → /test-cases  (dev approves in repo, exports Excel)
   ├── Break a spec into ordered verifiable tasks? ──→ /plan  (then plan-roaster agent to stress-test)
   ├── Record WHY a decision was made? ──────────────→ /adr
   ├── Stress-test an EXISTING plan/decision, interactive? → /grill  (frontier rounds; cold single-pass doc roast → plan-roaster agent)
   └── Document a feature for engineers + stakeholders? → /docs  (dual-audience, humanized)
-  Chain them: /define runs interview → spec → plan checkpoint-gated (one invoke). adr + docs offered as tail of /parallel-ship.
-  Full arc: /define (interview→spec→plan) → /parallel-build → /parallel-ship (→ offers /adr + /docs)
+  Chain them: /define runs interview → spec → test-cases → plan checkpoint-gated (one invoke). adr + docs offered as tail of /parallel-ship.
+  Full arc: /define (interview→spec→test-cases→plan) → /parallel-build → /parallel-ship (→ offers /adr + /docs)
 
 General utilities (any platform)
   ├── Research a question against primary sources? ──→ /research  (background agent, cited note in repo)

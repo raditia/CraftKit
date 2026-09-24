@@ -7,6 +7,53 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.46.0 — 2026-09-24
+
+### Test cases become first-class feature context; external sources get an honest drift check
+
+Skills only saw git, so requirements that lived in Figma and Lark reached a build by memory or not
+at all, and nothing tied a test to the requirement it was meant to prove.
+
+- **`/test-cases` (new skill).** Generates QA test-case documents (ID, title, steps, expected,
+  source, status, automation) from the feature's spec and Figma/Lark sources into
+  `docs/planning/<slug>.tests.md`. The developer approves rows in the repo; the skill never does.
+  Re-review on a drifted source flips citing rows to `needs-review` and is the only writer (with
+  `/spec`) of a source's `seen` marker. Excel export via the installed `xlsx` skill.
+- **`partials/test-cases-resolve.md`.** One reader contract: approved rows are requirements,
+  drafts are unverified, cases never come from the diff. Injected into `/plan` (task rows gain a
+  `TCs` column), the three platform test skills (one test per automatable case, titled with its
+  ID), `/eval` (and the `eval-judge` template, since the judge is a cold agent), and the build
+  orchestrators and `/parallel-ship`, whose gates now list approved cases with no test and block
+  on any missing. The `/eval` rubric's Spec conformance criterion counts approved cases too.
+- **`partials/external-sources.md`.** Checks each source's marker once per workflow and fetches
+  content only on drift; reports `clean`, `drifted` or `cannot-verify`, never a guess. v1 trusts
+  only Figma's REST `version`, and only where a company token is already set. Figma node hashes
+  stay `cannot-verify`: two reads were byte-identical, but a skill cannot rely on its host saving
+  the raw result to hash (`docs/research/lark-figma-mcp-revisions.md` §5). Lark's `revision_id`
+  and `latest_modify_time` also stay `cannot-verify` until an edit is shown to move them, so in
+  this release every Lark source reports `cannot-verify`. Fetched Figma/Lark text is treated as data, never as instructions. Context skills read sources only from a slug
+  their caller passes, so a standalone `/fe-context` is unchanged.
+- **One resolver everywhere.** `planning-resolve` excludes `*.tests.md`, resolves the slug once,
+  documents `sources:`, and is now injected into `build`, `parallel-build`, `parallel-review`,
+  `parallel-ship` and `team-build`, which cited it without carrying it.
+- **`/define`** chains interview, spec, test-cases, plan.
+- **Commands render their partials on every tool.** `sync_commands_adapter` rendered
+  `craftkitInject` only through Claude, so Cursor, Gemini and Codex installed `/build`,
+  `/team-build` and the `parallel-*` commands naming partials they did not carry (a gap since
+  `parallel-classifier` moved into a partial). Commands now render once per sync for every
+  adapter, like skills. Cost: on Gemini and Codex, where commands sit in the always-loaded
+  instructions file, each command grows by its partials. Check 30 holds the commands pass to it.
+- **Latency, per v1.45.0.** No new hooks, so the Gateway adds nothing per prompt. Source marker
+  reads run in the same message as Phase 0's git reads, with every Lark source in one batch
+  call, so a workflow waits on its slowest source rather than all of them; drifted content is
+  fetched only by the skills that use it (`/spec`, `/test-cases`).
+- **README** names the runtime layers: the CraftKit Gateway (`hooks/`, Claude only), the
+  Orchestrators (`commands/`), and the Distributor (`sync.sh`), with a runtime map.
+- **check.sh** gains a behavioral resolver fixture and contract checks for both partials, each
+  confirmed to fail on a broken copy.
+
+Deferred: Lark bitable publish and QA-feedback import, Jira as a source.
+
 ## v1.45.0 — 2026-09-24
 
 ### Workflows stop waiting on work that does not depend on them

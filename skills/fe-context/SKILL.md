@@ -2,6 +2,7 @@
 name: fe-context
 description: Derive the branch's change context from git and emit it into the turn: staged, committed and pushed changes, mapped to EVPMR layers. Writes no file. Run at the start of any other fe-* skill, or once in a workflow's Phase 0 and pass the result down.
 alwaysApply: false
+craftkitInject: external-sources
 ---
 
 **Commands:** `rtk git diff`, `rtk git log`, `rtk git status`, `rtk ls .`
@@ -15,7 +16,7 @@ alwaysApply: false
 
 # Feature Context Engineering
 
-Feed the right information at the right time. This skill derives what the branch changed, from git, **into the turn**. It stores nothing (ADR-0002): a recorded git fact is stale the moment the next commit lands, and the cache it replaced could not see staged work at all. Intent lives per feature under `docs/planning/` (ADR-0001), which this skill does not touch.
+Feed the right information at the right time. This skill derives what the branch changed, from git, **into the turn**. It stores nothing (ADR-0002): a recorded git fact is stale the moment the next commit lands, and the cache it replaced could not see staged work at all. Intent lives per feature under `docs/planning/` (ADR-0001). This skill never resolves or writes it; it reads a feature's `sources:` only when a caller passes the slug.
 
 ## Context hierarchy
 
@@ -144,6 +145,9 @@ Branch: {{branch}} | Base: {{base}} | HEAD: {{short sha}}
 
 ## Known Issues
 {{lint errors, TypeScript errors, failing tests. Empty if none.}}
+
+## External Sources
+{{Only when your caller passed a slug: one line per source, per `external-sources`. Omit otherwise.}}
 
 ## Conflicts / Ambiguities
 {{Unresolved conflicts surfaced above. Not silently fixed.}}

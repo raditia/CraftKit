@@ -172,7 +172,7 @@ install_claude_command() {
     local name="$1"
     local source_file="$2"
     mkdir -p "$CLAUDE_COMMANDS_DIR"
-    _claude_render_injected "$source_file" "$CLAUDE_COMMANDS_DIR/${name}.md"
+    cp "$source_file" "$CLAUDE_COMMANDS_DIR/${name}.md"
 }
 
 uninstall_claude_command() {
@@ -474,7 +474,7 @@ get_claude_agent_dest() {
 }
 
 # Injection is tool-agnostic and lives in sync.sh (craftkit_render_injected), because the
-# skills pass renders for every adapter while agents and commands render only here.
+# skills and commands passes render for every adapter while agents render only here.
 _claude_render_injected() {
     craftkit_render_injected "$1" "$2"
 }
@@ -490,15 +490,6 @@ effective_claude_agent_source() {
     echo "$tmp"
 }
 
-# Same hook for commands: without it, an unchanged command whose injected partial moved on
-# would never re-sync, and the installed copy would silently keep the old text.
-effective_claude_command_source() {
-    local source_file="$2"
-    local tmp
-    tmp="$(mktemp)"
-    _claude_render_injected "$source_file" "$tmp"
-    echo "$tmp"
-}
 
 install_claude_agent() {
     local name="$1"

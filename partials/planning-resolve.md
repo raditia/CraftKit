@@ -9,8 +9,13 @@ Intent lives in `docs/planning/<slug>.md`, one file per feature (ADR-0001). The 
 branch to feature is **derived, never recorded**, so there is no index to go stale:
 
 ```bash
-rtk grep -l "^status: active" docs/planning/*.md 2>/dev/null
+rtk grep -l "^status: active" docs/planning/*.md 2>/dev/null | grep -v '\.tests\.md$'
 ```
+
+`<slug>.tests.md` is the feature's test-case file, not a second feature, so it is excluded.
+
+**Resolve once.** A skill handed a slug uses it and never resolves again, so no sub-step can land
+on a different feature than its caller.
 
 | Result | What it means | What to do |
 |---|---|---|
@@ -35,6 +40,10 @@ intent, and the author is the only one who can say which.
 slug: <kebab-slug, matches the filename>
 status: active
 created: {{ISO date}}
+sources:            # optional; pointers plus a seen marker, never content (ADR-0002)
+  - kind: figma     # or lark
+    ref: <file key/node id, or doc token>
+    seen: <marker last reviewed; written only by /spec and /test-cases>
 ---
 
 # <feature title>
@@ -48,6 +57,8 @@ _(owned by /plan)_
 ## Decisions
 _(pointers appended by /adr; paths are ../adr/NNNN-title.md)_
 ```
+
+Test cases live beside it in `docs/planning/<slug>.tests.md` (see `test-cases-resolve`).
 
 Commit this file early on the feature branch. Left uncommitted it follows you onto every other
 branch, which is the two-candidate case above and the thing this layout exists to avoid.

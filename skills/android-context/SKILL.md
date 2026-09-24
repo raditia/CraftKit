@@ -2,6 +2,7 @@
 name: android-context
 description: Derive an Android branch's change context from git and emit it into the turn: an MVP flavored summary of changed feature modules, screens, presenters, and Dagger wiring. Writes no file. Optional branch-scoping step that feeds /android-review and /ship.
 alwaysApply: false
+craftkitInject: external-sources
 ---
 
 **Commands:** `git diff`, `git log`, `git status`, `./gradlew :<module>:lintGeneralDebug`
@@ -96,6 +97,9 @@ it down. No timestamp and no recorded baseline, because nothing persists to go s
 
 ## Known Issues
 {{Android Lint findings, build errors. Empty if none.}}
+
+## External Sources
+{{Only when your caller passed a slug: one line per source, per `external-sources`. Omit otherwise.}}
 
 ## Conflicts / Ambiguities
 {{Unresolved conflicts surfaced above. Not silently fixed.}}

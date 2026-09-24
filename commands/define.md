@@ -1,6 +1,6 @@
 ---
 name: define
-description: Checkpoint-gated pre-build planning pipeline that chains /interview → /spec → /plan (offering /ideate and plan-roaster where useful) so an underspecified feature ask becomes a reviewed spec + task plan in one invocation. Pauses for your approval between phases. Writes the feature's intent file under docs/planning/. Use before building a feature whose scope, approach, or tasks aren't yet clear.
+description: Checkpoint-gated pre-build planning pipeline that chains /interview → /spec → /test-cases → /plan (offering /ideate and plan-roaster where useful) so an underspecified feature ask becomes a reviewed spec + task plan in one invocation. Pauses for your approval between phases. Writes the feature's intent file under docs/planning/. Use before building a feature whose scope, approach, or tasks aren't yet clear.
 ---
 
 **Model:** everyday. Escalate the spec phase for hard-to-reverse features (schema, public API, payment/auth).
@@ -44,6 +44,14 @@ Run `/spec` using the Discovery Brief (+ any `/ideate` choice) as input. Creates
 
 **Gate:** PRD printed, every success criterion verifiable, out-of-scope non-empty. Written to `docs/planning/<slug>.md`.
 
+## Phase 2.5: Test cases (`/test-cases`)
+
+Run `/test-cases` in Generate mode against the spec and its `sources:`. Skip when the feature has no
+sources and the author declines cases drawn from the spec alone.
+
+**Gate:** `docs/planning/<slug>.tests.md` written, every row cites a source or says `inferred`. The
+author approves rows in the file before `/plan`, so tasks map to approved IDs only.
+
 ## Phase 3: Plan (`/plan`)
 
 Run `/plan` against the spec. Writes the `## Task Plan` section of that same file. Route each task's **Executes via** to the platform's scaffold/test skill.
@@ -63,6 +71,7 @@ DEFINE COMPLETE
 ──────────────────────────────
 Discovery:  <confidence>%  (or "ask was clear, skipped")
 Spec:       docs/planning/<slug>.md, <N> verifiable criteria, <M> out-of-scope
+Test cases: docs/planning/<slug>.tests.md, <N> rows, <A> approved  (or "skipped")
 Plan:       <T> tasks · critical path <D> deep · <P> parallelizable  (same file)
 Roaster:    <score>/10  (or "skipped")
 → Next: /parallel-build to execute · adr/docs offered at /parallel-ship

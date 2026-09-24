@@ -2,6 +2,7 @@
 name: ios-context
 description: Derive an iOS branch's change context from git and emit it into the turn: an MVVM-C flavored summary of changed modules, screens, coordinators, and fetchers. Writes no file. Optional branch-scoping step that feeds /ios-review and /ship.
 alwaysApply: false
+craftkitInject: external-sources
 ---
 
 **Commands:** `git diff`, `git log`, `git status`, `swiftlint lint --path <file>`
@@ -97,6 +98,9 @@ it down. No timestamp and no recorded baseline, because nothing persists to go s
 
 ## Known Issues
 {{SwiftLint findings, build errors. Empty if none.}}
+
+## External Sources
+{{Only when your caller passed a slug: one line per source, per `external-sources`. Omit otherwise.}}
 
 ## Conflicts / Ambiguities
 {{Unresolved conflicts surfaced above. Not silently fixed.}}

@@ -1,6 +1,7 @@
 ---
 name: build
 description: Sequential feature build workflow, platform-routed at Step 0: context, scaffold, patterns, performance, review and tests for RN/web (EVPMR), Android (MVP) or iOS (MVVM-C). Use when building a new feature or screen without parallel validation.
+craftkitInject: planning-resolve, test-cases-resolve
 ---
 
 **Commands:** `rtk git diff`, `rtk tsc`, `rtk jest`, `rtk lint`
@@ -33,8 +34,8 @@ For native, Step 1 context is optional: run `/android-context` or `/ios-context`
 Run the `/fe-context` workflow:
 1. Detect base branch: `rtk git remote show origin | grep 'HEAD branch'`
 2. Diff: `rtk git log --oneline <base>...HEAD` and `rtk git diff <base>...HEAD`
-3. Resolve the feature's intent file per `planning-resolve`
-4. Derive the change context into the turn: Summary, Architecture Patterns in Use, Key Changes, Test Coverage Needed. Write no file
+3. Resolve the feature's intent file per `planning-resolve` and its test cases per `test-cases-resolve`; build to approved cases only, and pass the slug to every step below
+4. Run the diff reads and the source marker reads (`external-sources`) in one message, since neither waits on the other, then derive the change context into the turn: Summary, Architecture Patterns in Use, Key Changes, Test Coverage Needed, External Sources. Write no file
 5. Hard limit: ≤ 600 lines
 
 **Gate:** the derived block covers the feature scope, and intent resolved or was explicitly absent.
@@ -75,7 +76,7 @@ Write tests covering all new code paths:
 - Run: `rtk test --testPathPattern="path/to/__tests__/FileName" --no-coverage`
 - Coverage: `rtk test --testPathPattern="path/to/feature" --coverage` with Lines, Branches, Functions, Statements all ≥ 93%
 
-**Gate:** All tests pass. Coverage ≥ 93% on all four metrics.
+**Gate:** All tests pass. Coverage ≥ 93% on all four metrics. Approved test cases: every one with an automatable Automation value has its test, titled with its ID; list any missing by ID, which blocks the gate.
 
 ---
 

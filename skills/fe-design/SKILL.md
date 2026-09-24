@@ -2,6 +2,7 @@
 name: fe-design
 description: Catch design that reads as AI-generated: default gradients and glassmorphism, template layouts, bento grids, decorative icon and badge filler, invented dashboard numbers, and responsive layouts that break on mobile. Use when building or reviewing any screen's visual design, not its correctness. Adapted from miqdadbadjuber/anti-slop (MIT).
 alwaysApply: false
+craftkitInject: external-sources
 ---
 
 **Commands:** none required. Read the changed `View*.tsx` and its `StyleSheet`
@@ -9,7 +10,7 @@ alwaysApply: false
 
 ---
 
-**Context:** Derived context for the change (Summary + Changed Files), emitted by `/fe-context`. Read the changed `View*.tsx` and any `UI*` sub-components.
+**Context:** Derived context for the change (Summary + Changed Files), emitted by `/fe-context`. Read the changed `View*.tsx` and any `UI*` sub-components. When your caller passed a slug, read its Figma source per `external-sources`: a choice the design file makes deliberately is intent, not a model default.
 
 > **Visual design only.** Correctness, dead controls and layer violations belong to `/fe-review` and `/code-quality`. Contrast ratios, tap-target sizes, focus order and keyboard paths belong to `/fe-a11y`. Product copy belongs to `/humanizer`. Inline styles, `StyleSheet.create` and design tokens are already laws in `fe-rules`. This skill judges one thing: whether the design has a character of its own, or wears the model's defaults.
 
