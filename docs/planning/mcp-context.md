@@ -22,27 +22,34 @@ created: 2026-09-24
   1. A Figma or Lark source changed since its recorded marker is reported `drifted`, and every
      TC citing that source flips to `needs-review` (proposed, then written on confirm).
   2. With no MCP server connected, auth expired or rate-limited, every touched skill reports
-     `cannot-verify` for that source and otherwise behaves exactly as before (git-only).
+     `cannot-verify` for that source and otherwise behaves as before (git-only). With no slug
+     passed in, a context skill skips the sources step entirely, so standalone output is
+     unchanged.
   3. `/plan` maps every task to at least one approved TC id; `/build`, `/parallel-build` treat
      only `approved` TCs as requirements and list `draft` / `needs-review` ones as unverified.
   4. Each approved TC with `automation: jest|junit|quick` gets exactly one test, named with the
      TC id, in `/fe-test`, `/android-test`, `/ios-test`; `manual` TCs are listed, not tested.
   5. `/eval` receives the approved TC set as acceptance criteria.
-  6. Lark publish writes only after explicit confirm, and aborts without writing when a re-read
-     just before the write shows the target changed since the draft (no server-side
-     precondition exists, so the skill names the residual race).
-  7. Excel export produces one `.xlsx` with id, title, steps, expected, status per TC.
-  8. With two features in the repo, no skill or agent fetches a source or reads a TC file that
+  6. Excel export produces one `.xlsx` with id, title, steps, expected, status per TC.
+  7. With two features in the repo, no skill or agent fetches a source or reads a TC file that
      belongs to the other feature's slug.
-  9. `bash check.sh` exits 0, with new checks for items 2 and 8 that fail before the change.
+  8. A source whose marker cannot be computed reproducibly (spike T0) reports `cannot-verify`,
+     never `drifted`; `seen` is written only by `/spec` (first record) and `/test-cases` (on a
+     confirmed re-review), so a handled drift returns to `clean`.
+  9. `bash check.sh` exits 0, with new checks that fail before the change: resolver exclusion,
+     context skills do not inject `planning-resolve`, intent readers do, no concrete tool ids.
 - **In scope:**
   - `sources:` list in the intent file: Figma and Lark pointers, each with a `seen` marker.
   - `partials/external-sources.md`: read-time freshness check (clean / drifted /
-    cannot-verify), scoped fetch, git-only fallback. Injected into `fe-context`,
-    `android-context`, `ios-context`, `spec`, `plan`, `fe-design`, and the build orchestrators.
-  - New `/test-cases` skill: generate from sources, re-review on drift, import QA feedback from
-    Lark as a proposal, publish to Lark (propose, confirm, guarded write), export Excel via the
-    installed `xlsx` skill.
+    cannot-verify), scoped fetch, git-only fallback. Marker checks run once per workflow in
+    Phase 0 (cheap metadata only); content is fetched only on drift, to stay inside Figma MCP
+    rate limits. Injected into `fe-context`, `android-context`, `ios-context`, `spec`, `plan`,
+    `fe-design`, and the build orchestrators. Context skills receive slug + sources from the
+    caller and never resolve intent themselves.
+  - New `/test-cases` skill: generate from sources, re-review on drift (sole `seen` writer after
+    `/spec`), export Excel via the installed `xlsx` skill.
+  - `planning-resolve` injected into every intent reader that lacks it today: `build`,
+    `parallel-build`, `parallel-review`, `parallel-ship`, `team-build`.
   - `partials/test-cases-resolve.md`: how a consumer finds and filters approved TCs; injected
     into `plan`, the three platform test skills, `build` / `parallel-build`, `eval`.
   - `/define` chain becomes interview, spec, test-cases, plan.
@@ -54,6 +61,8 @@ created: 2026-09-24
   - Push / webhooks, scheduled polling.
   - A craftkit MCP server, or distributing MCP server config through `sync.sh`.
   - Writing to Figma (comments included).
+  - Lark bitable publish and QA-feedback import (v1.47, after the T0 spike proves markers
+    stable; the bitable decision and re-read guard below stand for that release).
   - Lark Sheets publish (needs Open API outside MCP).
   - Lark as master copy or approval source.
   - Generating or regenerating TCs from the diff or the code.
@@ -81,8 +90,9 @@ created: 2026-09-24
   - Repo is the master copy for TCs; Lark and Excel are published views.
   - Approval is dev-owned in the repo (`status` edited by a human, as with intent `status`).
   - TCs live in a sibling `docs/planning/<slug>.tests.md`, keyed by the same slug. It carries
-    `feature: <slug>` and **no `status:` line**, and `planning-resolve` globs exclude
-    `*.tests.md`, else every feature would resolve as two active candidates.
+    `feature: <slug>` and **no line starting with `status:`** (TCs are a table, so a per-TC
+    status is never at column 0), and `planning-resolve` globs exclude `*.tests.md` as a second
+    guard, else every feature would resolve as two active candidates.
   - Per TC: `id` (TC-001), `title`, `steps`, `expected`, `source` (pointer + section), `status`
     (`draft` / `approved` / `rejected` / `needs-review`), `automation`
     (`jest` / `junit` / `quick` / `manual`). A TC with no source is marked `inferred`.
@@ -114,14 +124,34 @@ created: 2026-09-24
     only and drafts are listed as unverified.
   - Given approved TC-003 with `automation: jest`, when `/fe-test` runs, then exactly one test
     titled with `TC-003` exists.
-  - Given the Lark doc changed after the draft, when publish is confirmed, then nothing is
-    written and the user is told why.
+  - Given a source marker that differs between two reads of an unchanged source, when T0 runs,
+    then that marker kind is dropped to `cannot-verify` in `external-sources.md`.
   - Given `mcp-a.md` and `mcp-b.md` both active, when a skill runs for `mcp-a`, then it reads no
     pointer or TC from `mcp-b`.
   - `bash check.sh` exits 0; `bash sync.sh` twice, second run all `(up to date)`.
 
 ## Task Plan
-_(owned by /plan)_
+**Updated:** 2026-09-24T00:00:00Z · **By:** /plan
+
+| ID | Task | Acceptance | Depends on | Executes via |
+|----|------|-----------|-----------|--------------|
+| T0 | Spike: read one real Figma node (remote + desktop MCP) and one real Lark doc twice each, on two hosts; pipe output through a fixed normalizer + `shasum`. Record results in the research note | Identical hashes per source, or that marker kind is marked `cannot-verify` for v1; normalizer command pinned | none | manual, with company MCP access (dev runs it) |
+| T1 | `partials/planning-resolve.md`: glob excludes `*.tests.md`; document `sources:` frontmatter (pointer + `seen`) and the sibling `<slug>.tests.md`; resolve once in Phase 0, pass slug down | Fixture with `a.md` (active) + `a.tests.md` resolves exactly one candidate | none | direct authoring |
+| T2 | `partials/external-sources.md`: capability-named reads, per-source marker table as settled by T0, clean / drifted / cannot-verify, fetch only the passed slug's `sources:`, markers once per workflow and content only on drift, skip when no slug passed, IT-sanctioned servers only, never cache content, `seen` written only by `/spec` and `/test-cases` | Exists; no em-dash; no concrete `mcp__` id; states skip-without-slug and cannot-verify fallback | T0 | direct authoring |
+| T3 | `partials/test-cases-resolve.md`: locate `<slug>.tests.md`, TC table schema (7 fields, 4 statuses, no column-0 `status:`), `approved` only as requirements, read only mapped ids, never derive from the diff | Exists; schema complete | T1 | direct authoring |
+| T4 | New `skills/test-cases/SKILL.md`: generate from sources (cite or mark `inferred`), drift re-review to `needs-review` then bump `seen` on confirm, Excel via `xlsx` skill; injects T1-T3 | Name matches dir; injections render on `sync.sh`; criteria 1, 6, 8 each have a step | T1, T2, T3 | direct authoring |
+| T5 | Inject `external-sources` into `fe-context`, `android-context`, `ios-context` (slug from caller, no resolver), `spec`, `plan`, `fe-design`; `/spec` template writes `sources:` with first `seen` | Hosts list it; context skills still write no file (check.sh:1449) | T2 | direct authoring |
+| T6 | Inject `planning-resolve` into `build`, `parallel-build`, `parallel-review`, `parallel-ship`, `team-build`; inject `test-cases-resolve` into `plan` (task rows gain a `TCs` column), `fe-test` / `android-test` / `ios-test` (one test per automatable TC, titled with its id), `eval`, `build` / `parallel-build` / `team-build` | Every host injects its partials | T1, T3 | direct authoring |
+| T7 | `/define` chain: interview, spec, test-cases, plan (new gate) | `commands/define.md` has the phase and gate | T4 | direct authoring |
+| T8 | Routing: rule tree + tiebreaker (TC documents to `/test-cases`, test code to platform test skill), `hooks/craftkit-routing.js` | `sync.sh` drift guard passes; hook advertises `/test-cases` | T4 | direct authoring |
+| T9 | `check.sh`: (a) behavioral resolver fixture excludes `*.tests.md`; (b) extend the check-32 host list (check.sh:1422) to the 5 orchestrators; (c) context skills inject `external-sources` but not `planning-resolve`; (d) no concrete `mcp__` id in `skills/`, `commands/`, `partials/`; (e) every TC consumer injects `test-cases-resolve` | Each fails on a deliberately broken copy, then passes | T1, T2, T5, T6 | direct authoring + `bash check.sh` |
+| T10 | README (skills table, tree, partials), `CHANGELOG.md` v1.46.0, version in `package.json` + README header | Version-agreement and README-coverage checks pass | T4, T7, T8 | direct authoring |
+| T11 | Full verify | `bash check.sh` exits 0; `bash sync.sh` `Sync complete.`, second run all `(up to date)` | T0-T10 | `bash check.sh`, `bash sync.sh` |
+
+**Parallelizable now:** T0, T1
+**Critical path:** T0 → T2 → T4 → T8 → T10 → T11 (6 deep)
+**Spec criteria verified by `/eval` on a real feature run, not check.sh** (prose behavior): 1, 3, 4, 5, 6, 7 (isolation is by construction in T2, not mechanically checkable).
+**Deferred to v1.47:** bitable publish + QA-feedback import, gated on T0.
 
 ## Decisions
 _(pointers appended by /adr)_
