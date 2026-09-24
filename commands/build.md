@@ -35,7 +35,7 @@ Run the `/fe-context` workflow:
 1. Detect base branch: `rtk git remote show origin | grep 'HEAD branch'`
 2. Diff: `rtk git log --oneline <base>...HEAD` and `rtk git diff <base>...HEAD`
 3. Resolve the feature's intent file per `planning-resolve` and its test cases per `test-cases-resolve`; build to approved cases only, and pass the slug to every step below
-4. Derive the change context into the turn: Summary, Architecture Patterns in Use, Key Changes, Test Coverage Needed. Write no file
+4. Run the diff reads and the source marker reads (`external-sources`) in one message, since neither waits on the other, then derive the change context into the turn: Summary, Architecture Patterns in Use, Key Changes, Test Coverage Needed, External Sources. Write no file
 5. Hard limit: ≤ 600 lines
 
 **Gate:** the derived block covers the feature scope, and intent resolved or was explicitly absent.

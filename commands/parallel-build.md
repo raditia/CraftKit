@@ -33,8 +33,8 @@ For native, skip the EVPMR-specific steps. When Phase 0 context is skipped (sing
 Run the platform's context step from Step 0. For RN / web that is `/fe-context`:
 1. Detect base: `rtk git remote show origin | grep 'HEAD branch'`
 2. `rtk git log --oneline <base>...HEAD` + `rtk git diff <base>...HEAD`
-3. Derive the context block (≤ 600 lines) into the turn: Summary, Architecture Patterns in Use, Key Changes, Test Coverage Needed. Write no file; pass it to every phase below
-4. Resolve the intent file per `planning-resolve` and its test cases per `test-cases-resolve`, once; pass the slug and the approved cases to every phase below
+3. Resolve the intent file per `planning-resolve` and its test cases per `test-cases-resolve`, once, before step 2's reads (a local grep, so it costs milliseconds); pass the slug and the approved cases to every phase below
+4. Run step 2's git reads and the source marker reads (`external-sources`) in **one message**: they are independent, so the wait is the slowest of them. Then derive the context block (≤ 600 lines) into the turn: Summary, Architecture Patterns in Use, Key Changes, Test Coverage Needed, External Sources. Write no file; pass it to every phase below
 
 **Gate:** the derived block covers the feature scope, or, for a single native screen, the sibling screen has been read.
 

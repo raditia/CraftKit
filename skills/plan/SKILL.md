@@ -2,7 +2,7 @@
 name: plan
 description: Decompose a spec into small, verifiable, dependency-ordered tasks, each with an acceptance check and the skill that executes it. Writes the task plan into the feature's docs/planning/ intent file. Offers a plan-roaster stress-test before build. Adapted from addyosmani/agent-skills planning-and-task-breakdown (MIT).
 alwaysApply: false
-craftkitInject: planning-resolve, test-cases-resolve
+craftkitInject: planning-resolve, test-cases-resolve, external-sources
 ---
 
 **Model:** everyday. Escalate when the dependency graph is large or tasks touch > 5 interdependent files.
@@ -18,7 +18,7 @@ You have a `/spec` (or an equivalently clear ask) and need implementable units. 
 
 ## Method
 
-1. **Read the spec** from the resolved intent file's `## Spec` section, or inline.
+1. **Read the spec** from the resolved intent file's `## Spec` section, or inline, and check its sources per `external-sources`. A drifted source means the spec may be stale: say so before planning on it.
 2. **Derive tasks from acceptance criteria and approved test cases.** Each criterion becomes one or more tasks, and every approved test case is covered by at least one task. A task with no acceptance check is not a task; either give it one or drop it.
 3. **Size to verifiable units.** Each task is small enough to build + verify in one pass. If a task can't state its own done-check, split it.
 4. **Order by dependency.** A task lists what must land first. Mark tasks with no unmet dependency as parallelizable.

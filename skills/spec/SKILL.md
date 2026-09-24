@@ -2,7 +2,7 @@
 name: spec
 description: Turn a discovery brief or clear ask into a PRD before coding: objective, users, scope, constraints, boundaries, acceptance criteria. Writes the feature's intent file under docs/planning/ so downstream skills execute with intent, not guesses. Adapted from addyosmani/agent-skills spec-driven-development (MIT).
 alwaysApply: false
-craftkitInject: planning-resolve
+craftkitInject: planning-resolve, external-sources
 ---
 
 **Model:** everyday. Escalate when the feature is hard to reverse (schema, public API, payment/auth surface) per the karpathy hard-to-reverse gate.
@@ -52,6 +52,10 @@ for the shape and the `status` field).
 **Ask the author for the slug.** It is the durable key for this feature, so it is named, never
 derived: a branch name breaks on rename and has no answer on `main`. One or three kebab words.
 
+**Ask for the feature's Figma and Lark pointers** (file key + node id, doc token). Record each
+under `sources:` with the marker read now per `external-sources`, or `seen: none` when it is
+`cannot-verify`. No pointers → omit `sources:`.
+
 Create `docs/planning/` if absent, then write `docs/planning/<slug>.md`:
 
 ```markdown
@@ -59,6 +63,10 @@ Create `docs/planning/` if absent, then write `docs/planning/<slug>.md`:
 slug: {{slug}}
 status: active
 created: {{ISO date}}
+sources:
+  - kind: {{figma|lark}}
+    ref: {{pointer}}
+    seen: {{marker:value, or none}}
 ---
 
 # {{feature}}

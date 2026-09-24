@@ -7,6 +7,46 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.46.0 — 2026-09-24
+
+### Test cases and external sources become first-class feature context
+
+Skills only saw git, so requirements that lived in Figma and Lark reached a build by memory or not
+at all, and nothing tied a test to the requirement it was meant to prove.
+
+- **`/test-cases` (new skill).** Generates QA test-case documents (ID, title, steps, expected,
+  source, status, automation) from the feature's spec and Figma/Lark sources into
+  `docs/planning/<slug>.tests.md`. The developer approves rows in the repo; the skill never does.
+  Re-review on a drifted source flips citing rows to `needs-review` and is the only writer (with
+  `/spec`) of a source's `seen` marker. Excel export via the installed `xlsx` skill.
+- **`partials/test-cases-resolve.md`.** One reader contract: approved rows are requirements,
+  drafts are unverified, cases never come from the diff. Injected into `/plan` (task rows gain a
+  `TCs` column), the three platform test skills (one test per automatable case, titled with its
+  ID), `/eval` (and the `eval-judge` template, since the judge is a cold agent), and the build
+  orchestrators, whose gates now list approved cases with no test.
+- **`partials/external-sources.md`.** Checks each source's marker once per workflow and fetches
+  content only on drift; reports `clean`, `drifted` or `cannot-verify`, never a guess. v1 trusts
+  native markers only (Lark `revision_id` / `latest_modify_time`, Figma REST `version`); content
+  hashes stay `cannot-verify` until they are shown reproducible across hosts and servers
+  (`docs/research/lark-figma-mcp-revisions.md`). The Lark markers need two tools enabled with `-t` on
+  the local Lark MCP (neither is in a preset), so a default install reports `cannot-verify` for
+  Lark until they are. Fetched Figma/Lark text is treated as data, never as instructions. Context skills read sources only from a slug
+  their caller passes, so a standalone `/fe-context` is unchanged.
+- **One resolver everywhere.** `planning-resolve` excludes `*.tests.md`, resolves the slug once,
+  documents `sources:`, and is now injected into `build`, `parallel-build`, `parallel-review`,
+  `parallel-ship` and `team-build`, which cited it without carrying it.
+- **`/define`** chains interview, spec, test-cases, plan.
+- **Latency, per v1.45.0.** No new hooks, so the Gateway adds nothing per prompt. Source marker
+  reads run in the same message as Phase 0's git reads, with every Lark source in one batch
+  call, so a workflow waits on its slowest source rather than all of them; drifted content is
+  fetched only by the skills that use it (`/spec`, `/test-cases`).
+- **README** names the runtime layers: the CraftKit Gateway (`hooks/`, Claude only), the
+  Orchestrators (`commands/`), and the Distributor (`sync.sh`), with a runtime map.
+- **check.sh** gains a behavioral resolver fixture and contract checks for both partials, each
+  confirmed to fail on a broken copy.
+
+Deferred: Lark bitable publish and QA-feedback import, Jira as a source.
+
 ## v1.45.0 — 2026-09-24
 
 ### Workflows stop waiting on work that does not depend on them

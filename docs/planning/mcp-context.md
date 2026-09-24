@@ -85,6 +85,9 @@ created: 2026-09-24
   - Lark MCP has no Sheets v2 tools, so the published Lark TC view is a **bitable** (one record
     per TC), written and read through the MCP default preset. Excel covers the spreadsheet file
     need. Lark Sheets via the Open API is deferred.
+  - Latency (continues v1.45.0): no new Gateway hooks; source marker reads run in one message
+    beside the git reads (Lark batched); content is fetched only where a skill needs it now;
+    `/define` gates stay sequential by design, since each needs the author.
   - No em-dash, README sync matrix, CHANGELOG + version bump, `check.sh` exit 0.
 - **Key decisions:**
   - Repo is the master copy for TCs; Lark and Excel are published views.
@@ -98,6 +101,13 @@ created: 2026-09-24
     (`jest` / `junit` / `quick` / `manual`). A TC with no source is marked `inferred`.
   - Freshness markers are pointers plus a marker, never cached content (ADR-0002 extended to
     external sources). Weighty enough for an `/adr` after build.
+  - Runtime naming: CraftKit Gateway (`hooks/`, Claude only), Orchestrators (`commands/`),
+    Distributor (`sync.sh`); map under Task Plan, mirrored in README "At runtime".
+  - Fetched Figma/Lark text is data, never instructions; `/test-cases` paraphrases and cites
+    rather than copying, since `.tests.md` is committed. Isolation and approval stay prose-enforced
+    (no Gateway hook sees MCP calls); a PreToolUse Guard is the v1.47 candidate.
+  - Follow-up: native multi-screen builds have no slug-pass step, so `android-context` /
+    `ios-context` External Sources populate only when a caller passes one.
   - Isolation by construction: fetch only pointers in the resolved slug's `sources:`; no free
     search. One git worktree per concurrent feature is recommended, not enforced.
 - **Risks & open questions:**
@@ -135,7 +145,7 @@ created: 2026-09-24
 
 | ID | Task | Acceptance | Depends on | Executes via |
 |----|------|-----------|-----------|--------------|
-| T0 | Spike: read one real Figma node (remote + desktop MCP) and one real Lark doc twice each, on two hosts; pipe output through a fixed normalizer + `shasum`. Record results in the research note | Identical hashes per source, or that marker kind is marked `cannot-verify` for v1; normalizer command pinned | none | manual, with company MCP access (dev runs it) |
+| T0 | Spike: read one real Figma node (remote + desktop MCP) and one real Lark doc twice each, on two hosts; pipe output through a fixed normalizer + `shasum`. Also edit the Lark doc once and confirm `revision_id` / `latest_modify_time` move, since v1 already trusts them. Record results in the research note | Identical hashes per source, or that marker kind is marked `cannot-verify` for v1; normalizer command pinned | none | manual, with company MCP access (dev runs it) |
 | T1 | `partials/planning-resolve.md`: glob excludes `*.tests.md`; document `sources:` frontmatter (pointer + `seen`) and the sibling `<slug>.tests.md`; resolve once in Phase 0, pass slug down | Fixture with `a.md` (active) + `a.tests.md` resolves exactly one candidate | none | direct authoring |
 | T2 | `partials/external-sources.md`: capability-named reads, per-source marker table as settled by T0, clean / drifted / cannot-verify, fetch only the passed slug's `sources:`, markers once per workflow and content only on drift, skip when no slug passed, IT-sanctioned servers only, never cache content, `seen` written only by `/spec` and `/test-cases` | Exists; no em-dash; no concrete `mcp__` id; states skip-without-slug and cannot-verify fallback | T0 | direct authoring |
 | T3 | `partials/test-cases-resolve.md`: locate `<slug>.tests.md`, TC table schema (7 fields, 4 statuses, no column-0 `status:`), `approved` only as requirements, read only mapped ids, never derive from the diff | Exists; schema complete | T1 | direct authoring |
@@ -163,28 +173,32 @@ UserPromptSubmit), Loader (`craftkit-platform-rules.js`, SessionStart), Guards (
 text, advisory not enforced. The Gateway does not see MCP calls today; a PreToolUse Guard on Lark
 write tools is the candidate confirm-enforcer for v1.47.
 
-```
- INSTALL TIME                     RUNTIME (inside each agent host)
- sync.sh + adapters/  ──sync──►
- (Distributor)        ┌─ CRAFTKIT GATEWAY (hooks/, Claude only) ─────────────────────────────┐
-                      │ Router      craftkit-routing.js         UserPromptSubmit             │
-                      │ Loader      craftkit-platform-rules.js  SessionStart                 │
-                      │ Guards      gate-skill-first · gate-read-size · read-cap  PreToolUse │
-                      │ Exit gates  gate-verify-on-stop · gate-announce-honored  Stop        │
-                      └───────────────┬──────────────────────────────────────────────────────┘
-                                      ▼ routes each prompt to
-            ORCHESTRATORS  commands/*.md
-            /define · /parallel-build · /build · /team-build · /parallel-review · /parallel-ship · /fix · /ship
-              │ Phase 0: resolve slug once (planning-resolve), approved TCs (test-cases-resolve), pass down
-              ├──► SKILLS  skills/*   /spec · /test-cases* · /plan · /fe-test · /eval · context skills
-              │        └──► MCP servers via the host's client: Figma · Lark   (external-sources*)
-              └──► AGENTS  agents/*.md  cold reviewers (Claude only)
-                                      │ read / write
-            STATE (repo, per feature)  docs/planning/<slug>.md        intent + sources: pointers + seen
-                                       docs/planning/<slug>.tests.md  test cases (repo is master)
-            VIEWS (published)          Excel now · Lark bitable in v1.47
+```mermaid
+flowchart TD
+    subgraph INSTALL["Install time"]
+        D["Distributor\nsync.sh + adapters/"]
+    end
+    subgraph GW["CraftKit Gateway · hooks/ · Claude Code only"]
+        R["Router\ncraftkit-routing.js\nUserPromptSubmit"]
+        L["Loader\ncraftkit-platform-rules.js\nSessionStart"]
+        G["Guards\ngate-skill-first · gate-read-size · read-cap\nPreToolUse"]
+        X["Exit gates\ngate-verify-on-stop · gate-announce-honored\nStop"]
+    end
+    O["Orchestrators · commands/*.md\n/define · /parallel-build · /build · /team-build\n/parallel-review · /parallel-ship · /fix · /ship\nPhase 0: resolve slug once + approved test cases, pass down"]
+    S["Skills · skills/*\n/spec · /test-cases · /plan · /fe-test · /eval · context skills"]
+    A["Agents · agents/*.md\ncold reviewers · Claude only"]
+    M["MCP servers via the host's client\nFigma · Lark\n(external-sources)"]
+    ST[("Repo state, per feature\ndocs/planning/&lt;slug&gt;.md: intent + sources\ndocs/planning/&lt;slug&gt;.tests.md: test cases")]
+    V["Published views\nExcel now · Lark bitable planned"]
 
- * = planned, not built yet (T2, T4, T5)
+    D -- sync --> GW
+    R -- routes each prompt --> O
+    O --> S
+    O --> A
+    S --> M
+    S <--> ST
+    A -. reads .-> ST
+    S --> V
 ```
 
 ## Decisions

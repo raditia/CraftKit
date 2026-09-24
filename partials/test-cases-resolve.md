@@ -31,7 +31,7 @@ intent resolver's glob. It has no `status:` frontmatter for the same reason.
 
 | Field | Values |
 |---|---|
-| **Status** | `draft` · `approved` · `rejected` · `needs-review`. Set by a human, in the repo |
+| **Status** | `draft` · `approved` · `rejected` · `needs-review`. `approved` and `rejected` are set by a human, in the repo; `/test-cases` writes only `draft` and `needs-review` |
 | **Automation** | `jest` (RN/web) · `junit` (Android) · `quick` (iOS) · `manual` |
 | **Source** | The pointer and section the case came from, or `inferred` when none backs it |
 

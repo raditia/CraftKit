@@ -1,4 +1,4 @@
-# craftkit `v1.45.0`
+# craftkit `v1.46.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -15,7 +15,7 @@ One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**,
   - [Dynamic workflows](#dynamic-workflows-default) · `/parallel-review`, `/parallel-ship`, `/parallel-build`
   - [How the classifier picks agents](#how-the-classifier-picks-agents)
   - [Sequential fallback](#sequential-fallback) · `/review`, `/ship`, `/build`
-  - [Planning pipeline: /define](#planning-pipeline-define-before-you-build) · `/interview` → `/spec` → `/plan`
+  - [Planning pipeline: /define](#planning-pipeline-define-before-you-build) · `/interview` → `/spec` → `/test-cases` → `/plan`
   - [Experimental: /team-build](#experimental-team-build-agent-teams) · agent-teams build
   - [Fix, tests, and PR message](#fix-tests-and-pr-message)
   - [Grill, research, and handoff](#grill-research-and-handoff) · stress-test plans, delegate reading, hand off sessions
@@ -180,6 +180,47 @@ Five namespaces, one source of truth:
 | `agents/` | Spawned by an orchestrator | `subagent_type:`, never directly (Claude only) |
 | `partials/` | Only as a splice into a skill, command or agent | Never, since it ships inside its host file (every tool for a skill, Claude only for a command or agent) |
 
+### At runtime: Gateway, Orchestrators, state
+
+`sync.sh` is the **Distributor**: it runs at install time and never while you work. At runtime three
+layers act inside each AI tool:
+
+| Role | What | Where |
+|------|------|-------|
+| **CraftKit Gateway** | Every prompt and tool call passes through it: **Router** (`craftkit-routing.js`, UserPromptSubmit), **Loader** (`craftkit-platform-rules.js`, SessionStart), **Guards** (`gate-skill-first`, `gate-read-size`, `craftkit-read-cap`, PreToolUse), **Exit gates** (`gate-verify-on-stop`, `gate-announce-honored`, Stop) | `hooks/`, Claude Code only. Cursor, Gemini and Codex get the routing rule as text: advisory, not enforced |
+| **Orchestrators** | Run a workflow: resolve the feature once in Phase 0, pass the slug down, spawn skills and agents | `commands/*.md` |
+| **Skills and agents** | Do one job; skills reach Figma and Lark through the host's MCP client | `skills/`, `agents/` (Claude only) |
+
+The Gateway does not see MCP calls. Per-feature state lives in the repo, never in a tool:
+
+```mermaid
+flowchart TD
+    subgraph INSTALL["Install time"]
+        D["Distributor\nsync.sh + adapters/"]
+    end
+    subgraph GW["CraftKit Gateway · hooks/ · Claude Code only"]
+        R["Router\ncraftkit-routing.js\nUserPromptSubmit"]
+        L["Loader\ncraftkit-platform-rules.js\nSessionStart"]
+        G["Guards\ngate-skill-first · gate-read-size · read-cap\nPreToolUse"]
+        X["Exit gates\ngate-verify-on-stop · gate-announce-honored\nStop"]
+    end
+    O["Orchestrators · commands/*.md\n/define · /parallel-build · /build · /team-build\n/parallel-review · /parallel-ship · /fix · /ship\nPhase 0: resolve slug once + approved test cases, pass down"]
+    S["Skills · skills/*\n/spec · /test-cases · /plan · /fe-test · /eval · context skills"]
+    A["Agents · agents/*.md\ncold reviewers · Claude only"]
+    M["MCP servers via the host's client\nFigma · Lark\n(external-sources)"]
+    ST[("Repo state, per feature\ndocs/planning/&lt;slug&gt;.md: intent + sources\ndocs/planning/&lt;slug&gt;.tests.md: test cases")]
+    V["Published views\nExcel now · Lark bitable planned"]
+
+    D -- sync --> GW
+    R -- routes each prompt --> O
+    O --> S
+    O --> A
+    S --> M
+    S <--> ST
+    A -. reads .-> ST
+    S --> V
+```
+
 ### Where files land per AI tool
 
 | Tool | Always-on (`rules/`) | On-demand (`skills/` + `commands/`) | Agents (`agents/`) |
@@ -202,7 +243,7 @@ Agents are Claude-only, since the other three tools have no cold sub-agent conce
 Natural language routes to the right command automatically. No slash commands required.
 
 ```
-"plan this feature"     →  /define   (interview → spec → plan, checkpoint-gated)
+"plan this feature"     →  /define   (interview → spec → test-cases → plan, checkpoint-gated)
 "review this"           →  /parallel-review
 "build this feature"    →  /parallel-build
 "ship this"             →  /parallel-ship
@@ -449,11 +490,11 @@ flowchart TD
 
 ### Planning pipeline: /define, before you build
 
-`/define` runs `/interview` (de-fuzz the ask) → `/spec` (PRD) → `/plan` (tasks), pausing for your approval after each, so a bad spec can't quietly turn into bad tasks. It offers `/ideate` when the approach is open and `plan-roaster` before build. The result goes into `docs/planning/<slug>.md`, which every execution skill reads.
+`/define` runs `/interview` (de-fuzz the ask) → `/spec` (PRD) → `/test-cases` (QA cases from Figma/Lark, approved by you) → `/plan` (tasks), pausing for your approval after each, so a bad spec can't quietly turn into bad tasks. It offers `/ideate` when the approach is open and `plan-roaster` before build. The result goes into `docs/planning/<slug>.md`, which every execution skill reads.
 
 ```
-/define ──► interview ─(gate)─► spec ─(gate)─► plan ─(gate)─► [ready] ──► /parallel-build ──► /parallel-ship
-             de-fuzz           PRD            tasks                        build            └─► offers /adr + /docs
+/define ──► interview ─(gate)─► spec ─(gate)─► test-cases ─(gate)─► plan ─(gate)─► [ready] ──► /parallel-build ──► /parallel-ship
+            de-fuzz             PRD            QA cases             tasks                      build               └─► offers /adr + /docs
 ```
 
 It stops at a reviewed plan. `/adr` and `/docs` come later, offered at the end of `/parallel-ship` once the code is final. Each planning skill also runs on its own. To challenge a plan you already have, use `/grill` (interactive) or the `plan-roaster` agent (one shot).
@@ -660,6 +701,7 @@ All opt-in, never auto-run from `/parallel-build`. `/spec`, `/plan` and `/adr` w
 |-------|-------------|-------------|
 | [`interview`](skills/interview/SKILL.md) | De-fuzz an underspecified ask: one question at a time to ~95% confidence, then hand to `/spec` | n/a |
 | [`spec`](skills/spec/SKILL.md) | Write a PRD before coding: objective, scope, boundaries, acceptance criteria | Hard-to-reverse (schema, public API, payment/auth), so escalate to opus |
+| [`test-cases`](skills/test-cases/SKILL.md) | QA test-case documents (title, steps, expected) from the feature's Figma and Lark sources into `docs/planning/<slug>.tests.md`; you approve rows, it re-reviews on source drift and exports Excel. Test code stays with `/fe-test`, `/android-test`, `/ios-test` | Sources contradict each other, so escalate to opus |
 | [`plan`](skills/plan/SKILL.md) | Break a spec into ordered, verifiable tasks + deps + executing skill; offers `plan-roaster` | Large dependency graph or > 5 interdependent files |
 | [`adr`](skills/adr/SKILL.md) | Record one architectural decision: context, options, decision, consequences (the *why*) | n/a |
 | [`grill`](skills/grill/SKILL.md) | Stress-test an existing plan/decision: frontier-round interview until nothing is silently assumed; parks ungrillable questions, captures `docs/glossary.md` terms, offers `/adr` | n/a |
@@ -789,7 +831,7 @@ flowchart TD
 | L4 Errors | On demand | Failing tests, lint, TypeScript errors | n/a, always live |
 | L5 History | Session | Conversation context | n/a |
 
-Every skill that reads intent uses one resolver, `partials/planning-resolve.md` ([why](docs/design-notes.md#intent-resolution)).
+Every skill that reads intent uses one resolver, `partials/planning-resolve.md` ([why](docs/design-notes.md#intent-resolution)). Test cases have one reader contract, `partials/test-cases-resolve.md` (approved rows only, never derived from the diff), and Figma/Lark sources one checker, `partials/external-sources.md` (markers, not content; `cannot-verify` when no MCP is reachable).
 
 ---
 
