@@ -7,6 +7,44 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.45.0 — 2026-09-24
+
+### Workflows stop waiting on work that does not depend on them
+
+The parallel orchestrators ran their slowest steps back to back even where nothing
+connected them, so wall-clock was a sum where it could have been a max.
+
+- **`/parallel-ship` and `/parallel-review` launch the test run beside the agents.** Phase 1
+  used to run type/build, lint and the test suite, and only then spawn the review agents.
+  The agents are read-only and never read the test result, so the suite (the slowest gate,
+  minutes with coverage) now starts as a background Bash call in the same message as the
+  agents. Type/build and lint still run first and still stop the run before any agent tokens
+  are spent, because they cost seconds. The trade is stated in both commands: a branch whose
+  tests fail has already paid for its review, and those findings are reported beside the
+  failure rather than thrown away.
+- **`/parallel-build` authors tests while the Phase 5 agents run.** The main thread used to
+  idle until every validation agent returned and only then start Phase 6. It now writes the
+  test files straight after spawning, and runs them after synthesis, since an `[ERROR]` fix
+  can change the code under test.
+
+### The whole-transcript Skill count is cached
+
+`currentTurn()` falls back to counting Skill calls across the whole transcript once a session
+passes the 1MB tail window, and every Read, Edit and Stop gate calls it, so a long session
+paid a full rescan per tool call: 118ms at 37MB, growing with the file.
+
+- `countSkillCalls` keeps a per-transcript stamp (byte offset of the last complete line, count
+  so far) under the same `craftkit-gate` tmp dir the turn budgets use, and scans only what was
+  appended since. Only whole lines are counted, so a match can never straddle the saved offset;
+  a file shorter than its offset was replaced and is rescanned from zero; an unwritable stamp
+  costs speed, never the count. Measured on eight real transcripts: identical counts to the old
+  scan, 1-2ms warm, and about 3x faster cold because the per-chunk whitespace strip is gone.
+- `check.sh` check 23 holds the cache to a rescan behaviorally: appended calls add on, a
+  half-written line is counted once it completes and never twice, and a replaced file drops
+  its stale count. Confirmed failing with the shrink reset disabled before it passed.
+- Ruled out, measured: Node's compile cache (`NODE_COMPILE_CACHE`) gives nothing on hooks
+  this small (139ms vs 140ms), so a hook's floor is Node startup itself.
+
 ## v1.44.0 — 2026-09-17
 
 ### The Read path gets a gate, and a cold reader to delegate to

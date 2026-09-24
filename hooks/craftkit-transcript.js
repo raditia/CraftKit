@@ -38,28 +38,52 @@ function readTailLines(transcriptPath) {
 // Counts Skill calls across the WHOLE file, for when the tail window missed the session
 // start. Needed because the transcript only grows: once a session passes TAIL_BYTES,
 // every later turn sees a truncated window, so treating "unknown" as "never routed" would
-// have flipped a session-scoped gate off permanently partway through. A plain substring
+// have flipped a session-scoped gate off permanently partway through. A plain pattern
 // count, no JSON parse, because the only question is how many Skill calls exist.
+//
+// Incremental: every Read, Edit and Stop in a long session lands here, and a full rescan
+// grows with the transcript (116ms at 37MB). The transcript is append-only JSONL, so the
+// count up to the last complete line is final; a stamp keeps that byte offset and count,
+// and each call scans only what was appended since. Only whole lines are counted, so a
+// match can never straddle the saved offset. A file shorter than the offset was replaced,
+// not appended to, and is rescanned from zero. An unwritable stamp costs speed, not
+// correctness: the count is still returned, the next call just starts over.
+const SKILL_CALL = /"name"\s*:\s*"Skill"/g;
+
 function countSkillCalls(transcriptPath) {
-  const NEEDLE = '"name":"Skill"';
-  let fd, total = 0;
+  const stamp = path.join(os.tmpdir(), 'craftkit-gate', 'skills-' +
+    crypto.createHash('sha1').update(transcriptPath).digest('hex').slice(0, 16));
+  let lineStart = 0, total = 0;
+  try {
+    const parts = fs.readFileSync(stamp, 'utf8').trim().split(/\s+/);
+    lineStart = Number(parts[0]) || 0;
+    total = Number(parts[1]) || 0;
+  } catch (e) { /* no stamp yet, so scan from the start */ }
+  let fd;
   try {
     fd = fs.openSync(transcriptPath, 'r');
-    const buf = Buffer.alloc(256 * 1024);
-    // Carry the tail of each chunk so a needle split across a chunk boundary still counts.
-    let carry = '';
+    if (fs.fstatSync(fd).size < lineStart) { lineStart = 0; total = 0; }
+    const buf = Buffer.alloc(1024 * 1024);
+    let pending = Buffer.alloc(0);
+    let pos = lineStart;
     let read;
-    while ((read = fs.readSync(fd, buf, 0, buf.length, null)) > 0) {
-      const text = carry + buf.toString('utf8', 0, read).replace(/\s+/g, '');
-      let i = 0;
-      while ((i = text.indexOf(NEEDLE, i)) !== -1) { total++; i += NEEDLE.length; }
-      carry = text.slice(-NEEDLE.length);
+    while ((read = fs.readSync(fd, buf, 0, buf.length, pos)) > 0) {
+      pos += read;
+      const chunk = pending.length ? Buffer.concat([pending, buf.subarray(0, read)]) : buf.subarray(0, read);
+      const cut = chunk.lastIndexOf(0x0a) + 1;
+      total += (chunk.toString('utf8', 0, cut).match(SKILL_CALL) || []).length;
+      lineStart += cut;
+      pending = Buffer.from(chunk.subarray(cut));
     }
   } catch (e) {
     return 0;
   } finally {
     if (fd !== undefined) { try { fs.closeSync(fd); } catch (e) { /* nothing to do */ } }
   }
+  try {
+    fs.mkdirSync(path.dirname(stamp), { recursive: true });
+    fs.writeFileSync(stamp, lineStart + ' ' + total);
+  } catch (e) { /* uncached: the next call rescans, the count above still stands */ }
   return total;
 }
 

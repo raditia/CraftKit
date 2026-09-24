@@ -816,6 +816,26 @@ PYEOF
         || { fail "skill gate treats a system-reminder-prefixed real prompt as a notification, silently disarming on routable work"; _gd=1; }
     _skillgate s13 "$_gx/truncated-routed.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
         && { fail "skill gate loses a session's routing history once the transcript passes the tail window, disabling itself for the rest of a long session"; _gd=1; }
+    # The whole-file Skill count is cached by byte offset so a long session stops paying a
+    # full rescan on every Read and Edit. A cache is only safe if it agrees with a rescan:
+    # appended calls add on, a half-written line is counted once it completes and never
+    # twice, and a file that shrank was replaced, so its stale count must not survive.
+    mkdir -p "$_gx/cc-tmp"
+    TMPDIR="$_gx/cc-tmp" node -e '
+const fs = require("fs");
+const src = fs.readFileSync(process.argv[1], "utf8") + "\nmodule.exports.__count = countSkillCalls;";
+fs.writeFileSync(process.argv[2] + "/t.js", src);
+const count = require(process.argv[2] + "/t.js").__count;
+const f = process.argv[2] + "/cc.jsonl";
+const call = JSON.stringify({ type: "tool_use", name: "Skill" });
+fs.writeFileSync(f, call + "\n");
+const got = [count(f)];
+fs.appendFileSync(f, call + "\n" + call.slice(0, 10)); got.push(count(f));
+fs.appendFileSync(f, call.slice(10) + "\n"); got.push(count(f));
+fs.writeFileSync(f, "{}\n"); got.push(count(f));
+process.exit(got.join() === "1,2,3,0" ? 0 : (console.log(got.join()), 1));
+' "$REPO_DIR/hooks/craftkit-transcript.js" "$_gx/cc-tmp" >/dev/null \
+        || { fail "cached Skill count disagrees with a full rescan (appended, split-line, or replaced transcript), so the gate misreads a long session's routing history"; _gd=1; }
     _stopgate "$_gx/bare.jsonl" | grep -q '"decision":"block"' \
         || { fail "stop gate let a turn end with edits and no verification command"; _gd=1; }
     _stopgate "$_gx/verified.jsonl" | grep -q '"decision"' \
