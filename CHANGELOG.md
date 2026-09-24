@@ -7,6 +7,22 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.46.1 — 2026-09-24
+
+### npm installs ship partials/
+
+`package.json` "files" is an allowlist, and `partials/` was never added to it when partials
+arrived in v1.33.0. An npm install therefore ran `sync.sh` with no `partials/` directory, and
+`craftkit_render_injected` warned and skipped every name it could not resolve, so npm-installed
+skills and commands lost their spliced sections (the parallel classifier, the intent resolver,
+the test-case contract, the eval rubric) with nothing failing. Git-clone installs were never
+affected.
+
+- `package.json` ships `partials/`. Verified by packing the tarball and rendering a skill from
+  the unpacked copy: all its partials splice.
+- `check.sh` check 32d fails when any directory `sync.sh` reads from `$REPO_DIR` is missing from
+  "files", so the next new content directory cannot repeat this. Confirmed failing before the fix.
+
 ## v1.46.0 — 2026-09-24
 
 ### Test cases become first-class feature context; external sources get an honest drift check

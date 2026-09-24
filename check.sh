@@ -1514,6 +1514,23 @@ _es_ids="$(grep -rln "mcp__" "$SKILLS_DIR" "$COMMANDS_DIR" "$PARTIALS_DIR" 2>/de
 [[ $_es -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
+# 32d. The npm package ships every directory sync.sh reads. package.json "files"
+#      is an allowlist, so a new content directory is left out of npm installs
+#      unless someone adds it by hand. partials/ shipped that way for several
+#      releases: craftkit_render_injected warns and skips a name it cannot
+#      resolve, so npm-installed skills and commands lost their spliced sections
+#      with nothing failing.
+# ---------------------------------------------------------------------------
+check "the npm package ships every directory sync.sh reads"
+_pk=0
+for _pkd in $(grep -oE '\$REPO_DIR/[A-Za-z_-]+' "$REPO_DIR/sync.sh" | sed 's|^\$REPO_DIR/||' | sort -u); do
+    [[ -d "$REPO_DIR/$_pkd" ]] || continue
+    grep -q "\"$_pkd/\"" "$REPO_DIR/package.json" \
+        || { fail "package.json \"files\" omits $_pkd/, which sync.sh reads, so npm installs run without it"; _pk=1; }
+done
+[[ $_pk -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
 # 33. Derived context is derived, never stored (ADR-0002). A reader that still
 #     names the old file is reading a snapshot the generator stopped writing,
 #     which returns nothing rather than failing loudly. Release 1's narrower
