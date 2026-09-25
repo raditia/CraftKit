@@ -201,9 +201,31 @@ allowed-tools: Read Write Edit Glob Grep
 
 **Descriptions are load triggers**, phrased as such: four of the six end with an explicit instruction to the router, either "Load with the core." (`antislop-ui`, `antislop-copywriting`, `antislop-layoutmobile`) or "Load always" (`antislop`). Three front-load a "Use when" clause, for example "Use when writing or editing prose: headlines, tone, CTAs, and anti-AI-writing patterns." (`skills/antislop-copywriting/SKILL.md:3`).
 
-**Bodies are long.** Lines and bytes per skill: core 685 lines / 50184 B, copywriting 372 / 25175, ui 311 / 26844, layoutmobile 170 / 16378, human 147 / 11051, code 128 / 8944. The core alone is roughly 50 KB, which the installer's own comment flags as a cost: "an `@` import pulls all 46 KB of it into every session, including ones that touch no UI" (`cli/lib/install.mjs:111-112`), which is why the pointer names skills rather than importing the core.
+**Bodies are long.** Lines and bytes per skill:
 
-The core's body structure (`antislop.md`, headings at `:1-680`): a First-Run Install Wizard (`:11`), Two Usage Modes (`:60`), What This Is and What It Isn't (`:75`), Core Principle (`:95`), a five-item Craftsmanship Standard `C-1` to `C-5` (`:110-130`), Part 1 AI Slop Patterns in seven categories (`:136-221`), Part 2 the 38 mandatory rules in three tiers (`:230-543`), and Part 3 a Liveliness Toolkit with three dials (`:544-548`).
+| Skill | Lines | Bytes |
+|---|---|---|
+| core | 685 | 50184 |
+| copywriting | 372 | 25175 |
+| ui | 311 | 26844 |
+| layoutmobile | 170 | 16378 |
+| human | 147 | 11051 |
+| code | 128 | 8944 |
+
+The core alone is roughly 50 KB, which the installer's own comment flags as a cost: "an `@` import pulls all 46 KB of it into every session, including ones that touch no UI" (`cli/lib/install.mjs:111-112`), which is why the pointer names skills rather than importing the core.
+
+The core's body structure (`antislop.md`, headings at `:1-680`):
+
+| Section | Lines |
+|---|---|
+| First-Run Install Wizard | `:11` |
+| Two Usage Modes | `:60` |
+| What This Is and What It Isn't | `:75` |
+| Core Principle | `:95` |
+| Craftsmanship Standard, five items `C-1` to `C-5` | `:110-130` |
+| Part 1: AI Slop Patterns, seven categories | `:136-221` |
+| Part 2: the 38 mandatory rules, three tiers | `:230-543` |
+| Part 3: Liveliness Toolkit, three dials | `:544-548` |
 
 Each rule is a `####` heading plus a bullet list of `FORBIDDEN` / `REQUIRED` clauses. Verbatim, the em-dash rule (`antislop.md:238-244`, separator normalized per the caveat above):
 

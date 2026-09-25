@@ -125,7 +125,18 @@ fn default_model_from_available(available: Vec<ModelPreset>) -> String {
         .or_else(|| available.first())
 ```
 
-`is_default` is assigned at runtime by picker visibility (`codex-rs/protocol/src/openai_models.rs:868`), not baked into the file. The bundled catalog holds 8 models in priority order: `gpt-5.6-sol` (1), `gpt-5.6-terra` (2), `gpt-5.6-luna` (3), `gpt-5.5` (7), `gpt-5.4` (16, hidden), `gpt-5.4-mini` (23, hidden), `gpt-5.2` (29), `codex-auto-review` (43, hidden), none setting `is_default`, so the offline fallback resolves to top-priority visible: `gpt-5.6-sol`.
+`is_default` is assigned at runtime by picker visibility (`codex-rs/protocol/src/openai_models.rs:868`), not baked into the file. The bundled catalog holds 8 models, none setting `is_default`, so the offline fallback resolves to the top-priority visible one: `gpt-5.6-sol`.
+
+| Model | Priority | Hidden |
+|---|---|---|
+| `gpt-5.6-sol` | 1 | |
+| `gpt-5.6-terra` | 2 | |
+| `gpt-5.6-luna` | 3 | |
+| `gpt-5.5` | 7 | |
+| `gpt-5.4` | 16 | yes |
+| `gpt-5.4-mini` | 23 | yes |
+| `gpt-5.2` | 29 | |
+| `codex-auto-review` | 43 | yes |
 
 **This is the answer for Codex CLI: omit `model` entirely.** Leaving the key unset delegates to a catalog the CLI refreshes from the server every 300s, self-updating without naming any ID, and strictly better than any string we could pin.
 
