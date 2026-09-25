@@ -760,167 +760,15 @@ intent file resolves under docs/planning/  →   code-quality (spec conformance:
 test files only                     →   agents skipped, gates only
 ```
 
-**Example A: View + Presenter changed**
+Five example diffs and what the classifier picks for `/parallel-review`:
 
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
----
-flowchart TD
-    A["diff: ViewCheckout.tsx · PresenterCheckout.ts"] --> B[Classify]
-    B --> C[code-quality]
-    B --> D[fe-review]
-    B --> E[fe-a11y]
-    C & D & E --> F[Synthesize → merged findings]
-```
-
-**Example B: Model only**
-
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
----
-flowchart TD
-    A["diff: ModelCheckout.ts"] --> B[Classify]
-    B --> C["code-quality<br/>type safety focus"]
-    C --> D["Targeted findings<br/>no EVPMR/a11y noise"]
-```
-
-**Example C: Test files only**
-
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
----
-flowchart TD
-    A["diff: __tests__/ViewCheckout.test.tsx"] --> B["Classify: tests only<br/>Phase 2 SKIPPED, saves agent cost entirely"]
-    B --> C["Gates only: tsc + lint + test"]
-```
-
-**Example D: 4 EVPMR layers → adversarial triggered**
-
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
----
-flowchart TD
-    A["diff: Entry + View + Presenter + Model<br/>3+ layers → adversarial added"] --> B[Classify]
-    B --> C[code-quality]
-    B --> D[fe-review]
-    B --> E[fe-a11y]
-    B --> F["adversarial<br/>strongest case against merging"]
-    C & D & E & F --> G[Synthesize]
-```
-
-**Example E: Android screen (same command, native agents)**
-
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
----
-flowchart TD
-    A["diff: CheckoutFragment.kt · CheckoutPresenter.kt<br/>platform: Android"] --> B[Classify]
-    B --> C["code-quality<br/>platform-agnostic"]
-    B --> D[android-review]
-    B --> E[android-a11y]
-    B --> F[android-performance]
-    C & D & E & F --> G["Synthesize<br/>gates were gradlew lint + testGeneralDebugUnitTest"]
-```
+| Example diff | Agents picked | Why |
+|---|---|---|
+| `ViewCheckout.tsx` + `PresenterCheckout.ts` | code-quality · fe-review · fe-a11y | a View changed, so a11y joins |
+| `ModelCheckout.ts` only | code-quality (type-safety focus) | targeted findings, no EVPMR or a11y noise |
+| `__tests__/ViewCheckout.test.tsx` only | none: gates only (tsc + lint + test) | tests only, so Phase 2 is skipped and costs no agents |
+| Entry + View + Presenter + Model | code-quality · fe-review · fe-a11y · adversarial | 3+ layers changed, so adversarial argues against merging |
+| `CheckoutFragment.kt` + `CheckoutPresenter.kt` (Android) | code-quality · android-review · android-a11y · android-performance | same command, native agents; gates are `gradlew lint` + `testGeneralDebugUnitTest` |
 
 ---
 
@@ -1078,7 +926,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
+    fontSize: 18px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -1088,21 +936,35 @@ config:
     titleColor: "#707577"
     edgeLabelBackground: "#FFFFFF"
   flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
+    wrappingWidth: 260
 ---
-flowchart TD
-    A[/team-build/] --> B["Preflight<br/>teams enabled? · Claude Code? · lead model check"]
-    B --> C["Lead plans<br/>context + scaffold → task board<br/>one file, one owner"]
-    C --> D
-    subgraph team ["Teammates (everyday model, staged spawn)"]
-        D["impl-a ‖ impl-b<br/>build files in parallel<br/>message each other directly"] --> E["reviewer<br/>spawns when implementation done"]
-        E --> F["tester<br/>spawns when review done"]
+swimlane-beta LR
+    subgraph you["YOU"]
+        ask("/team-build<br/>explicit only")
     end
-    F --> G["Lead verifies integration<br/>typecheck · lint · tests"]
-    G --> H[Report + verdict]
+    subgraph lead["LEAD · escalated model"]
+        pre("preflight<br/>teams on · lead model")
+        plan("plan + scaffold<br/>one file, one owner")
+        ver("verify integration<br/>typecheck · lint · tests")
+    end
+    subgraph team["TEAMMATES · everyday model"]
+        impl("impl-a ‖ impl-b<br/>message each other")
+        rt("reviewer, then tester<br/>staged spawn")
+    end
+    subgraph result["RESULT"]
+        rep("report<br/>+ verdict")
+    end
+    ask --> pre --> plan --> impl --> rt --> ver --> rep
+
+    classDef you fill:#FFFFFF,stroke:#707577,color:#242628
+    classDef hook fill:#D1F0FF,stroke:#0A9AF2,color:#242628,stroke-dasharray:4 3
+    classDef main fill:#FFFFFF,stroke:#0A9AF2,color:#242628
+    classDef sub fill:#FFFFFF,stroke:#029D24,color:#242628
+    classDef verdict fill:#0A5C2C,stroke:#0A5C2C,color:#8BE200
+    class ask you
+    class pre,plan,ver main
+    class impl,rt sub
+    class rep verdict
 ```
 
 Works on RN/web, Android and iOS; the task board follows each platform's file layout.
@@ -1460,19 +1322,15 @@ config:
     rankSpacing: 40
 ---
 flowchart TD
-    A["UserPromptSubmit fires<br/>hooks/craftkit-routing.js"] --> B{"~/.claude.json<br/>readable?"}
-    B -->|no| Z["fall back to family aliases<br/>haiku · sonnet · opus<br/>injected line says so out loud"]
-    B -->|yes| PL{"plan?<br/>oauthAccount.organizationType<br/>· gmail domain"}
-    PL -->|"enterprise"| W1["window reaches the frontier<br/>sonnet · opus · fable<br/>everyday = opus"]
-    PL -->|"personal / unrecognized"| W2["window caps below it<br/>haiku · sonnet · opus<br/>everyday = sonnet"]
-    W1 --> C["union the two caches<br/>modelAccessCache (entitled: true)<br/>‖ additionalModelOptionsCache (picker extras)"]
-    W2 --> C
-    C --> D["parse each id<br/>family + version · drop a dated suffix"]
-    D --> E["newest version per family,<br/>keeping only families in the window"]
-    E --> H["fill the window<br/>cheapest · everyday · escalate"]
-    H --> J["inject the trio as additionalContext"]
+    A("routing hook<br/>every prompt") --> B{"~/.claude.json<br/>readable?"}
+    B -->|no| Z("family aliases<br/>haiku · sonnet · opus")
+    B -->|yes| PL{"plan"}
+    PL -->|enterprise| W1("window: sonnet · opus · fable<br/>everyday = opus")
+    PL -->|"personal / unknown"| W2("window: haiku · sonnet · opus<br/>everyday = sonnet")
+    W1 --> E("newest entitled id<br/>per family in the window")
+    W2 --> E
+    E --> J("inject cheapest · everyday · escalate")
     Z --> J
-    J --> K["skills name a tier<br/>agents spawn on the family alias"]
 ```
 
 A new model release needs no edit here: `opus-5` replaces `opus-4-8` as soon as the account is entitled to it. Only a brand-new family name touches the rank list. Personal plans are capped below the frontier family on purpose ([why](docs/design-notes.md#model-routing)).
