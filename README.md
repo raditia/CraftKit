@@ -166,7 +166,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 13px
+    fontSize: 16px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -177,7 +177,9 @@ config:
     edgeLabelBackground: "#FFFFFF"
   flowchart:
     curve: basis
-    wrappingWidth: 640
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
 ---
 flowchart TB
     subgraph S1["STAGE 1 · CONTENT"]
@@ -197,7 +199,7 @@ flowchart TB
         t4("Codex CLI")
     end
     subgraph S4["STAGE 4 · SESSION GATES"]
-        gates("Claude Code: enforced by hooks · other tools: same rules as advisory text<br/>● routing + model tier   ● skill-first   ● read-size   ● verify-on-stop   ● announce")
+        gates("Claude Code: enforced by hooks<br/>other tools: same rules as advisory text<br/>● routing + model tier  ● skill-first<br/>● read-size  ● verify-on-stop  ● announce")
     end
     subgraph S5["STAGE 5 · OUTPUT"]
         out("Verified change, shipped")
@@ -244,40 +246,51 @@ layers act inside each AI tool:
 The Gateway does not see MCP calls. Per-feature state lives in the repo, never in a tool:
 
 ```mermaid
-swimlane-beta LR
-    subgraph install["INSTALL TIME"]
-        D["Distributor<br/>sync.sh + adapters/"]
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 16px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
+---
+flowchart TB
+    subgraph R1["INSTALL TIME"]
+        D("Distributor<br/>sync.sh + adapters/")
     end
-    subgraph gw["CRAFTKIT GATEWAY · hooks/ · Claude Code only · does not see MCP calls"]
-        L["Loader<br/>SessionStart"]
-        R["Router<br/>UserPromptSubmit"]
-        G["Guards<br/>PreToolUse"]
-        X["Exit gates<br/>Stop"]
+    subgraph GW["GATEWAY · hooks/ · Claude Code only · does not see MCP calls"]
+        direction LR
+        L("Loader<br/>SessionStart") ~~~ R("Router<br/>UserPromptSubmit") ~~~ G("Guards<br/>PreToolUse") ~~~ X("Exit gates<br/>Stop")
     end
-    subgraph orch["ORCHESTRATORS · commands/*.md"]
-        O["/define · /parallel-build · /build · /team-build<br/>/parallel-review · /parallel-ship · /fix · /ship<br/>Phase 0: resolve slug once + approved test cases, pass down"]
+    subgraph R3["ORCHESTRATORS · commands/*.md"]
+        O("/define · /parallel-build<br/>/build · /team-build<br/>/parallel-review · /parallel-ship<br/>/fix · /ship<br/>Phase 0: resolve slug once<br/>+ approved test cases, pass down")
     end
-    subgraph work["WORKERS"]
-        S["Skills · skills/*<br/>/spec · /test-cases · /plan · /fe-test · /eval"]
-        A["Agents · agents/*.md<br/>cold reviewers · Claude only"]
-        M["MCP via the host's client<br/>Figma · Lark"]
+    subgraph R4["WORKERS"]
+        direction LR
+        S("Skills · skills/*<br/>/spec · /test-cases · /plan<br/>/fe-test · /eval") ~~~ A("Agents · agents/*.md<br/>cold reviewers<br/>Claude only") ~~~ M("MCP via the host's client<br/>Figma · Lark")
     end
-    subgraph state["STATE · in the repo, per feature"]
-        ST1["docs/planning/&lt;slug&gt;.md<br/>intent + sources: pointers"]
-        ST2["docs/planning/&lt;slug&gt;.tests.md<br/>test cases · repo is master"]
-        V["Published view<br/>Excel export"]
+    subgraph R5["STATE · in the repo, per feature"]
+        direction LR
+        ST1("docs/planning/&lt;slug&gt;.md<br/>intent + sources: pointers") ~~~ ST2("docs/planning/&lt;slug&gt;.tests.md<br/>test cases · repo is master") ~~~ V("Published view<br/>Excel export")
     end
-    D -->|sync| L
-    L --> R
-    R -->|routes each prompt| O
-    O --> S
-    O --> A
-    S --> M
-    S -.->|each tool call| G
-    O -.->|turn end| X
-    S --> ST1
-    S --> ST2
-    ST2 --> V
+    R1 -->|sync| GW
+    GW -->|routes each prompt| R3
+    R3 --> R4
+    R4 --> R5
 
     classDef n fill:#FFFFFF,stroke:#C1C4C6,color:#242628
     classDef key fill:#D1F0FF,stroke:#0A9AF2,color:#242628
@@ -285,6 +298,11 @@ swimlane-beta LR
     class D,O,S,A,M,V n
     class R,L,G,X key
     class ST1,ST2 ok
+    style R1 fill:transparent,stroke:transparent
+    style GW fill:#D1F0FF,stroke:#C1C4C6
+    style R3 fill:transparent,stroke:transparent
+    style R4 fill:transparent,stroke:transparent
+    style R5 fill:transparent,stroke:transparent
 ```
 
 ### Where files land per AI tool
@@ -331,7 +349,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 13px
+    fontSize: 16px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -342,17 +360,19 @@ config:
     edgeLabelBackground: "#FFFFFF"
   flowchart:
     curve: basis
-    wrappingWidth: 640
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
 ---
 flowchart TD
     S["every prompt"] --> W["walk up from cwd"]
     W --> C{"marker at this level?"}
     C -->|"none"| U["parent directory"]
     U --> W
-    C -->|"settings.gradle"| A["Android · MVP"]
-    C -->|"Podfile · Package.swift · *.xcodeproj"| I["iOS · MVVM-C"]
-    C -->|"package.json"| R["RN / web · EVPMR"]
-    C -->|"two or more at one level"| M["mixed · union both agent sets"]
+    C -->|"settings.gradle"| A["Android<br/>MVP"]
+    C -->|"Podfile · Package.swift<br/>*.xcodeproj"| I["iOS<br/>MVVM-C"]
+    C -->|"package.json"| R["RN / web<br/>EVPMR"]
+    C -->|"two or more<br/>at one level"| M["mixed<br/>union both<br/>agent sets"]
     A --> INJ["inject platform into the prompt"]
     I --> INJ
     R --> INJ
@@ -415,7 +435,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 13px
+    fontSize: 16px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -426,14 +446,16 @@ config:
     edgeLabelBackground: "#FFFFFF"
   flowchart:
     curve: basis
-    wrappingWidth: 640
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
 ---
 flowchart TD
-    A[/parallel-review/] --> P["Step 0: detect platform\nRN/web · Android · iOS"]
-    P --> B["Phase 1: parallel fast gates\ntsc ‖ lint  ·or·  gradlew lint  ·or·  swiftlint"]
-    B -->|all pass ✓| C["Classify diff\nreads actual files · skips irrelevant agents"]
-    C --> D["Phase 2: one message, all concurrent\ntest (background) ‖ code-quality ‖ platform review\n‖ platform a11y? ‖ adversarial?\nselected by classifier"]
-    D --> E["Synthesize\nmerge · deduplicate · sort by severity"]
+    A[/parallel-review/] --> P["Step 0: detect platform<br/>RN/web · Android · iOS"]
+    P --> B["Phase 1: parallel fast gates<br/>tsc ‖ lint  ·or·  gradlew lint  ·or·  swiftlint"]
+    B -->|all pass ✓| C["Classify diff<br/>reads actual files · skips irrelevant agents"]
+    C --> D["Phase 2: one message, all concurrent<br/>test (background) ‖ code-quality ‖ platform review<br/>‖ platform a11y? ‖ adversarial?<br/>selected by classifier"]
+    D --> E["Synthesize<br/>merge · deduplicate · sort by severity"]
     E --> F[Merged report]
     B -->|any fail ✗| G["BLOCKED: fix gates first"]
 ```
@@ -450,7 +472,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 13px
+    fontSize: 16px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -461,17 +483,19 @@ config:
     edgeLabelBackground: "#FFFFFF"
   flowchart:
     curve: basis
-    wrappingWidth: 640
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
 ---
 flowchart TD
     A[/parallel-ship/] --> P["Step 0: detect platform"]
-    P --> B["Phase 1: parallel fast gates\ntype/build ‖ lint"]
+    P --> B["Phase 1: parallel fast gates<br/>type/build ‖ lint"]
     B -->|all pass ✓| C[Classify diff]
-    C --> D["Phase 2: one message, all concurrent\ntest + coverage (background)\nRN/web: ≥93% Lines · Branches · Functions · Statements\nnative: report actual module coverage\n‖ code-quality ‖ ponytail-review ‖ platform review\n‖ platform performance? ‖ platform a11y? ‖ adversarial?\nselected by classifier"]
+    C --> D["Phase 2: one message, all concurrent<br/>test + coverage (background)<br/>RN/web: ≥93% Lines · Branches · Functions · Statements<br/>native: report actual module coverage<br/>‖ code-quality ‖ ponytail-review ‖ platform review<br/>‖ platform performance? ‖ platform a11y? ‖ adversarial?<br/>selected by classifier"]
     D --> E[Synthesize]
     E --> F{Errors?}
     F -->|none| G[READY TO MERGE]
-    G -.->|opt-in tail| T["offers /adr (decision record)\n+ /docs (dual-audience pages)"]
+    G -.->|opt-in tail| T["offers /adr (decision record)<br/>+ /docs (dual-audience pages)"]
     F -->|yes| H["BLOCKED: list blockers"]
     B -->|any fail ✗| H
 ```
@@ -488,7 +512,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 13px
+    fontSize: 16px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -499,17 +523,19 @@ config:
     edgeLabelBackground: "#FFFFFF"
   flowchart:
     curve: basis
-    wrappingWidth: 640
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
 ---
 flowchart TD
-    A[/parallel-build/] --> P["Step 0: detect platform\npicks the scaffold · patterns · gates · test skills"]
-    P --> B["Context\nsequential · derived into the turn (RN/web)\nnative: sibling screen, or *-context if multi-screen"]
-    B --> C["Scaffold\nsequential · fe-scaffold ·or· android-scaffold ·or· ios-scaffold"]
-    C --> D["Implement\nguided by the platform's patterns + performance skills"]
-    D --> E["Phase 3: parallel fast gates\ntype/build ‖ lint"]
-    E -->|all pass ✓| F["Classify what was built\nread actual file content · select agents"]
-    F --> G["Phase 5: parallel LLM agents\nplatform review ‖ ponytail-review ‖ fe-patterns (RN/web)\n‖ platform a11y? ‖ platform performance? ‖ adversarial?\nselected by classifier\nmain thread authors tests meanwhile"]
-    G -->|no ERROR| H["Tests run\nfe-test ≥93% ·or· android-test ·or· ios-test"]
+    A[/parallel-build/] --> P["Step 0: detect platform<br/>picks the scaffold · patterns · gates · test skills"]
+    P --> B["Context<br/>sequential · derived into the turn (RN/web)<br/>native: sibling screen, or *-context if multi-screen"]
+    B --> C["Scaffold<br/>sequential · fe-scaffold ·or· android-scaffold ·or· ios-scaffold"]
+    C --> D["Implement<br/>guided by the platform's patterns + performance skills"]
+    D --> E["Phase 3: parallel fast gates<br/>type/build ‖ lint"]
+    E -->|all pass ✓| F["Classify what was built<br/>read actual file content · select agents"]
+    F --> G["Phase 5: parallel LLM agents<br/>platform review ‖ ponytail-review ‖ fe-patterns (RN/web)<br/>‖ platform a11y? ‖ platform performance? ‖ adversarial?<br/>selected by classifier<br/>main thread authors tests meanwhile"]
+    G -->|no ERROR| H["Tests run<br/>fe-test ≥93% ·or· android-test ·or· ios-test"]
     H --> I[DONE]
     E -->|any fail ✗| J["BLOCKED: fix gates first"]
     G -->|ERROR found| J
@@ -527,7 +553,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 13px
+    fontSize: 16px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -538,32 +564,27 @@ config:
     edgeLabelBackground: "#FFFFFF"
   flowchart:
     curve: basis
-    wrappingWidth: 640
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
 ---
 flowchart LR
-    subgraph P1["1 · INDEPENDENT REVIEW · same files, one message, no shared state"]
+    h1["1 · INDEPENDENT REVIEW<br/>same files · one message<br/>no shared state"] ~~~ h2["2 · MERGE"] ~~~ h3["3 · RANK BY AGREEMENT"] ~~~ h4["4 · VERDICT"]
         a1("code-quality")
         a2("platform review")
         a3("platform a11y")
         a4("ponytail · performance")
-        adv("adversarial<br/>argues against shipping")
-    end
-    subgraph P2["2 · MERGE"]
-        dd("Deduplicate<br/>by file:line<br/>skipped agent → coverage-gap warning")
-    end
-    subgraph P3["3 · RANK BY AGREEMENT"]
-        k1("CONSENSUS<br/>2+ agents, independently · fix first")
-        k2("Standard<br/>one agent, normal confidence")
-        k3("UNIQUE<br/>uncorroborated · kept, lower confidence")
-        k4("Contradiction<br/>state both, judge by evidence, never average")
-        k5("BLIND SPOTS<br/>what the whole panel missed")
-    end
-    subgraph P4["4 · VERDICT"]
+        adv("adversarial<br/>argues against<br/>shipping")
+        dd("Deduplicate<br/>by file:line<br/>skipped agent →<br/>coverage-gap<br/>warning")
+        k1("CONSENSUS<br/>2+ agents<br/>independently · fix first")
+        k2("Standard<br/>one agent<br/>normal confidence")
+        k3("UNIQUE<br/>uncorroborated<br/>kept, lower confidence")
+        k4("Contradiction<br/>state both<br/>judge by evidence<br/>never average")
+        k5("BLIND SPOTS<br/>what the whole<br/>panel missed")
         v1("READY TO MERGE<br/>no errors, gates pass")
-        v2("BLOCKED (list)<br/>an error, a failed gate, or a missing test case")
-        v3("INCOMPLETE<br/>an agent failed to run · never ready")
-        note["UNVERIFIED claims cannot back an ERROR,<br/>so an unproven finding cannot block a merge"]
-    end
+        v2("BLOCKED (list)<br/>an error, a failed gate<br/>or a missing test case")
+        v3("INCOMPLETE<br/>an agent failed to run<br/>never ready")
+        note["UNVERIFIED claims<br/>cannot back an ERROR,<br/>so an unproven finding<br/>cannot block a merge"]
     a1 & a2 & a3 & a4 --> dd
     dd --> k1 & k2 & k3 & k4
     adv -.-> k5
@@ -589,11 +610,7 @@ flowchart LR
     class k3 dash
     class k4,v2 warn
     class v3 info
-    class note quiet
-    style P1 fill:transparent,stroke:transparent
-    style P2 fill:transparent,stroke:transparent
-    style P3 fill:transparent,stroke:transparent
-    style P4 fill:transparent,stroke:transparent
+    class note,h1,h2,h3,h4 quiet
 ```
 
 ---
@@ -645,7 +662,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 13px
+    fontSize: 16px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -656,7 +673,9 @@ config:
     edgeLabelBackground: "#FFFFFF"
   flowchart:
     curve: basis
-    wrappingWidth: 640
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
 ---
 flowchart TD
     A["diff: ViewCheckout.tsx · PresenterCheckout.ts"] --> B[Classify]
@@ -676,7 +695,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 13px
+    fontSize: 16px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -687,12 +706,14 @@ config:
     edgeLabelBackground: "#FFFFFF"
   flowchart:
     curve: basis
-    wrappingWidth: 640
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
 ---
 flowchart TD
     A["diff: ModelCheckout.ts"] --> B[Classify]
-    B --> C["code-quality\ntype safety focus"]
-    C --> D["Targeted findings\nno EVPMR/a11y noise"]
+    B --> C["code-quality<br/>type safety focus"]
+    C --> D["Targeted findings<br/>no EVPMR/a11y noise"]
 ```
 
 **Example C: Test files only**
@@ -705,7 +726,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 13px
+    fontSize: 16px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -716,10 +737,12 @@ config:
     edgeLabelBackground: "#FFFFFF"
   flowchart:
     curve: basis
-    wrappingWidth: 640
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
 ---
 flowchart TD
-    A["diff: __tests__/ViewCheckout.test.tsx"] --> B["Classify: tests only\nPhase 2 SKIPPED, saves agent cost entirely"]
+    A["diff: __tests__/ViewCheckout.test.tsx"] --> B["Classify: tests only<br/>Phase 2 SKIPPED, saves agent cost entirely"]
     B --> C["Gates only: tsc + lint + test"]
 ```
 
@@ -733,7 +756,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 13px
+    fontSize: 16px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -744,14 +767,16 @@ config:
     edgeLabelBackground: "#FFFFFF"
   flowchart:
     curve: basis
-    wrappingWidth: 640
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
 ---
 flowchart TD
-    A["diff: Entry + View + Presenter + Model\n3+ layers → adversarial added"] --> B[Classify]
+    A["diff: Entry + View + Presenter + Model<br/>3+ layers → adversarial added"] --> B[Classify]
     B --> C[code-quality]
     B --> D[fe-review]
     B --> E[fe-a11y]
-    B --> F["adversarial\nstrongest case against merging"]
+    B --> F["adversarial<br/>strongest case against merging"]
     C & D & E & F --> G[Synthesize]
 ```
 
@@ -765,7 +790,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 13px
+    fontSize: 16px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -776,15 +801,17 @@ config:
     edgeLabelBackground: "#FFFFFF"
   flowchart:
     curve: basis
-    wrappingWidth: 640
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
 ---
 flowchart TD
-    A["diff: CheckoutFragment.kt · CheckoutPresenter.kt\nplatform: Android"] --> B[Classify]
-    B --> C["code-quality\nplatform-agnostic"]
+    A["diff: CheckoutFragment.kt · CheckoutPresenter.kt<br/>platform: Android"] --> B[Classify]
+    B --> C["code-quality<br/>platform-agnostic"]
     B --> D[android-review]
     B --> E[android-a11y]
     B --> F[android-performance]
-    C & D & E & F --> G["Synthesize\ngates were gradlew lint + testGeneralDebugUnitTest"]
+    C & D & E & F --> G["Synthesize<br/>gates were gradlew lint + testGeneralDebugUnitTest"]
 ```
 
 ---
@@ -809,7 +836,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 13px
+    fontSize: 16px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -820,7 +847,9 @@ config:
     edgeLabelBackground: "#FFFFFF"
   flowchart:
     curve: basis
-    wrappingWidth: 640
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
 ---
 flowchart TD
     N["build / review / ship intent"] --> Q{"can this context<br/>spawn subagents?"}
@@ -847,7 +876,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 13px
+    fontSize: 16px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -858,7 +887,9 @@ config:
     edgeLabelBackground: "#FFFFFF"
   flowchart:
     curve: basis
-    wrappingWidth: 640
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
 ---
 flowchart TB
     subgraph ROW[" "]
@@ -939,7 +970,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 13px
+    fontSize: 16px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -950,17 +981,19 @@ config:
     edgeLabelBackground: "#FFFFFF"
   flowchart:
     curve: basis
-    wrappingWidth: 640
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
 ---
 flowchart TD
-    A[/team-build/] --> B["Preflight\nteams enabled? · Claude Code? · lead model check"]
-    B --> C["Lead plans\ncontext + scaffold → task board\none file, one owner"]
+    A[/team-build/] --> B["Preflight<br/>teams enabled? · Claude Code? · lead model check"]
+    B --> C["Lead plans<br/>context + scaffold → task board<br/>one file, one owner"]
     C --> D
     subgraph team ["Teammates (everyday model, staged spawn)"]
-        D["impl-a ‖ impl-b\nbuild files in parallel\nmessage each other directly"] --> E["reviewer\nspawns when implementation done"]
-        E --> F["tester\nspawns when review done"]
+        D["impl-a ‖ impl-b<br/>build files in parallel<br/>message each other directly"] --> E["reviewer<br/>spawns when implementation done"]
+        E --> F["tester<br/>spawns when review done"]
     end
-    F --> G["Lead verifies integration\ntypecheck · lint · tests"]
+    F --> G["Lead verifies integration<br/>typecheck · lint · tests"]
     G --> H[Report + verdict]
 ```
 
@@ -1251,7 +1284,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 13px
+    fontSize: 16px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -1262,17 +1295,19 @@ config:
     edgeLabelBackground: "#FFFFFF"
   flowchart:
     curve: basis
-    wrappingWidth: 640
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
 ---
-flowchart TD
-    A["/fe-context\nreads diff · emits derived context"]
-    P["/spec · /plan · /adr\nwrite docs/planning/&lt;slug&gt;.md"]
-    A --> B["/fe-scaffold\n5-file EVPMR module"]
-    A --> C["/fe-review · /fe-patterns\n/fe-performance · /code-quality"]
-    A --> D["/fe-test\n≥93% coverage"]
+flowchart LR
+    A["/fe-context<br/>reads diff · emits derived context"]
+    P["/spec · /plan · /adr<br/>write docs/planning/&lt;slug&gt;.md"]
+    A --> B["/fe-scaffold<br/>5-file EVPMR module"]
+    A --> C["/fe-review · /fe-patterns<br/>/fe-performance · /code-quality"]
+    A --> D["/fe-test<br/>≥93% coverage"]
     P --> C
-    P --> E["/eval\nspec conformance"]
-    P --> F["/docs\ndual-audience"]
+    P --> E["/eval<br/>spec conformance"]
+    P --> F["/docs<br/>dual-audience"]
 ```
 
 | Level | Source | What | Stale when |
@@ -1301,7 +1336,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 13px
+    fontSize: 16px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -1312,22 +1347,24 @@ config:
     edgeLabelBackground: "#FFFFFF"
   flowchart:
     curve: basis
-    wrappingWidth: 640
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
 ---
 flowchart TD
-    A["UserPromptSubmit fires\nhooks/craftkit-routing.js"] --> B{"~/.claude.json\nreadable?"}
-    B -->|no| Z["fall back to family aliases\nhaiku · sonnet · opus\ninjected line says so out loud"]
-    B -->|yes| PL{"plan?\noauthAccount.organizationType\n· gmail domain"}
-    PL -->|"enterprise"| W1["window reaches the frontier\nsonnet · opus · fable\neveryday = opus"]
-    PL -->|"personal / unrecognized"| W2["window caps below it\nhaiku · sonnet · opus\neveryday = sonnet"]
-    W1 --> C["union the two caches\nmodelAccessCache (entitled: true)\n‖ additionalModelOptionsCache (picker extras)"]
+    A["UserPromptSubmit fires<br/>hooks/craftkit-routing.js"] --> B{"~/.claude.json<br/>readable?"}
+    B -->|no| Z["fall back to family aliases<br/>haiku · sonnet · opus<br/>injected line says so out loud"]
+    B -->|yes| PL{"plan?<br/>oauthAccount.organizationType<br/>· gmail domain"}
+    PL -->|"enterprise"| W1["window reaches the frontier<br/>sonnet · opus · fable<br/>everyday = opus"]
+    PL -->|"personal / unrecognized"| W2["window caps below it<br/>haiku · sonnet · opus<br/>everyday = sonnet"]
+    W1 --> C["union the two caches<br/>modelAccessCache (entitled: true)<br/>‖ additionalModelOptionsCache (picker extras)"]
     W2 --> C
-    C --> D["parse each id\nfamily + version · drop a dated suffix"]
-    D --> E["newest version per family,\nkeeping only families in the window"]
-    E --> H["fill the window\ncheapest · everyday · escalate"]
+    C --> D["parse each id<br/>family + version · drop a dated suffix"]
+    D --> E["newest version per family,<br/>keeping only families in the window"]
+    E --> H["fill the window<br/>cheapest · everyday · escalate"]
     H --> J["inject the trio as additionalContext"]
     Z --> J
-    J --> K["skills name a tier\nagents spawn on the family alias"]
+    J --> K["skills name a tier<br/>agents spawn on the family alias"]
 ```
 
 A new model release needs no edit here: `opus-5` replaces `opus-4-8` as soon as the account is entitled to it. Only a brand-new family name touches the rank list. Personal plans are capped below the frontier family on purpose ([why](docs/design-notes.md#model-routing)).
