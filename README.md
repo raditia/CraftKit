@@ -218,29 +218,40 @@ layers act inside each AI tool:
 The Gateway does not see MCP calls. Per-feature state lives in the repo, never in a tool:
 
 ```mermaid
-flowchart TB
-    subgraph R1["INSTALL TIME"]
+swimlane-beta LR
+    subgraph install["INSTALL TIME"]
         D["Distributor<br/>sync.sh + adapters/"]
     end
-    subgraph GW["CRAFTKIT GATEWAY · hooks/ · Claude Code only · does not see MCP calls"]
-        direction LR
-        R["Router<br/>UserPromptSubmit"] ~~~ L["Loader<br/>SessionStart"] ~~~ G["Guards<br/>PreToolUse"] ~~~ X["Exit gates<br/>Stop"]
+    subgraph gw["CRAFTKIT GATEWAY · hooks/ · Claude Code only · does not see MCP calls"]
+        L["Loader<br/>SessionStart"]
+        R["Router<br/>UserPromptSubmit"]
+        G["Guards<br/>PreToolUse"]
+        X["Exit gates<br/>Stop"]
     end
-    subgraph R3["ORCHESTRATORS · commands/*.md"]
+    subgraph orch["ORCHESTRATORS · commands/*.md"]
         O["/define · /parallel-build · /build · /team-build<br/>/parallel-review · /parallel-ship · /fix · /ship<br/>Phase 0: resolve slug once + approved test cases, pass down"]
     end
-    subgraph R4["WORKERS"]
-        direction LR
-        S["Skills · skills/*<br/>/spec · /test-cases · /plan · /fe-test · /eval"] ~~~ A["Agents · agents/*.md<br/>cold reviewers · Claude only"] ~~~ M["MCP via the host's client<br/>Figma · Lark"]
+    subgraph work["WORKERS"]
+        S["Skills · skills/*<br/>/spec · /test-cases · /plan · /fe-test · /eval"]
+        A["Agents · agents/*.md<br/>cold reviewers · Claude only"]
+        M["MCP via the host's client<br/>Figma · Lark"]
     end
-    subgraph R5["STATE · in the repo, per feature"]
-        direction LR
-        ST1[("docs/planning/&lt;slug&gt;.md<br/>intent + sources: pointers")] ~~~ ST2[("docs/planning/&lt;slug&gt;.tests.md<br/>test cases · repo is master")] ~~~ V["Published view<br/>Excel export"]
+    subgraph state["STATE · in the repo, per feature"]
+        ST1["docs/planning/&lt;slug&gt;.md<br/>intent + sources: pointers"]
+        ST2["docs/planning/&lt;slug&gt;.tests.md<br/>test cases · repo is master"]
+        V["Published view<br/>Excel export"]
     end
-    R1 -- sync --> GW
-    GW -- routes each prompt --> R3
-    R3 --> R4
-    R4 <--> R5
+    D -->|sync| L
+    L --> R
+    R -->|routes each prompt| O
+    O --> S
+    O --> A
+    S --> M
+    S -.->|each tool call| G
+    O -.->|turn end| X
+    S --> ST1
+    S --> ST2
+    ST2 --> V
 
     classDef n fill:#ffffff,stroke:#c9c9c9,color:#1f1f1f
     classDef key fill:#d6efff,stroke:#0a84ff,color:#0b3d66
@@ -248,11 +259,6 @@ flowchart TB
     class D,O,S,A,M,V n
     class R,L,G,X key
     class ST1,ST2 ok
-    style R1 fill:#fafafa,stroke:#ececec,color:#8a8a8a
-    style GW fill:#eef8ff,stroke:#b8dcf7,color:#5a7a92
-    style R3 fill:#fafafa,stroke:#ececec,color:#8a8a8a
-    style R4 fill:#fafafa,stroke:#ececec,color:#8a8a8a
-    style R5 fill:#fafafa,stroke:#ececec,color:#8a8a8a
 ```
 
 ### Where files land per AI tool
@@ -568,34 +574,58 @@ flowchart TD
 `/define` runs `/interview` (de-fuzz the ask) → `/spec` (PRD) → `/test-cases` (QA cases from Figma/Lark, approved by you) → `/plan` (tasks), pausing for your approval after each, so a bad spec can't quietly turn into bad tasks. It offers `/ideate` when the approach is open and `plan-roaster` before build. The result goes into `docs/planning/<slug>.md`, which every execution skill reads.
 
 ```mermaid
-flowchart LR
-    subgraph DEF["Define · /define"]
-        direction TB
-        d1["interview"] --> d2["spec"] --> d3["test-cases"] --> d4["plan"]
+swimlane-beta LR
+    subgraph you["YOU"]
+        ask(["feature ask"])
+        chk{"approve<br/>each phase"}
+        merge(["merge"])
     end
-    subgraph BLD["Build · /parallel-build"]
-        direction TB
-        b1["platform routing"] --> b2["scaffold + implement"] --> b3["type + lint gates"] --> b4["parallel agents + tests"]
+    subgraph orch["ORCHESTRATORS"]
+        def["/define"]
+        bld["/parallel-build<br/>platform routing · type + lint gates"]
+        rev["/parallel-review<br/>in parallel, read-only"]
+        shp["/parallel-ship · pre-merge<br/>coverage gate RN/web ≥ 93%<br/>feature-flag rollback<br/>test-case trace · missing one = BLOCKED"]
+        tail["/adr · /docs · /eval<br/>opt-in tail"]
     end
-    subgraph REV["Review · /parallel-review · in parallel, read-only"]
-        direction TB
-        r1["code-quality"] ~~~ r2["platform reviewers"] ~~~ r3["a11y reviewers"] ~~~ r4["adversarial (3+ layers)"]
+    subgraph skills["SKILLS"]
+        i["interview"]
+        sp["spec"]
+        tc["test-cases"]
+        pl["plan"]
+        impl["scaffold + implement<br/>+ tests"]
     end
-    subgraph SHP["Ship · /parallel-ship · pre-merge"]
-        direction TB
-        s1["coverage gate<br/>RN/web ≥ 93%"] ~~~ s2["perf + ponytail agents"] ~~~ s3["feature-flag rollback"] ~~~ s4["test-case trace<br/>cases approved in Define<br/>missing one = BLOCKED"]
+    subgraph agents["AGENTS"]
+        ra["code-quality · platform reviewers<br/>a11y reviewers · adversarial (3+ layers)"]
+        sa["perf + ponytail agents"]
     end
-    DEF --> BLD --> REV --> SHP
-    SHP -. "opt-in tail" .-> tail["/adr · /docs · /eval"]
+    subgraph repo["REPO"]
+        intent["docs/planning/&lt;slug&gt;.md<br/>read by every execution skill"]
+        tests["docs/planning/&lt;slug&gt;.tests.md<br/>cases approved in Define"]
+    end
+    ask --> def --> i --> sp --> tc --> pl
+    i -.-> chk
+    sp -.-> chk
+    tc -.-> chk
+    pl -.-> chk
+    tc --> tests
+    pl --> intent
+    chk -->|plan approved| bld
+    intent --> bld
+    bld --> impl
+    bld --> rev
+    rev --> ra
+    rev --> shp
+    shp --> sa
+    tests -->|trace| shp
+    shp --> merge
+    shp -.-> tail
 
     classDef n fill:#ffffff,stroke:#c9c9c9,color:#1f1f1f
+    classDef key fill:#d6efff,stroke:#0a84ff,color:#0b3d66
     classDef ok fill:#ffffff,stroke:#1a9e3a,color:#137a2c
-    class d1,d2,d4,b1,b2,b3,b4,r1,r2,r3,r4,s1,s2,s3,tail n
-    class d3,s4 ok
-    style DEF fill:#eef8ff,stroke:#0a84ff,color:#0b3d66
-    style BLD fill:#eef8ff,stroke:#0a84ff,color:#0b3d66
-    style REV fill:#eef8ff,stroke:#0a84ff,color:#0b3d66
-    style SHP fill:#eef8ff,stroke:#0a84ff,color:#0b3d66
+    class ask,merge,def,bld,rev,shp,tail,i,sp,pl,impl,ra,sa,intent n
+    class chk key
+    class tc,tests ok
 ```
 
 ```mermaid
