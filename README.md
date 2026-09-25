@@ -423,6 +423,8 @@ Removing a hook from `_CRAFTKIT_HOOKS` uninstalls it on the next sync. The reaso
 
 Build, review, and ship use **dynamic parallel execution**: a classifier detects the platform (RN/web, Android, iOS), reads your actual diff, selects only the agents that matter, and runs them concurrently. Test-only diffs skip deep review entirely. Every command below works on all three platforms; only the gates and the agent set change.
 
+Each workflow is drawn in five lanes: **You**, **Hooks** (dashed, run automatically), **Main agent** (blue), **Sub-agents** (green, read-only, in parallel) and **Result** (dark green verdict).
+
 #### /parallel-review
 
 > Triggered by: `"review this"` / `"help me review"` / `"code review"` / `"LGTM check"`
@@ -435,7 +437,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
+    fontSize: 18px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -445,19 +447,44 @@ config:
     titleColor: "#707577"
     edgeLabelBackground: "#FFFFFF"
   flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
+    wrappingWidth: 260
 ---
-flowchart TD
-    A[/parallel-review/] --> P["Step 0: detect platform<br/>RN/web · Android · iOS"]
-    P --> B["Phase 1: parallel fast gates<br/>tsc ‖ lint  ·or·  gradlew lint  ·or·  swiftlint"]
-    B -->|all pass ✓| C["Classify diff<br/>reads actual files · skips irrelevant agents"]
-    C --> D["Phase 2: one message, all concurrent<br/>test (background) ‖ code-quality ‖ platform review<br/>‖ platform a11y? ‖ adversarial?<br/>selected by classifier"]
-    D --> E["Synthesize<br/>merge · deduplicate · sort by severity"]
-    E --> F[Merged report]
-    B -->|any fail ✗| G["BLOCKED: fix gates first"]
+swimlane-beta LR
+    subgraph you["YOU"]
+        ask("review my changes")
+    end
+    subgraph hooks["HOOKS"]
+        route("routing hook<br/>platform detected")
+    end
+    subgraph main["MAIN AGENT"]
+        gates("fast gates<br/>classify diff")
+        tst("tests<br/>in background")
+        syn("synthesis<br/>dedupe · rank")
+    end
+    subgraph subs["SUB-AGENTS"]
+        rev("reviewers in parallel<br/>read-only")
+    end
+    subgraph result["RESULT"]
+        v("READY TO MERGE<br/>BLOCKED · INCOMPLETE")
+    end
+    ask --> route --> gates
+    gates --> rev
+    gates --> tst
+    rev --> syn
+    tst --> syn
+    syn --> v
+    gates -.->|gate fails| v
+
+    classDef you fill:#FFFFFF,stroke:#707577,color:#242628
+    classDef hook fill:#D1F0FF,stroke:#0A9AF2,color:#242628,stroke-dasharray:4 3
+    classDef main fill:#FFFFFF,stroke:#0A9AF2,color:#242628
+    classDef sub fill:#FFFFFF,stroke:#029D24,color:#242628
+    classDef verdict fill:#0A5C2C,stroke:#0A5C2C,color:#8BE200
+    class ask you
+    class route hook
+    class gates,tst,syn main
+    class rev sub
+    class v verdict
 ```
 
 #### /parallel-ship
@@ -472,7 +499,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
+    fontSize: 18px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -482,22 +509,44 @@ config:
     titleColor: "#707577"
     edgeLabelBackground: "#FFFFFF"
   flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
+    wrappingWidth: 260
 ---
-flowchart TD
-    A[/parallel-ship/] --> P["Step 0: detect platform"]
-    P --> B["Phase 1: parallel fast gates<br/>type/build ‖ lint"]
-    B -->|all pass ✓| C[Classify diff]
-    C --> D["Phase 2: one message, all concurrent<br/>test + coverage (background)<br/>RN/web: ≥93% Lines · Branches · Functions · Statements<br/>native: report actual module coverage<br/>‖ code-quality ‖ ponytail-review ‖ platform review<br/>‖ platform performance? ‖ platform a11y? ‖ adversarial?<br/>selected by classifier"]
-    D --> E[Synthesize]
-    E --> F{Errors?}
-    F -->|none| G[READY TO MERGE]
-    G -.->|opt-in tail| T["offers /adr (decision record)<br/>+ /docs (dual-audience pages)"]
-    F -->|yes| H["BLOCKED: list blockers"]
-    B -->|any fail ✗| H
+swimlane-beta LR
+    subgraph you["YOU"]
+        ask("ship this")
+    end
+    subgraph hooks["HOOKS"]
+        route("routing hook<br/>platform detected")
+    end
+    subgraph main["MAIN AGENT"]
+        gates("fast gates<br/>classify diff")
+        tst("tests + coverage<br/>RN/web ≥ 93%")
+        syn("synthesis<br/>test-case trace")
+    end
+    subgraph subs["SUB-AGENTS"]
+        rev("reviewers + ponytail<br/>perf · a11y · adversarial")
+    end
+    subgraph result["RESULT"]
+        v("READY TO MERGE<br/>BLOCKED · INCOMPLETE")
+    end
+    ask --> route --> gates
+    gates --> rev
+    gates --> tst
+    rev --> syn
+    tst --> syn
+    syn --> v
+    gates -.->|gate fails| v
+
+    classDef you fill:#FFFFFF,stroke:#707577,color:#242628
+    classDef hook fill:#D1F0FF,stroke:#0A9AF2,color:#242628,stroke-dasharray:4 3
+    classDef main fill:#FFFFFF,stroke:#0A9AF2,color:#242628
+    classDef sub fill:#FFFFFF,stroke:#029D24,color:#242628
+    classDef verdict fill:#0A5C2C,stroke:#0A5C2C,color:#8BE200
+    class ask you
+    class route hook
+    class gates,tst,syn main
+    class rev sub
+    class v verdict
 ```
 
 #### /parallel-build
@@ -512,7 +561,7 @@ config:
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
+    fontSize: 18px
     primaryColor: "#FFFFFF"
     primaryBorderColor: "#C1C4C6"
     primaryTextColor: "#242628"
@@ -522,23 +571,44 @@ config:
     titleColor: "#707577"
     edgeLabelBackground: "#FFFFFF"
   flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
+    wrappingWidth: 260
 ---
-flowchart TD
-    A[/parallel-build/] --> P["Step 0: detect platform<br/>picks the scaffold · patterns · gates · test skills"]
-    P --> B["Context<br/>sequential · derived into the turn (RN/web)<br/>native: sibling screen, or *-context if multi-screen"]
-    B --> C["Scaffold<br/>sequential · fe-scaffold ·or· android-scaffold ·or· ios-scaffold"]
-    C --> D["Implement<br/>guided by the platform's patterns + performance skills"]
-    D --> E["Phase 3: parallel fast gates<br/>type/build ‖ lint"]
-    E -->|all pass ✓| F["Classify what was built<br/>read actual file content · select agents"]
-    F --> G["Phase 5: parallel LLM agents<br/>platform review ‖ ponytail-review ‖ fe-patterns (RN/web)<br/>‖ platform a11y? ‖ platform performance? ‖ adversarial?<br/>selected by classifier<br/>main thread authors tests meanwhile"]
-    G -->|no ERROR| H["Tests run<br/>fe-test ≥93% ·or· android-test ·or· ios-test"]
-    H --> I[DONE]
-    E -->|any fail ✗| J["BLOCKED: fix gates first"]
-    G -->|ERROR found| J
+swimlane-beta LR
+    subgraph you["YOU"]
+        ask("build feature X")
+    end
+    subgraph hooks["HOOKS"]
+        route("routing hook<br/>platform detected")
+    end
+    subgraph main["MAIN AGENT"]
+        impl("context · scaffold<br/>implement · gates")
+        tst("write tests<br/>while agents run")
+        syn("synthesis<br/>consensus · unique")
+    end
+    subgraph subs["SUB-AGENTS"]
+        rev("reviewers in parallel<br/>picked by classifier")
+    end
+    subgraph result["RESULT"]
+        done("DONE · BLOCKED<br/>INCOMPLETE")
+    end
+    ask --> route --> impl
+    impl --> rev
+    impl --> tst
+    rev --> syn
+    tst --> syn
+    syn --> done
+    impl -.->|gate fails| done
+
+    classDef you fill:#FFFFFF,stroke:#707577,color:#242628
+    classDef hook fill:#D1F0FF,stroke:#0A9AF2,color:#242628,stroke-dasharray:4 3
+    classDef main fill:#FFFFFF,stroke:#0A9AF2,color:#242628
+    classDef sub fill:#FFFFFF,stroke:#029D24,color:#242628
+    classDef verdict fill:#0A5C2C,stroke:#0A5C2C,color:#8BE200
+    class ask you
+    class route hook
+    class impl,tst,syn main
+    class rev sub
+    class done verdict
 ```
 
 #### How findings become one verdict
