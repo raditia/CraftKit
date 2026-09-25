@@ -423,15 +423,45 @@ Removing a hook from `_CRAFTKIT_HOOKS` uninstalls it on the next sync. The reaso
 
 Build, review, and ship use **dynamic parallel execution**: a classifier detects the platform (RN/web, Android, iOS), reads your actual diff, selects only the agents that matter, and runs them concurrently. Test-only diffs skip deep review entirely. Every command below works on all three platforms; only the gates and the agent set change.
 
-Each workflow is drawn in five coloured lanes, top to bottom:
+Each workflow is drawn in five lanes (You, Hooks, Main agent, Sub-agents, Result). Box styles:
 
-| Lane | Colour | Box style | What runs there |
-|---|---|---|---|
-| **You** | pink | grey outline | your prompt |
-| **Hooks** | teal | dashed blue | Claude Code hooks, automatic |
-| **Main agent** | orange | blue outline | skills on the main thread |
-| **Sub-agents** | cyan | green outline | read-only reviewers, in parallel |
-| **Result** | green | dark green | the verdict |
+```mermaid
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 16px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 240
+    nodeSpacing: 30
+    rankSpacing: 40
+---
+flowchart LR
+    y("You<br/>your prompt") ~~~ h("Hook<br/>runs automatically") ~~~ m("Skill<br/>on the main agent") ~~~ a("Sub-agent<br/>read-only, parallel") ~~~ v("Verdict")
+
+    classDef you fill:#FFFFFF,stroke:#707577,color:#242628
+    classDef hook fill:#D1F0FF,stroke:#0A9AF2,color:#242628,stroke-dasharray:4 3
+    classDef main fill:#FFFFFF,stroke:#0A9AF2,color:#242628
+    classDef sub fill:#FFFFFF,stroke:#029D24,color:#242628
+    classDef verdict fill:#0A5C2C,stroke:#0A5C2C,color:#8BE200
+    class y you
+    class h hook
+    class m main
+    class a sub
+    class v verdict
+```
 
 #### /parallel-review
 
@@ -440,11 +470,20 @@ Each workflow is drawn in five coloured lanes, top to bottom:
 ```mermaid
 ---
 config:
-  theme: redux-color
+  theme: base
+  look: classic
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
     fontSize: 18px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
   flowchart:
     wrappingWidth: 260
 ---
@@ -493,11 +532,20 @@ swimlane-beta LR
 ```mermaid
 ---
 config:
-  theme: redux-color
+  theme: base
+  look: classic
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
     fontSize: 18px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
   flowchart:
     wrappingWidth: 260
 ---
@@ -546,11 +594,20 @@ swimlane-beta LR
 ```mermaid
 ---
 config:
-  theme: redux-color
+  theme: base
+  look: classic
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
     fontSize: 18px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
   flowchart:
     wrappingWidth: 260
 ---
