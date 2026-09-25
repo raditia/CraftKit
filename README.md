@@ -159,39 +159,65 @@ bash sync.sh    # distribute; a second consecutive run must report no work
 Every `git pull` triggers a sync that installs rules, skills, commands, and agents into each AI tool:
 
 ```mermaid
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 13px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 640
+---
 flowchart TB
     subgraph S1["STAGE 1 · CONTENT"]
-        direction LR
-        c1["rules/"] ~~~ c2["skills/"] ~~~ c3["commands/"] ~~~ c4["agents/"] ~~~ c5["partials/<br/>spliced in, never alone"]
+        c1("rules/")
+        c2("skills/")
+        c3("commands/")
+        c4("agents/")
+        c5("partials/<br/>spliced in, never alone")
     end
     subgraph S2["STAGE 2 · DISTRIBUTE"]
-        direction LR
-        pull["git pull<br/>post-merge hook"] --> sync["sync.sh<br/>idempotent · check.sh gates every change"]
+        pull("git pull<br/>post-merge hook") --> sync("sync.sh<br/>idempotent · check.sh gates every change")
     end
     subgraph S3["STAGE 3 · TOOLS · one adapter each"]
-        direction LR
-        t1["Claude Code"] ~~~ t2["Cursor"] ~~~ t3["Gemini CLI"] ~~~ t4["Codex CLI"]
+        t1("Claude Code")
+        t2("Cursor")
+        t3("Gemini CLI")
+        t4("Codex CLI")
     end
-    subgraph S4["STAGE 4 · SESSION GATES · hooks enforce on Claude Code, the same rules are advisory text elsewhere"]
-        direction LR
-        g1["routing<br/>+ model tier"] --- g2["skill-first"] --- g3["read-size"] --- g4["verify-on-stop"] --- g5["announce"]
+    subgraph S4["STAGE 4 · SESSION GATES"]
+        gates("Claude Code: enforced by hooks · other tools: same rules as advisory text<br/>● routing + model tier   ● skill-first   ● read-size   ● verify-on-stop   ● announce")
     end
     subgraph S5["STAGE 5 · OUTPUT"]
-        out["Verified change, shipped"]
+        out("Verified change, shipped")
     end
-    S1 --> S2 --> S3 --> S4 --> S5
+    c1 & c2 & c3 & c4 & c5 --> pull
+    sync --> t1 & t2 & t3 & t4
+    t1 & t2 & t3 & t4 --> gates
+    gates --> out
 
-    classDef n fill:#ffffff,stroke:#c9c9c9,color:#1f1f1f
-    classDef key fill:#d6efff,stroke:#0a84ff,color:#0b3d66
-    classDef ok fill:#ffffff,stroke:#1a9e3a,color:#137a2c
+    classDef n fill:#FFFFFF,stroke:#C1C4C6,color:#242628
+    classDef key fill:#D1F0FF,stroke:#0A9AF2,color:#242628
+    classDef ok fill:#FFFFFF,stroke:#029D24,color:#029D24
     class c1,c2,c3,c4,c5,pull,t1,t2,t3,t4 n
-    class sync,g1,g2,g3,g4,g5 key
+    class sync,gates key
     class out ok
-    style S1 fill:#fafafa,stroke:#ececec,color:#8a8a8a
-    style S2 fill:#fafafa,stroke:#ececec,color:#8a8a8a
-    style S3 fill:#fafafa,stroke:#ececec,color:#8a8a8a
-    style S4 fill:#eef8ff,stroke:#b8dcf7,color:#5a7a92
-    style S5 fill:#fafafa,stroke:#ececec,color:#8a8a8a
+    style S1 fill:transparent,stroke:transparent
+    style S2 fill:transparent,stroke:transparent
+    style S3 fill:transparent,stroke:transparent
+    style S4 fill:transparent,stroke:transparent
+    style S5 fill:transparent,stroke:transparent
 ```
 
 Five namespaces, one source of truth:
@@ -253,9 +279,9 @@ swimlane-beta LR
     S --> ST2
     ST2 --> V
 
-    classDef n fill:#ffffff,stroke:#c9c9c9,color:#1f1f1f
-    classDef key fill:#d6efff,stroke:#0a84ff,color:#0b3d66
-    classDef ok fill:#ffffff,stroke:#1a9e3a,color:#137a2c
+    classDef n fill:#FFFFFF,stroke:#C1C4C6,color:#242628
+    classDef key fill:#D1F0FF,stroke:#0A9AF2,color:#242628
+    classDef ok fill:#FFFFFF,stroke:#029D24,color:#029D24
     class D,O,S,A,M,V n
     class R,L,G,X key
     class ST1,ST2 ok
@@ -298,6 +324,26 @@ Natural language routes to the right command automatically. No slash commands re
 Platform is not inferred. On every prompt `hooks/craftkit-routing.js` resolves it from `cwd` and injects the answer:
 
 ```mermaid
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 13px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 640
+---
 flowchart TD
     S["every prompt"] --> W["walk up from cwd"]
     W --> C{"marker at this level?"}
@@ -362,6 +408,26 @@ Build, review, and ship use **dynamic parallel execution**: a classifier detects
 > Triggered by: `"review this"` / `"help me review"` / `"code review"` / `"LGTM check"`
 
 ```mermaid
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 13px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 640
+---
 flowchart TD
     A[/parallel-review/] --> P["Step 0: detect platform\nRN/web · Android · iOS"]
     P --> B["Phase 1: parallel fast gates\ntsc ‖ lint  ·or·  gradlew lint  ·or·  swiftlint"]
@@ -377,6 +443,26 @@ flowchart TD
 > Triggered by: `"ship this"` / `"prepare for PR"` / `"is this ready?"` / `"get this ready to merge"`
 
 ```mermaid
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 13px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 640
+---
 flowchart TD
     A[/parallel-ship/] --> P["Step 0: detect platform"]
     P --> B["Phase 1: parallel fast gates\ntype/build ‖ lint"]
@@ -395,6 +481,26 @@ flowchart TD
 > Triggered by: `"build feature X"` / `"implement X"` / `"create a new screen"`
 
 ```mermaid
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 13px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 640
+---
 flowchart TD
     A[/parallel-build/] --> P["Step 0: detect platform\npicks the scaffold · patterns · gates · test skills"]
     P --> B["Context\nsequential · derived into the turn (RN/web)\nnative: sibling screen, or *-context if multi-screen"]
@@ -414,40 +520,80 @@ flowchart TD
 Every review agent reads the same files in the same message and shares nothing, so agreement between them is evidence:
 
 ```mermaid
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 13px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 640
+---
 flowchart LR
     subgraph P1["1 · INDEPENDENT REVIEW · same files, one message, no shared state"]
-        direction TB
-        a1["code-quality"] ~~~ a2["platform review"] ~~~ a3["platform a11y"] ~~~ a4["ponytail · performance"] ~~~ adv["adversarial<br/>argues against shipping<br/>feeds BLIND SPOTS"]
+        a1("code-quality")
+        a2("platform review")
+        a3("platform a11y")
+        a4("ponytail · performance")
+        adv("adversarial<br/>argues against shipping")
     end
     subgraph P2["2 · MERGE"]
-        dd["Deduplicate by file:line<br/>skipped agent → coverage-gap warning"]
+        dd("Deduplicate<br/>by file:line<br/>skipped agent → coverage-gap warning")
     end
     subgraph P3["3 · RANK BY AGREEMENT"]
-        direction TB
-        k1["CONSENSUS<br/>2+ agents, independently · fix first"] ~~~ k2["Standard<br/>one agent"] ~~~ k3["UNIQUE<br/>uncorroborated · kept, lower confidence"] ~~~ k4["Contradiction<br/>state both, judge by evidence, never average"] ~~~ k5["BLIND SPOTS<br/>what the whole panel missed"]
+        k1("CONSENSUS<br/>2+ agents, independently · fix first")
+        k2("Standard<br/>one agent, normal confidence")
+        k3("UNIQUE<br/>uncorroborated · kept, lower confidence")
+        k4("Contradiction<br/>state both, judge by evidence, never average")
+        k5("BLIND SPOTS<br/>what the whole panel missed")
     end
     subgraph P4["4 · VERDICT"]
-        direction TB
-        v1["READY TO MERGE<br/>no errors, gates pass"] ~~~ v2["BLOCKED (list)<br/>an error, a failed gate, or a missing test case"] ~~~ v3["INCOMPLETE<br/>an agent failed to run · never ready"] ~~~ note["UNVERIFIED claims cannot back an ERROR,<br/>so an unproven finding cannot block a merge"]
+        v1("READY TO MERGE<br/>no errors, gates pass")
+        v2("BLOCKED (list)<br/>an error, a failed gate, or a missing test case")
+        v3("INCOMPLETE<br/>an agent failed to run · never ready")
+        note["UNVERIFIED claims cannot back an ERROR,<br/>so an unproven finding cannot block a merge"]
     end
-    P1 --> P2 --> P3 --> P4
+    a1 & a2 & a3 & a4 --> dd
+    dd --> k1 & k2 & k3 & k4
+    adv -.-> k5
+    k1 & k2 & k3 & k4 & k5 --> v2
+    k1 ~~~ v1
+    k4 ~~~ v3
+    k5 ~~~ note
 
-    classDef n fill:#ffffff,stroke:#c9c9c9,color:#1f1f1f
-    classDef key fill:#d6efff,stroke:#0a84ff,color:#0b3d66
-    classDef ok fill:#e3f9d9,stroke:#1a9e3a,color:#137a2c
-    classDef bad fill:#ffffff,stroke:#d6336c,color:#b0214f
-    classDef dash fill:#ffffff,stroke:#8a8a8a,color:#1f1f1f,stroke-dasharray:4 3
-    classDef quiet fill:#fafafa,stroke:#fafafa,color:#8a8a8a
-    class a1,a2,a3,a4,k2 n
-    class adv,k4,k5,v2 bad
-    class dd,v3 key
-    class k1,v1 ok
+    classDef n fill:#FFFFFF,stroke:#C1C4C6,color:#242628
+    classDef key fill:#D1F0FF,stroke:#0A9AF2,color:#242628
+    classDef ok fill:#FFFFFF,stroke:#029D24,color:#029D24
+    classDef done fill:#0A5C2C,stroke:#0A5C2C,color:#8BE200
+    classDef warn fill:#FEF5FC,stroke:#FA9EB4,color:#8B1842
+    classDef warnline fill:#FFFFFF,stroke:#FA9EB4,color:#242628
+    classDef info fill:#D1F0FF,stroke:#D1F0FF,color:#024590
+    classDef dash fill:#FFFFFF,stroke:#C1C4C6,color:#242628,stroke-dasharray:4 3
+    classDef quiet fill:transparent,stroke:transparent,color:#707577
+    class a1,a2,a3,a4 ok
+    class adv,k5 warnline
+    class dd key
+    class k1,v1 done
+    class k2 n
     class k3 dash
+    class k4,v2 warn
+    class v3 info
     class note quiet
-    style P1 fill:#fafafa,stroke:#ececec,color:#8a8a8a
-    style P2 fill:#fafafa,stroke:#ececec,color:#8a8a8a
-    style P3 fill:#fafafa,stroke:#ececec,color:#8a8a8a
-    style P4 fill:#fafafa,stroke:#ececec,color:#8a8a8a
+    style P1 fill:transparent,stroke:transparent
+    style P2 fill:transparent,stroke:transparent
+    style P3 fill:transparent,stroke:transparent
+    style P4 fill:transparent,stroke:transparent
 ```
 
 ---
@@ -492,6 +638,26 @@ test files only                     →   agents skipped, gates only
 **Example A: View + Presenter changed**
 
 ```mermaid
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 13px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 640
+---
 flowchart TD
     A["diff: ViewCheckout.tsx · PresenterCheckout.ts"] --> B[Classify]
     B --> C[code-quality]
@@ -503,6 +669,26 @@ flowchart TD
 **Example B: Model only**
 
 ```mermaid
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 13px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 640
+---
 flowchart TD
     A["diff: ModelCheckout.ts"] --> B[Classify]
     B --> C["code-quality\ntype safety focus"]
@@ -512,6 +698,26 @@ flowchart TD
 **Example C: Test files only**
 
 ```mermaid
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 13px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 640
+---
 flowchart TD
     A["diff: __tests__/ViewCheckout.test.tsx"] --> B["Classify: tests only\nPhase 2 SKIPPED, saves agent cost entirely"]
     B --> C["Gates only: tsc + lint + test"]
@@ -520,6 +726,26 @@ flowchart TD
 **Example D: 4 EVPMR layers → adversarial triggered**
 
 ```mermaid
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 13px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 640
+---
 flowchart TD
     A["diff: Entry + View + Presenter + Model\n3+ layers → adversarial added"] --> B[Classify]
     B --> C[code-quality]
@@ -532,6 +758,26 @@ flowchart TD
 **Example E: Android screen (same command, native agents)**
 
 ```mermaid
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 13px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 640
+---
 flowchart TD
     A["diff: CheckoutFragment.kt · CheckoutPresenter.kt\nplatform: Android"] --> B[Classify]
     B --> C["code-quality\nplatform-agnostic"]
@@ -556,6 +802,26 @@ When you want a lightweight, single-pass run, use the explicit slash command.
 They are also the automatic substitute wherever subagents can't be spawned:
 
 ```mermaid
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 13px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 640
+---
 flowchart TD
     N["build / review / ship intent"] --> Q{"can this context<br/>spawn subagents?"}
     Q -->|"yes"| P["/parallel-build<br/>/parallel-review<br/>/parallel-ship"]
@@ -574,73 +840,73 @@ flowchart TD
 `/define` runs `/interview` (de-fuzz the ask) → `/spec` (PRD) → `/test-cases` (QA cases from Figma/Lark, approved by you) → `/plan` (tasks), pausing for your approval after each, so a bad spec can't quietly turn into bad tasks. It offers `/ideate` when the approach is open and `plan-roaster` before build. The result goes into `docs/planning/<slug>.md`, which every execution skill reads.
 
 ```mermaid
-swimlane-beta LR
-    subgraph you["YOU"]
-        ask(["feature ask"])
-        chk{"approve<br/>each phase"}
-        merge(["merge"])
-    end
-    subgraph orch["ORCHESTRATORS"]
-        def["/define"]
-        bld["/parallel-build<br/>platform routing · type + lint gates"]
-        rev["/parallel-review<br/>in parallel, read-only"]
-        shp["/parallel-ship · pre-merge<br/>coverage gate RN/web ≥ 93%<br/>feature-flag rollback<br/>test-case trace · missing one = BLOCKED"]
-        tail["/adr · /docs · /eval<br/>opt-in tail"]
-    end
-    subgraph skills["SKILLS"]
-        i["interview"]
-        sp["spec"]
-        tc["test-cases"]
-        pl["plan"]
-        impl["scaffold + implement<br/>+ tests"]
-    end
-    subgraph agents["AGENTS"]
-        ra["code-quality · platform reviewers<br/>a11y reviewers · adversarial (3+ layers)"]
-        sa["perf + ponytail agents"]
-    end
-    subgraph repo["REPO"]
-        intent["docs/planning/&lt;slug&gt;.md<br/>read by every execution skill"]
-        tests["docs/planning/&lt;slug&gt;.tests.md<br/>cases approved in Define"]
-    end
-    ask --> def --> i --> sp --> tc --> pl
-    i -.-> chk
-    sp -.-> chk
-    tc -.-> chk
-    pl -.-> chk
-    tc --> tests
-    pl --> intent
-    chk -->|plan approved| bld
-    intent --> bld
-    bld --> impl
-    bld --> rev
-    rev --> ra
-    rev --> shp
-    shp --> sa
-    tests -->|trace| shp
-    shp --> merge
-    shp -.-> tail
-
-    classDef n fill:#ffffff,stroke:#c9c9c9,color:#1f1f1f
-    classDef key fill:#d6efff,stroke:#0a84ff,color:#0b3d66
-    classDef ok fill:#ffffff,stroke:#1a9e3a,color:#137a2c
-    class ask,merge,def,bld,rev,shp,tail,i,sp,pl,impl,ra,sa,intent n
-    class chk key
-    class tc,tests ok
-```
-
-```mermaid
-flowchart LR
-    subgraph FIX["Separate path for bugs · /fix"]
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 13px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 640
+---
+flowchart TB
+    subgraph ROW[" "]
         direction LR
-        f1["failing test first"] --> f2["isolate"] --> f3["hypothesize"] --> f4["fix"] --> f5["regression test"]
+        subgraph DEF[" "]
+            direction TB
+            hd("Define<br/>/define") --- d1("interview") --- d2("spec") --- d3("test-cases") --- d4("plan")
+        end
+        subgraph BLD[" "]
+            direction TB
+            hb("Build<br/>/parallel-build") --- b1("platform routing") --- b2("scaffold + implement") --- b3("type + lint gates") --- b4("parallel agents + tests")
+        end
+        subgraph REV["in parallel · read-only"]
+            direction TB
+            hr("Review<br/>/parallel-review") ~~~ r1("code-quality") ~~~ r2("platform reviewers") ~~~ r3("a11y reviewers") ~~~ r4("adversarial (3+ layers)")
+        end
+        subgraph SHP[" "]
+            direction TB
+            hs("Ship<br/>/parallel-ship · pre-merge") --- s1("coverage gate<br/>RN/web ≥ 93%") --- s2("perf + ponytail agents") --- s3("feature-flag rollback") --- s4("test-case trace<br/>cases approved in Define<br/>missing one = BLOCKED")
+        end
+        DEF --> BLD --> REV --> SHP
     end
-    classDef n fill:#ffffff,stroke:#c9c9c9,color:#1f1f1f
-    classDef key fill:#d6efff,stroke:#0a84ff,color:#0b3d66
-    classDef ok fill:#ffffff,stroke:#1a9e3a,color:#137a2c
-    class f2,f3,f4 n
-    class f1 key
-    class f5 ok
-    style FIX fill:#fafafa,stroke:#ececec,color:#8a8a8a
+    subgraph CHK["YOUR CHECKPOINTS"]
+        direction LR
+        k1("approve every phase<br/>continue · edit · stop") ~~~ k2("read the verdict<br/>DONE · READY TO MERGE<br/>BLOCKED · INCOMPLETE") ~~~ k3("act on the findings<br/>review agents are read-only") ~~~ k4("open the PR, merge<br/>opt-in /adr · /docs · /eval")
+    end
+    subgraph FIX["SEPARATE PATH FOR BUGS · /fix"]
+        direction LR
+        f1("failing test first") --- f2("isolate") --- f3("hypothesize") --- f4("fix") --- f5("regression test")
+    end
+    ROW ~~~ CHK ~~~ FIX
+
+    classDef n fill:#FFFFFF,stroke:#C1C4C6,color:#242628
+    classDef key fill:#D1F0FF,stroke:#0A9AF2,color:#242628
+    classDef ok fill:#FFFFFF,stroke:#029D24,color:#029D24
+    classDef quiet fill:transparent,stroke:transparent,color:#707577
+    class d1,d2,d4,b1,b2,b3,b4,r1,r2,r3,r4,s1,s2,s3,f2,f3,f4 n
+    class hd,hb,hr,hs key
+    class d3,s4,f5 ok
+    class k1,k2,k3,k4 quiet
+    style f1 fill:#FFFFFF,stroke:#0071CE,color:#242628
+    style ROW fill:transparent,stroke:transparent
+    style DEF fill:transparent,stroke:transparent
+    style BLD fill:transparent,stroke:transparent
+    style REV fill:transparent,stroke:transparent,color:#029D24
+    style SHP fill:transparent,stroke:transparent
+    style CHK fill:transparent,stroke:#C1C4C6,stroke-dasharray:3 3
+    style FIX fill:transparent,stroke:transparent,color:#0071CE
 ```
 
 It stops at a reviewed plan. `/adr` and `/docs` come later, offered at the end of `/parallel-ship` once the code is final. Each planning skill also runs on its own. To challenge a plan you already have, use `/grill` (interactive) or the `plan-roaster` agent (one shot).
@@ -666,6 +932,26 @@ Your session becomes a **team lead**: it plans the work, then spawns teammates t
 - **Staged spawn.** The reviewer and tester start only once there is something to review or test.
 
 ```mermaid
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 13px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 640
+---
 flowchart TD
     A[/team-build/] --> B["Preflight\nteams enabled? · Claude Code? · lead model check"]
     B --> C["Lead plans\ncontext + scaffold → task board\none file, one owner"]
@@ -958,6 +1244,26 @@ Context comes in two halves (ADR-0001, ADR-0002):
 | **Intent** | What a human decided: spec, task plan, decisions | One file per feature at `docs/planning/<slug>.md`, with a human-owned `status:`. The active feature is found by globbing for `status: active`, so there is no index to go stale |
 
 ```mermaid
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 13px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 640
+---
 flowchart TD
     A["/fe-context\nreads diff · emits derived context"]
     P["/spec · /plan · /adr\nwrite docs/planning/&lt;slug&gt;.md"]
@@ -988,6 +1294,26 @@ Skills run on the everyday model and consult the escalate model inline when a qu
 On Claude Code, `hooks/craftkit-routing.js` resolves the tiers on every prompt from `~/.claude.json`: **your plan picks the tier window, your entitlements pick the ids inside it.**
 
 ```mermaid
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 13px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    curve: basis
+    wrappingWidth: 640
+---
 flowchart TD
     A["UserPromptSubmit fires\nhooks/craftkit-routing.js"] --> B{"~/.claude.json\nreadable?"}
     B -->|no| Z["fall back to family aliases\nhaiku · sonnet · opus\ninjected line says so out loud"]
