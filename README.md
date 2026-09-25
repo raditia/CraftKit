@@ -423,7 +423,15 @@ Removing a hook from `_CRAFTKIT_HOOKS` uninstalls it on the next sync. The reaso
 
 Build, review, and ship use **dynamic parallel execution**: a classifier detects the platform (RN/web, Android, iOS), reads your actual diff, selects only the agents that matter, and runs them concurrently. Test-only diffs skip deep review entirely. Every command below works on all three platforms; only the gates and the agent set change.
 
-Each workflow is drawn in five lanes: **You**, **Hooks** (dashed, run automatically), **Main agent** (blue), **Sub-agents** (green, read-only, in parallel) and **Result** (dark green verdict).
+Each workflow is drawn in five coloured lanes, top to bottom:
+
+| Lane | Colour | Box style | What runs there |
+|---|---|---|---|
+| **You** | pink | grey outline | your prompt |
+| **Hooks** | teal | dashed blue | Claude Code hooks, automatic |
+| **Main agent** | orange | blue outline | skills on the main thread |
+| **Sub-agents** | cyan | green outline | read-only reviewers, in parallel |
+| **Result** | green | dark green | the verdict |
 
 #### /parallel-review
 
@@ -432,20 +440,11 @@ Each workflow is drawn in five lanes: **You**, **Hooks** (dashed, run automatica
 ```mermaid
 ---
 config:
-  theme: base
-  look: classic
+  theme: redux-color
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
     fontSize: 18px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
   flowchart:
     wrappingWidth: 260
 ---
@@ -494,20 +493,11 @@ swimlane-beta LR
 ```mermaid
 ---
 config:
-  theme: base
-  look: classic
+  theme: redux-color
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
     fontSize: 18px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
   flowchart:
     wrappingWidth: 260
 ---
@@ -556,20 +546,11 @@ swimlane-beta LR
 ```mermaid
 ---
 config:
-  theme: base
-  look: classic
+  theme: redux-color
   fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
   themeVariables:
     fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
     fontSize: 18px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
   flowchart:
     wrappingWidth: 260
 ---
