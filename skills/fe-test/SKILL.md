@@ -2,7 +2,7 @@
 name: fe-test
 description: Write or improve Jest tests for React Native / web (EVPMR) covering all changed code paths. Enforces 93% coverage minimum. Native repos use /android-test or /ios-test instead.
 alwaysApply: false
-craftkitInject: planning-resolve, test-cases-resolve
+craftkitInject: planning-resolve, test-cases-resolve, test-heal
 ---
 
 > **Platform gate, check first.** This skill is RN/web only (Jest, 93% bar, EVPMR paths). If the code under test is `*.kt`/`*.java` → stop, run `/android-test`. If `*.swift`/`*.m` → stop, run `/ios-test`. Neither has a fixed coverage bar; do not carry the 93% gate into them.
@@ -96,7 +96,7 @@ rtk git diff main...HEAD
 ```
 
 ### 2. Map cases (max 3 bullets per changed file, not exhaustive)
-For each **changed file only**: list the new/modified branches and states that need coverage. Stop at 3; additional cases emerge from coverage report. Do not map or touch files not in the diff.
+For each **changed file only**: list the new/modified branches and states that need coverage. Stop at 3; additional cases emerge from coverage report. Do not map or touch files not in the diff, except a cited `rename`/`mock-shape` heal per `test-heal`.
 
 ### 3. Write all tests
 Cover every code path from the diff, **changed files only**. Write all test files before running.
@@ -105,7 +105,7 @@ Cover every code path from the diff, **changed files only**. Write all test file
 ```bash
 rtk test --testPathPattern="path/to/__tests__/FileName" --no-coverage
 ```
-Fix failures; never skip or comment out.
+Fix failures; never skip or comment out. A test that existed before this branch is healed only per **Healing a failing test** (`test-heal`), above; after any heal, re-run the module's whole unit suite as it requires.
 
 ### 5. Coverage: must be ≥ 93% on changed files only
 ```bash

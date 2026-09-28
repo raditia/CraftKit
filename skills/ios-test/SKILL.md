@@ -2,7 +2,7 @@
 name: ios-test
 description: Write or improve Quick + Nimble unit tests for an iOS ViewModel: mock dependencies via the Dependency struct and the …Action protocol, assert on captured values.
 alwaysApply: false
-craftkitInject: planning-resolve, test-cases-resolve
+craftkitInject: planning-resolve, test-cases-resolve, test-heal
 ---
 
 **Commands:** `git diff <base>...HEAD`, `bazelisk test //Modules/<Module>:<Module>TestsBundle`, `swiftlint lint --path <file>`
@@ -107,14 +107,14 @@ When the feature has test cases (`test-cases-resolve` above), every approved cas
 
 ## Workflow
 
-1. **Diff first:** `git diff <base>...HEAD --name-only`; touch only changed ViewModels.
+1. **Diff first:** `git diff <base>...HEAD --name-only`; touch only changed ViewModels, except a cited `rename`/`mock-shape` heal per `test-heal`.
 2. **Read a sibling spec** in `Tests/<Feature>/` to match style + reuse mocks.
 3. **Write specs** for every behavior path from the diff.
 4. **Run:** all must pass:
    ```bash
    bazelisk test //Modules/<Module>:<Module>TestsBundle
    ```
-   (Or run the module's test scheme in Xcode if Bazel is unavailable locally.) Fix failures; never skip or comment out an `it`.
+   (Or run the module's test scheme in Xcode if Bazel is unavailable locally.) Fix failures; never skip or comment out an `it`. A test that existed before this branch is healed only per **Healing a failing test** (`test-heal`), above; after any heal, re-run the module's whole unit suite as it requires.
 5. **SwiftLint:** `swiftlint lint --path <each-new-test-file>`; fix all.
 6. **Done:** report specs added, pass/fail count, and any VM path that was unreachable without a production refactor (flag, don't silently skip).
 
