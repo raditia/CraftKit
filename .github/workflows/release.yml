@@ -81,3 +81,45 @@ jobs:
           gh release create "$VERSION" \
             --title "craftkit $VERSION" \
             --notes "$NOTES"
+
+  publish:
+    # After release, so a missing CHANGELOG section blocks npm too. Keyed on the npm
+    # registry rather than the tag: a version whose tag exists but never reached npm
+    # (every release before this job existed) still publishes on the next push.
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # npm trusted publishing (OIDC): no NPM_TOKEN secret, provenance attached.
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # Trusted publishing needs npm >= 11.5.1, which Node 24 bundles.
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Check if version is already on npm
+        id: npm_check
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if [ -n "$(npm view "$NAME@$VERSION" version 2>/dev/null)" ]; then
+            echo "$NAME@$VERSION is already on npm; skipping."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # check.yml runs alongside this workflow, not before it, so gate here too.
+      - name: bash check.sh
+        if: steps.npm_check.outputs.exists == 'false'
+        run: bash check.sh
+
+      - name: Publish to npm
+        if: steps.npm_check.outputs.exists == 'false'
+        run: npm publish
