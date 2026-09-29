@@ -7,6 +7,20 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.47.1 — 2026-09-29
+
+### Release workflow publishes to npm
+
+The npm package trailed the repo by forty releases (`1.6.2` against `1.47.0`) because
+`release.yml` only tagged and cut a GitHub release; publishing was manual and kept being skipped.
+
+- New `publish` job in `release.yml`, run after the release job so a missing CHANGELOG section
+  blocks npm too. It publishes whenever the `package.json` version is not yet on the registry,
+  so a failed or skipped publish recovers on the next push to `main` instead of staying behind.
+- `check.sh` runs before `npm publish`, since `check.yml` runs alongside and does not gate it.
+- Auth is npm trusted publishing (OIDC): no `NPM_TOKEN` secret, provenance attached.
+- `package.json` gains a `repository` field, which provenance requires to match the publishing repo.
+
 ## v1.47.0 — 2026-09-28
 
 ### Test skills heal failing tests by one contract

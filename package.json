@@ -1,6 +1,6 @@
 {
   "name": "@raditia/craftkit",
-  "version": "1.47.0",
+  "version": "1.47.1",
   "description": "AI coding skills that auto-sync across Claude Code, Cursor, Gemini CLI, and Codex CLI",
   "scripts": {
     "postinstall": "bash scripts/postinstall.sh"
@@ -32,6 +32,10 @@
   ],
   "author": "raditia",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/raditia/CraftKit.git"
+  },
   "publishConfig": {
     "access": "public"
   }
