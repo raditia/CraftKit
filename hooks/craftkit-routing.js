@@ -122,6 +122,10 @@ function localSkills(cwd, advertised) {
 let input = '';
 process.stdin.on('data', chunk => { input += chunk; });
 process.stdin.on('end', () => {
+  if (process.env.CRAFTKIT_PANELIST) {
+    process.stdout.write('{}');
+    return;
+  }
   const tier = resolveModelTiers();
   let cwd = process.cwd();
   try {

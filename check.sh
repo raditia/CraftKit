@@ -1803,6 +1803,108 @@ fi
 rm -rf "$_cxt"
 [[ $_cx -eq 0 ]] && pass
 
+# 38. cross-review fails loud and never collapses to one model. Behavioral, against stub
+#     CLIs: the whole value of the command is that two different providers ran, so a
+#     missing provider, an API-key login, or a nested panelist must each stop the run,
+#     and a healthy run must produce both rounds from both reviewers.
+# ---------------------------------------------------------------------------
+check "cross-review requires both providers and runs two rounds"
+_cr=0
+_crx="$(mktemp -d)"
+mkdir -p "$_crx/bin" "$_crx/home" "$_crx/repo"
+mkdir -p "$_crx/home/.craftkit"
+_crroot="$(cd "$_crx/repo" && pwd -P)"
+printf 'project=%s\nclaude=stub\ncodex=Logged in using ChatGPT\n' "$_crroot" > "$_crx/home/.craftkit/cross-review-allowed-auth"
+cat > "$_crx/bin/claude" <<'STUB'
+#!/bin/sh
+case "$1" in --version) echo "claude-stub 0";; auth) printf '{"loggedIn": true, "authMethod": "%s"}\n' "${STUB_CLAUDE_AUTH:-stub}";;
+  *) prompt="$(cat)"; if [ "${STUB_BAD_FORMAT:-}" = 1 ]; then echo invalid; exit 0; fi
+     case "$prompt" in *'Round 2'*) [ "${STUB_MUTATE:-}" = 1 ] && echo changed >> f
+            [ "${STUB_NEW_UNTRACKED:-}" = 1 ] && echo new > added-during-review.txt
+            if [ "${STUB_R2_SKIP:-}" = 1 ]; then printf '## Response to theirs\n- none\n\n## Withdrawn\n- none\n'
+            else printf '## Response to theirs\n- F1 | AGREE | f:1 confirms it\n\n## Withdrawn\n- none\n'; fi;;
+       *) if [ "${STUB_LARGE_RESPONSE:-}" = 1 ]; then awk 'BEGIN { for (i=0; i<270000; i++) printf "x" }'
+          elif [ "${STUB_FENCE:-}" = 1 ]; then
+              printf 'Here is my review.\n```markdown\n## Findings\n- F1 | warning | f | claim\n  wrapped | evidence\n\n## Not reviewed\n- none\n```\n'
+          else
+              printf '## Findings\n- F1 | WARNING | %s | claim | command a || command b\n\n## Not reviewed\n- none\n' "${STUB_LOCATION:-f:1}"; fi;; esac;; esac
+STUB
+cat > "$_crx/bin/codex" <<'STUB'
+#!/bin/sh
+case "$1" in --version) echo "codex-stub 0";; login) echo "${STUB_AUTH:-Logged in using ChatGPT}";;
+  exec) while [ $# -gt 0 ]; do [ "$1" = "-o" ] && out="$2"; shift; done
+        prompt="$(cat)"; case "$prompt" in *'Round 2'*) printf '## Response to theirs\n- F1 | AGREE | f:1 confirms it\n\n## Withdrawn\n- none\n' > "$out";;
+            *) printf '## Findings\n- F1 | WARNING | %s | claim | command a || command b\n\n## Not reviewed\n- none\n' "${STUB_LOCATION:-f:1}" > "$out";; esac;; esac
+STUB
+chmod +x "$_crx/bin/claude" "$_crx/bin/codex"
+(cd "$_crx/repo" && git init -q && git -c user.email=c@k -c user.name=ck commit -q --allow-empty -m base \
+    && git branch -M main && echo x > f && git add f)
+_crrun() { (cd "$_crx/repo" && env HOME="$_crx/home" PATH="$_crx/bin:/usr/bin:/bin" "$@" bash "$REPO_DIR/scripts/cross-review.sh" main 2>&1); }
+_crrun_flags() { (cd "$_crx/repo" && env HOME="$_crx/home" PATH="$_crx/bin:/usr/bin:/bin" bash "$REPO_DIR/scripts/cross-review.sh" main "$@" 2>&1); }
+_out="$(_crrun)" \
+    || { fail "cross-review fails on a healthy stub run: $_out"; _cr=1; }
+_out2="$(_crrun)" \
+    || { fail "cross-review fails on a second healthy stub run: $_out2"; _cr=1; }
+[[ "$_out" != "$_out2" ]] || { fail "cross-review reused a run directory"; _cr=1; }
+if [[ -d "$_out" ]]; then
+    for _f in r1-claude.md r1-codex.md r2-claude.md r2-codex.md meta.md diff.patch; do
+        [[ -s "$_out/$_f" ]] || { fail "cross-review run is missing $_f"; _cr=1; }
+    done
+else
+    fail "cross-review did not return a run directory: $_out"; _cr=1
+fi
+mv "$_crx/bin/codex" "$_crx/codex.off"
+_crrun > "$_crx/out"; grep -q "could not run: codex CLI not found" "$_crx/out" \
+    || { fail "cross-review does not stop when codex is missing"; _cr=1; }
+mv "$_crx/codex.off" "$_crx/bin/codex"
+_crrun STUB_AUTH="Logged in using an API key" > "$_crx/out"; grep -q "could not run: Codex auth method is not allowed" "$_crx/out" \
+    || { fail "cross-review accepts a Codex API-key login outside the allowlist"; _cr=1; }
+_crrun STUB_CLAUDE_AUTH="unapproved" > "$_crx/out"; grep -q "could not run: Claude auth method is not allowed" "$_crx/out" \
+    || { fail "cross-review accepts an unapproved Claude auth method"; _cr=1; }
+printf 'project=/other/repo\nproject=%s\nclaude=stub\ncodex=Logged in using ChatGPT\n' "$_crroot" > "$_crx/home/.craftkit/cross-review-allowed-auth"
+_crrun > "$_crx/out" \
+    || { fail "cross-review rejects a policy approving several projects: $(cat "$_crx/out")"; _cr=1; }
+printf 'project=/other/repo\nclaude=stub\ncodex=Logged in using ChatGPT\n' > "$_crx/home/.craftkit/cross-review-allowed-auth"
+_crrun > "$_crx/out"; grep -q "project is not approved" "$_crx/out" \
+    || { fail "cross-review applies another project's approval"; _cr=1; }
+printf 'project=%s\nclaude=stub\ncodex=Logged in using ChatGPT\n' "$_crroot" > "$_crx/home/.craftkit/cross-review-allowed-auth"
+printf 'claude=company login\n' >> "$_crx/home/.craftkit/cross-review-allowed-auth"
+_crrun STUB_CLAUDE_AUTH="company login" > "$_crx/out" \
+    || { fail "cross-review loses spaces in Claude auth method: $(cat "$_crx/out")"; _cr=1; }
+_crrun CRAFTKIT_PANELIST=1 > "$_crx/out"; grep -q "could not run: refusing to start inside a panelist" "$_crx/out" \
+    || { fail "cross-review starts inside a panelist, so it can recurse"; _cr=1; }
+_crrun_flags extra > "$_crx/out"; grep -q "only one base ref is allowed" "$_crx/out" \
+    || { fail "cross-review silently accepts more than one base ref"; _cr=1; }
+_crrun STUB_BAD_FORMAT=1 > "$_crx/out"; grep -q "invalid r1 format" "$_crx/out" \
+    || { fail "cross-review accepts an invalid panelist format"; _cr=1; }
+_crrun STUB_LARGE_RESPONSE=1 > "$_crx/out"; grep -q "panelist response exceeds 256 KiB" "$_crx/out" \
+    || { fail "cross-review accepts an oversized panelist response"; _cr=1; }
+_crrun STUB_FENCE=1 > "$_crx/out" \
+    || { fail "cross-review rejects a fenced reply with a whole-file finding: $(cat "$_crx/out")"; _cr=1; }
+_crrun STUB_R2_SKIP=1 > "$_crx/out"; grep -q "must answer every codex finding" "$_crx/out" \
+    || { fail "cross-review accepts a critique that skips a peer finding"; _cr=1; }
+_crrun STUB_MUTATE=1 > "$_crx/out"; grep -q "tracked diff changed during review" "$_crx/out" \
+    || { fail "cross-review accepts a changed diff"; _cr=1; }
+_crrun STUB_NEW_UNTRACKED=1 > "$_crx/out"; grep -q "untracked paths changed during review" "$_crx/out" \
+    || { fail "cross-review accepts new excluded paths during review"; _cr=1; }
+rm -f "$_crx/repo/added-during-review.txt"
+echo x > "$_crx/repo/f"
+echo 'SECRET=1' > "$_crx/repo/.env"
+_excl="$(_crrun)" || { fail "cross-review fails with an untracked file present: $_excl"; _cr=1; }
+if [[ -d "$_excl" ]]; then
+    ! grep -q 'SECRET' "$_excl/diff.patch" "$_excl/r1-prompt.md" \
+        || { fail "cross-review sent an untracked file to the panelists"; _cr=1; }
+else
+    fail "cross-review did not return a run directory with an untracked file present: $_excl"; _cr=1
+fi
+awk 'BEGIN { for (i=0; i<70000; i++) print "oversize line " i }' > "$_crx/repo/f"
+_crrun > "$_crx/out"; grep -q "diff exceeds 256 KiB" "$_crx/out" \
+    || { fail "cross-review sends an oversized diff"; _cr=1; }
+[[ "$(printf '{}' | CRAFTKIT_PANELIST=active node "$HOOK")" == '{}' ]] \
+    || { fail "routing hook does not bypass a panelist"; _cr=1; }
+rm -rf "$_crx"
+[[ $_cr -eq 0 ]] && pass
+
 echo
 if [[ $FAILURES -eq 0 ]]; then
     echo "All checks passed."

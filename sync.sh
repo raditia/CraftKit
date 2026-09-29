@@ -516,6 +516,7 @@ prune_orphan_staging() {
     for d in "$staging"/*; do
         [[ -d "$d" ]] || continue
         base="$(basename "$d")"
+        [[ "$base" == "bin" ]] && continue
         live=0
         for adapter in "${ADAPTERS[@]}"; do
             case "$base" in "$adapter"|"$adapter"-*) live=1; break ;; esac
@@ -570,6 +571,24 @@ for adapter in "${ADAPTERS[@]}"; do
         "finalize_${adapter}"
     fi
 done
+
+# cross-review.sh is run by a synced command, and an installed command cannot know where
+# this repo lives, so the script gets a fixed path every tool can reach.
+sync_bin() {
+    local src="$REPO_DIR/scripts/cross-review.sh" dest="$HOME/.craftkit/bin/cross-review.sh"
+    echo ""
+    echo "[bin]"
+    if cmp -s "$src" "$dest"; then
+        echo "    bin: (up to date)"
+        return
+    fi
+    mkdir -p "$(dirname "$dest")"
+    cp "$src" "$dest" || return 1
+    chmod +x "$dest" || return 1
+    echo "    + cross-review.sh"
+}
+sync_bin
+
 echo ""
 [[ -n "$_ck_repo_version" ]] && printf '%s\n' "$_ck_repo_version" > "$_ck_version_file"
 

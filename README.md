@@ -1,4 +1,4 @@
-# craftkit `v1.48.0`
+# craftkit `v1.49.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -17,6 +17,7 @@ One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**,
   - [Sequential fallback](#sequential-fallback) · `/review`, `/ship`, `/build`
   - [Planning pipeline: /define](#planning-pipeline-define-before-you-build) · `/interview` → `/spec` → `/test-cases` → `/plan`
   - [Experimental: /team-build](#experimental-team-build-agent-teams) · agent-teams build
+  - [Cross-model: /cross-review](#cross-model-cross-review) · Claude and Codex review, then check each other
   - [Fix, tests, and PR message](#fix-tests-and-pr-message)
   - [Grill, research, and handoff](#grill-research-and-handoff) · stress-test plans, delegate reading, hand off sessions
   - [Scoring a run: /eval](#scoring-a-run-eval) · weighted correctness %, judged and ledgered
@@ -976,6 +977,85 @@ Works on RN/web, Android and iOS; the task board follows each platform's file la
 - **Teammates don't survive `/resume`.** An interrupted build restarts coordination from the task board.
 
 Full workflow: [`commands/team-build.md`](commands/team-build.md).
+
+---
+
+### Cross-model: /cross-review
+
+Claude and Codex review the same diff without seeing each other's work, then each answers the other's findings once. Your session reads both rounds and keeps what the evidence supports. Explicit `/cross-review` only.
+
+```mermaid
+---
+config:
+  theme: base
+  look: classic
+  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+  themeVariables:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
+    fontSize: 18px
+    primaryColor: "#FFFFFF"
+    primaryBorderColor: "#C1C4C6"
+    primaryTextColor: "#242628"
+    lineColor: "#A2A6A8"
+    clusterBkg: "#F5FBFF"
+    clusterBorder: "#F0F1F2"
+    titleColor: "#707577"
+    edgeLabelBackground: "#FFFFFF"
+  flowchart:
+    wrappingWidth: 260
+---
+swimlane-beta LR
+    subgraph you["YOU"]
+        ask("/cross-review<br/>explicit only")
+    end
+    subgraph script["cross-review.sh · fail closed"]
+        pre("preflight<br/>both CLIs · auth allowlist<br/>tracked diff ≤ 256 KiB")
+        chk("validate replies<br/>every peer finding answered<br/>tree unchanged")
+        stop("could not run<br/>no same-model fallback")
+    end
+    subgraph panel["PANEL · read-only, repo only"]
+        r1("round 1, blind<br/>claude -p ‖ codex exec")
+        r2("round 2, once<br/>AGREE · DISPUTE · CANNOT-VERIFY")
+    end
+    subgraph host["HOST · your session"]
+        adj("adjudicate by evidence<br/>read the cited lines")
+    end
+    subgraph result["RESULT"]
+        rep("findings + provenance<br/>then /eval")
+    end
+    ask --> pre --> r1 --> r2 --> chk --> adj --> rep
+    pre -->|"any check fails"| stop
+    chk -->|"bad format · tree changed"| stop
+
+    classDef you fill:#FFFFFF,stroke:#707577,color:#242628
+    classDef main fill:#FFFFFF,stroke:#0A9AF2,color:#242628
+    classDef sub fill:#FFFFFF,stroke:#029D24,color:#242628
+    classDef stop fill:#FFFFFF,stroke:#D1292E,color:#242628,stroke-dasharray:4 3
+    classDef verdict fill:#0A5C2C,stroke:#0A5C2C,color:#8BE200
+    class ask you
+    class pre,chk,adj main
+    class r1,r2 sub
+    class stop stop
+    class rep verdict
+```
+
+| Step | What happens |
+|---|---|
+| Preflight | Both CLIs present, both auth methods on the allowlist for this project, tracked diff captured and under 256 KiB. Any miss stops the run before anything is sent |
+| Round 1 | Both CLIs get the same prompt and diff, blind to each other (`claude -p --restricted --strict-mcp-config` with Read/Grep/Glob, `codex exec --ignore-user-config -s read-only`) |
+| Round 2 | Each marks every one of the other's findings AGREE, DISPUTE or CANNOT-VERIFY, and may withdraw its own |
+| Validate | Replies must parse and answer every peer finding; the tracked diff and untracked path list must be unchanged since the start |
+| Synthesis | The host keeps consensus, settles disputes by reading the cited lines, labels the rest |
+
+- **Both CLIs are required.** If either is missing or fails, the run stops with `cross-review could not run: …` instead of quietly becoming a same-model review.
+- **Only one critique round.** More rounds make the models drift toward agreement rather than evidence.
+- **Account safety.** Before any diff is sent, `~/.craftkit/cross-review-allowed-auth` must hold a `project=/absolute/path` line for this repository (one line per approved project) plus the exact methods allowed for both CLIs, for example `claude=claude.ai` and `codex=Logged in using ChatGPT`. `CRAFTKIT_CROSS_REVIEW_POLICY` points at a different file. The CLIs expose the login method, not the account, so confirm the signed-in accounts are approved. Auth checks and panelist calls clear API keys, alternate endpoints and provider override variables; Codex also ignores user configuration.
+- **Scope.** Tracked changes since the merge base, including working-tree edits. Untracked files are never sent, only counted, since an unignored `.env` is exactly the file nobody meant to share. Binary diffs name the file without reviewable contents.
+- **Layout-tolerant, content-strict.** Code fences, a preamble, wrapped lines and lowercase severities are accepted; a line that does not parse, or a critique that skips a peer finding, stops the run with the raw replies kept for inspection.
+- **Reproducible.** Each run keeps the diff, the exact prompts, both CLI versions and the commit in a unique owner-only directory under `~/.craftkit-state/cross-review/`.
+- Panelists run with `CRAFTKIT_PANELIST=1` (the script refuses to start inside one, and the routing hook stays silent) and `CRAFTKIT_GATE=off`, so the Stop gates cannot block a headless reviewer.
+
+Script: [`scripts/cross-review.sh`](scripts/cross-review.sh), installed to `~/.craftkit/bin/`. Workflow: [`commands/cross-review.md`](commands/cross-review.md).
 
 ---
 
