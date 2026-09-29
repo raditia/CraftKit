@@ -7,6 +7,40 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.48.0 — 2026-09-29
+
+### /cross-review: Claude and Codex review the same diff, then check each other
+
+craftkit's instructions already ran in every tool, but collaboration did not: `/parallel-*` and
+`/team-build` spawn through Claude-only runtimes, so a second opinion was always the same
+model twice. `/cross-review` puts two providers on one diff.
+
+- `scripts/cross-review.sh` (installed to `~/.craftkit/bin/` by a new `[bin]` sync step) runs
+  `claude -p --restricted` (Read/Grep/Glob only) and `codex exec -s read-only --ignore-user-config`
+  in parallel on one verbatim prompt, then one critique round where each marks every one of the
+  other's findings AGREE, DISPUTE or CANNOT-VERIFY. One round only, because further rounds drift
+  toward agreement, not evidence.
+- Fail closed before anything is sent: both CLIs present, both login methods and the project
+  listed in `~/.craftkit/cross-review-allowed-auth`, tracked diff under 256 KiB. API-key and
+  endpoint override variables are cleared for the auth checks and the panelists. A miss stops
+  the run with `cross-review could not run: <reason>`; it never falls back to a same-model review.
+- Untracked files are never sent, only counted, so an unignored `.env` cannot leave the machine.
+- Replies are validated layout-tolerant and content-strict: fences, preambles, wrapped lines and
+  lowercase severities pass; an unparseable line, or a critique that skips a peer finding, stops
+  the run with the raw replies kept. The run also stops if the tree changed during the review.
+- Prompts mark the diff and the peer's findings as untrusted data, keep panelists to files inside
+  the repository, and forbid invoking skills or agents. Panelists run with `CRAFTKIT_PANELIST=1`
+  (the script refuses to start under it, the routing hook stays silent) and `CRAFTKIT_GATE=off`.
+- Each run keeps the diff, exact prompts, commit, CLI versions and auth methods in a unique
+  owner-only directory under `~/.craftkit-state/cross-review/`, so a disagreement can be reproduced.
+- `commands/cross-review.md` is the host's adjudication table: consensus kept, disputes settled
+  by reading the cited lines, unverified claims capped at `[WARNING]`. README gains a flow diagram.
+- `check.sh` check 37 drives the script against stub CLIs: healthy runs, every fail-closed path,
+  untracked exclusion, tolerated layouts, and a critique that skips a finding.
+- `sync.sh`: `read_state` returns 0 on an empty state file. Before, `set -e` ended the sync
+  silently at the first adapter with no skills, so every adapter after it went unsynced.
+- `prune_orphan_staging` skips `~/.craftkit/bin`, which is not an adapter staging dir.
+
 ## v1.47.1 — 2026-09-29
 
 ### Release workflow publishes to npm

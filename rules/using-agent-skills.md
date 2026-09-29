@@ -25,6 +25,9 @@ Output compression (caveman) is delivered by the caveman plugin's hooks, not a s
 
 ## Skill discovery
 
+A cross-review panelist follows its assigned read-only prompt and skips skill
+routing; the host handles synthesis and verification.
+
 **Intent-first routing is a BLOCKING REQUIREMENT.** Before generating ANY response to a user request, classify intent against available skills. This is mandatory, not advisory. Do NOT require specific trigger words; infer from meaning, not keywords. Do NOT skip this step even for simple or conversational requests.
 
 Classification order:
@@ -88,6 +91,7 @@ Announce the command you actually ran (`Running /build …`), not the one you co
 | Explicit command | When to prefer |
 |-----------------|----------------|
 | `/team-build` | Agent-teams build: this session leads (escalated model), everyday-model teammates implement in parallel via shared task list + direct teammate messaging. All platforms. Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`; ~5× token cost of a solo build |
+| `/cross-review` | Claude and Codex review the same diff independently, answer each other once, host synthesizes by evidence. Read-only; both CLIs required, no same-model fallback. For high-stakes diffs where one model's blind spots are the risk |
 
 ### Individual skills (use when task is narrower than a full workflow)
 
