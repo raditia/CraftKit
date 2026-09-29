@@ -84,7 +84,7 @@ read_state() {
     _state_skills=()
     if [[ -f "$state_file" ]]; then
         while IFS= read -r line; do
-            [[ -n "$line" ]] && _state_skills+=("$line")
+            [[ -z "$line" ]] || _state_skills+=("$line")
         done < "$state_file"
     fi
 }
@@ -160,9 +160,8 @@ craftkit_strip_frontmatter() {
 # partials/<a>.md / rules/<a>.md / skills/<a>/SKILL.md are spliced in as a managed block
 # right after its own frontmatter, so the installed copy carries the live text instead of a
 # hand-maintained duplicate. No opt-in -> plain copy.
-# Tool-agnostic on purpose: agents and commands render only on Claude, which is the one tool
-# with the hosts, but a skill's body is its whole substance, so dropping an injected block
-# there would leave the other three tools with a skill missing its core table.
+# Tool-agnostic on purpose: commands and skills render for every adapter, while
+# agents render for Claude. A missing injected block leaves an installed workflow incomplete.
 craftkit_render_injected() {
     local src="$1" out="$2"
     local list
@@ -210,13 +209,16 @@ craftkit_render_injected() {
 sync_adapter() {
     local adapter="$1"
     local state_file="$STATE_DIR/$adapter"
-    local changed=0
+    local changed=0 skipped=0
 
     read_state "$adapter"
     local installed_skills=("${_state_skills[@]+"${_state_skills[@]}"}")
 
     read_current_skills
     local current_skills=("${_current_skills[@]+"${_current_skills[@]}"}")
+    # Cursor reads the shared ~/.agents/skills the Codex adapter installs, so it defines no
+    # installer. An empty list lets the removal loop take back its older copies.
+    declare -f "install_${adapter}_skill" >/dev/null || current_skills=()
 
     # Remove skills that were installed but are no longer in the repo
     for skill in "${installed_skills[@]+"${installed_skills[@]}"}"; do
@@ -236,6 +238,12 @@ sync_adapter() {
         local dest
         dest="$("get_${adapter}_dest" "$skill")"
 
+        if [[ "$adapter" == "codex" ]] && codex_skill_collision "$skill"; then
+            echo "    ! skipped unowned Codex skill: $skill ($dest)" >&2
+            skipped=1
+            continue
+        fi
+
         local rendered
         rendered="$(mktemp)"
         craftkit_render_injected "$source_file" "$rendered"
@@ -248,7 +256,7 @@ sync_adapter() {
         rm -f "$rendered"
     done
 
-    if [[ $changed -eq 0 ]]; then
+    if [[ $changed -eq 0 && $skipped -eq 0 ]]; then
         echo "    (up to date)"
     fi
 
@@ -361,7 +369,7 @@ sync_agents_adapter() {
 sync_commands_adapter() {
     local adapter="$1"
     local state_file="$STATE_DIR/${adapter}-commands"
-    local changed=0
+    local changed=0 skipped=0
 
     local installed_commands=()
     if [[ -f "$state_file" ]]; then
@@ -372,6 +380,7 @@ sync_commands_adapter() {
 
     read_current_commands
     local current_commands=("${_current_commands[@]+"${_current_commands[@]}"}")
+    declare -f "install_${adapter}_command" >/dev/null || current_commands=()
 
     # Remove commands that were installed but no longer exist in commands/
     for cmd in "${installed_commands[@]+"${installed_commands[@]}"}"; do
@@ -387,6 +396,11 @@ sync_commands_adapter() {
         local source_file="$COMMANDS_DIR/${cmd}.md"
         local dest
         dest="$("get_${adapter}_command_dest" "$cmd")"
+        if [[ "$adapter" == "codex" ]] && codex_skill_collision "$cmd"; then
+            echo "    ! skipped unowned Codex skill: $cmd ($dest)" >&2
+            skipped=1
+            continue
+        fi
         # Rendered for every adapter, as skills are: Cursor, Gemini and Codex install commands
         # too, and a command naming a partial it does not carry is a dangling instruction there.
         # Diffing the rendered text keeps the pass idempotent when only a partial moved on.
@@ -401,7 +415,7 @@ sync_commands_adapter() {
         rm -f "$rendered"
     done
 
-    [[ $changed -eq 0 ]] && echo "    commands: (up to date)"
+    [[ $changed -eq 0 && $skipped -eq 0 ]] && echo "    commands: (up to date)"
 
     printf '%s\n' "${current_commands[@]+"${current_commands[@]}"}" > "$state_file"
 }

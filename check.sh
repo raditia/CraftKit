@@ -1725,6 +1725,84 @@ for _f in rules/grounding.md partials/grounding-claims.md; do
 done
 [[ $_rg -eq 0 ]] && pass
 
+# ---------------------------------------------------------------------------
+# 37. Workflows install as native skills in ~/.agents/skills, which Codex and
+#     Cursor both read. A giant AGENTS.md exceeds Codex's default instruction
+#     budget, and a second Cursor copy lists every skill twice. Gemini keeps its
+#     full-body GEMINI.md block on purpose: moving it to skills would load bodies
+#     only on demand, behind a per-activation consent prompt. Runs the real sync
+#     passes, so the migration that takes back Cursor's older copies is exercised.
+# ---------------------------------------------------------------------------
+check "shared native skills for Codex and Cursor, Gemini keeps its block"
+_cx=0
+_cxt="$(mktemp -d)"
+# A plain subshell, not `if ! (...)`: a tested command disables set -e for everything it
+# calls, which would hide a sync pass that aborts the real run.
+(
+    set -euo pipefail
+    HOME="$_cxt"; export HOME
+    STATE_DIR="$HOME/.craftkit-state"
+    SKILLS_DIR="$REPO_DIR/skills"; COMMANDS_DIR="$REPO_DIR/commands"
+    RULES_DIR="$REPO_DIR/rules"; PARTIALS_DIR="$REPO_DIR/partials"
+    mkdir -p "$STATE_DIR"
+    sed -n '/^_CRAFTKIT_INJECTED_START=/p;/^_CRAFTKIT_INJECTED_END=/p' "$REPO_DIR/sync.sh" > "$_cxt/lib.sh"
+    for _fn in contains read_state read_current_skills read_current_commands craftkit_inject_list \
+               craftkit_strip_frontmatter craftkit_render_injected sync_adapter sync_commands_adapter; do
+        awk -v f="$_fn() {" '$0==f{p=1} p{print} p&&/^}/{exit}' "$REPO_DIR/sync.sh" >> "$_cxt/lib.sh"
+    done
+    source "$_cxt/lib.sh"
+    for _a in codex cursor gemini; do source "$REPO_DIR/adapters/$_a.sh"; done
+    mkdir -p "$HOME/.codex" "$HOME/.agents/skills/foreign" \
+        "$HOME/.agents/skills/android-review" "$HOME/.agents/skills/ios-review" \
+        "$HOME/.agents/skills/define" "$HOME/.cursor/rules" "$GEMINI_SKILLS_DIR"
+    printf 'user guidance\n%s\n' "$_CODEX_SECTION_START" > "$CODEX_AGENTS_MD"
+    awk 'BEGIN{for(i=1;i<=10000;i++)print "obsolete workflow body"}' >> "$CODEX_AGENTS_MD"
+    echo "$_CODEX_SECTION_END" >> "$CODEX_AGENTS_MD"
+    echo "foreign skill" > "$HOME/.agents/skills/foreign/SKILL.md"
+    echo "foreign Android skill" > "$HOME/.agents/skills/android-review/SKILL.md"
+    echo "foreign command" > "$HOME/.agents/skills/define/SKILL.md"
+    echo "old cursor copy" > "$HOME/.cursor/rules/fe-review.mdc"
+    echo "old cursor copy" > "$HOME/.cursor/rules/build.mdc"
+    echo "old gemini copy" > "$GEMINI_SKILLS_DIR/fe-review.md"
+    echo fe-review > "$STATE_DIR/cursor"; echo build > "$STATE_DIR/cursor-commands"
+    echo fe-review > "$STATE_DIR/gemini"
+    install_codex_rule grounding "$REPO_DIR/rules/grounding.md"
+    install_gemini_rule grounding "$REPO_DIR/rules/grounding.md"
+    # Twice: the second pass reads the empty state the migration leaves behind.
+    for _pass in 1 2; do
+        for _a in codex cursor gemini; do
+            sync_adapter "$_a" >/dev/null; sync_commands_adapter "$_a" >/dev/null
+        done
+    done 2>"$_cxt/sync-warnings"
+    if install_codex_skill foreign "$REPO_DIR/skills/fe-review/SKILL.md" 2>/dev/null; then exit 1; fi
+    [[ -f "$HOME/.agents/skills/fe-review/SKILL.md" ]] &&
+    [[ -f "$HOME/.agents/skills/build/SKILL.md" ]] &&
+    [[ -f "$HOME/.craftkit/codex/rules/grounding.md" ]] &&
+    [[ "$(grep -m1 '^description:' "$HOME/.agents/skills/fe-review/SKILL.md")" == "$(grep -m1 '^description:' "$REPO_DIR/skills/fe-review/SKILL.md")" ]] &&
+    [[ $(wc -c < "$CODEX_AGENTS_MD") -lt 8192 ]] &&
+    grep -qF 'user guidance' "$CODEX_AGENTS_MD" &&
+    ! grep -qF 'obsolete workflow body' "$CODEX_AGENTS_MD" &&
+    grep -qF 'foreign skill' "$HOME/.agents/skills/foreign/SKILL.md" &&
+    grep -qF 'foreign Android skill' "$HOME/.agents/skills/android-review/SKILL.md" &&
+    grep -qF 'foreign command' "$HOME/.agents/skills/define/SKILL.md" &&
+    [[ ! -e "$HOME/.agents/skills/android-review/.craftkit-managed" ]] &&
+    [[ ! -e "$HOME/.agents/skills/ios-review/SKILL.md" ]] &&
+    [[ ! -e "$HOME/.agents/skills/define/.craftkit-managed" ]] &&
+    grep -q 'skipped unowned Codex skill: android-review' "$_cxt/sync-warnings" &&
+    grep -q 'skipped unowned Codex skill: ios-review' "$_cxt/sync-warnings" &&
+    grep -q 'skipped unowned Codex skill: define' "$_cxt/sync-warnings" &&
+    [[ ! -e "$HOME/.cursor/rules/fe-review.mdc" && ! -e "$HOME/.cursor/rules/build.mdc" ]] &&
+    grep -q '^name: fe-review' "$HOME/GEMINI.md" && grep -q '^name: build' "$HOME/GEMINI.md" &&
+    ! grep -qF 'old gemini copy' "$HOME/GEMINI.md" &&
+    [[ -z "$(tr -d '\n' < "$STATE_DIR/cursor")" ]]
+)
+if [[ $? -ne 0 ]]; then
+    fail "skills missing from ~/.agents/skills, Cursor kept a second copy, or Gemini lost its workflow bodies"
+    _cx=1
+fi
+rm -rf "$_cxt"
+[[ $_cx -eq 0 ]] && pass
+
 echo
 if [[ $FAILURES -eq 0 ]]; then
     echo "All checks passed."
