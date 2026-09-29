@@ -190,7 +190,7 @@ flowchart TB
         c5("partials/<br/>spliced in, never alone")
     end
     subgraph S2["STAGE 2 · DISTRIBUTE"]
-        pull("git pull<br/>post-merge hook") --> sync("sync.sh<br/>idempotent · check.sh gates every change")
+        pull("git pull<br/>post-merge / post-rewrite hooks") --> sync("sync.sh<br/>idempotent · check.sh gates every change")
     end
     subgraph S3["STAGE 3 · TOOLS · one adapter each"]
         t1("Claude Code")
@@ -239,7 +239,7 @@ layers act inside each AI tool:
 
 | Role | What | Where |
 |------|------|-------|
-| **CraftKit Gateway** | Every prompt and tool call passes through it ([full table](#enforcement-gates-hooks-that-refuse)): **Router** (`craftkit-routing.js`, UserPromptSubmit), **Loader** (`craftkit-platform-rules.js`, SessionStart), **Guards** (`gate-skill-first`, `gate-read-size`, `craftkit-read-cap`, PreToolUse), **Exit gates** (`gate-verify-on-stop`, `gate-announce-honored`, Stop) | `hooks/`, Claude Code only. Cursor and Gemini get the routing rule as advisory text; Codex gets a short global guide. All three discover skills natively from `~/.agents/skills/` |
+| **CraftKit Gateway** | Every prompt and tool call passes through it ([full table](#enforcement-gates-hooks-that-refuse)): **Router** (`craftkit-routing.js`, UserPromptSubmit), **Loader** (`craftkit-platform-rules.js`, SessionStart), **Guards** (`gate-skill-first`, `gate-read-size`, `craftkit-read-cap`, PreToolUse), **Exit gates** (`gate-verify-on-stop`, `gate-announce-honored`, Stop) | `hooks/`, Claude Code only. Cursor and Gemini get the routing rule as advisory text; Codex gets a short global guide. Codex and Cursor discover skills natively from `~/.agents/skills/` |
 | **Orchestrators** | Run a workflow: resolve the feature once in Phase 0, pass the slug down, spawn skills and agents | `commands/*.md` |
 | **Skills and agents** | Do one job; skills reach Figma and Lark through the host's MCP client | `skills/`, `agents/` (Claude only) |
 
@@ -310,11 +310,11 @@ flowchart TB
 | Tool | Always-on (`rules/`) | On-demand (`skills/` + `commands/`) | Agents (`agents/`) |
 |------|----------------------|--------------------------------------|--------------------|
 | Claude Code | `~/.claude/CLAUDE.md` (managed block) | `~/.claude/commands/<name>.md` → `/<name>` | `~/.claude/agents/<name>.md` |
-| Cursor | `~/.cursor/rules/*.mdc` (alwaysApply) | `~/.agents/skills/<name>/SKILL.md` (shared native skills) | n/a |
-| Gemini CLI | `~/GEMINI.md` (managed block) | `~/.agents/skills/<name>/SKILL.md` (shared native skills) | n/a |
+| Cursor | `~/.cursor/rules/*.mdc` (alwaysApply) | `~/.agents/skills/<name>/SKILL.md` (shared native skills, local only) | n/a |
+| Gemini CLI | `~/GEMINI.md` (managed block) | `~/GEMINI.md` (managed block), and also lists the shared `~/.agents/skills/` | n/a |
 | Codex CLI | `~/.codex/AGENTS.md` (short managed block, full rules in `~/.craftkit/codex/rules/`) | `~/.agents/skills/<name>/SKILL.md` (shared native skills, including workflows) | n/a |
 
-Cursor, Gemini CLI and Codex all read `~/.agents/skills/`, so skills and commands install there once for all three rather than once per tool. CraftKit's named review agents currently install only for Claude. Codex supports custom subagents, but this adapter does not yet convert the Claude agent definitions. Codex workflows use the sequential fallback where those named agents are required.
+Codex and Cursor read skills from `~/.agents/skills/`, so they share one install there. Cursor does not copy that folder to Cloud Agents, so CraftKit skills reach local Cursor sessions only. Gemini CLI reads it too, but keeps its full `~/GEMINI.md` block: as native skills, workflows would load only on demand, behind a consent prompt on every activation. CraftKit's named review agents currently install only for Claude. Codex supports custom subagents, but this adapter does not yet convert the Claude agent definitions. Codex workflows use the sequential fallback where those named agents are required.
 
 **Retired:** GitHub Copilot and Crush (supported through v1.23.0). Neither has a headless entry point, so neither can join cross-tool agent fan-out ([more](docs/design-notes.md#retired-tools)).
 
@@ -1353,7 +1353,7 @@ Skills name a tier, never a model id. Agents spawn on the family alias (`haiku` 
 
 ## Managing skills
 
-**Edit source here, never the installed copies** in `~/.claude/`, `~/.cursor/`, `~/GEMINI.md` or `~/.codex/`. `sync.sh` overwrites those on the next pull.
+**Edit source here, never the installed copies** in `~/.claude/`, `~/.cursor/`, `~/GEMINI.md`, `~/.codex/` or `~/.agents/skills/`. `sync.sh` overwrites those on the next pull.
 
 ### Add a rule (always-on)
 

@@ -1726,13 +1726,14 @@ done
 [[ $_rg -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
-# 37. Workflows install once, as native skills in ~/.agents/skills, which Codex,
-#     Cursor and Gemini CLI all read. A giant AGENTS.md exceeds Codex's default
-#     instruction budget, and a second per-tool copy lists every skill twice in
-#     Cursor and Gemini. Runs the real sync passes, so the migration that takes
-#     back the older Cursor and Gemini copies is exercised, not just the installer.
+# 37. Workflows install as native skills in ~/.agents/skills, which Codex and
+#     Cursor both read. A giant AGENTS.md exceeds Codex's default instruction
+#     budget, and a second Cursor copy lists every skill twice. Gemini keeps its
+#     full-body GEMINI.md block on purpose: moving it to skills would load bodies
+#     only on demand, behind a per-activation consent prompt. Runs the real sync
+#     passes, so the migration that takes back Cursor's older copies is exercised.
 # ---------------------------------------------------------------------------
-check "one shared native skill install, compact Codex AGENTS.md"
+check "shared native skills for Codex and Cursor, Gemini keeps its block"
 _cx=0
 _cxt="$(mktemp -d)"
 # A plain subshell, not `if ! (...)`: a tested command disables set -e for everything it
@@ -1779,12 +1780,12 @@ _cxt="$(mktemp -d)"
     ! grep -qF 'obsolete workflow body' "$CODEX_AGENTS_MD" &&
     grep -qF 'foreign skill' "$HOME/.agents/skills/foreign/SKILL.md" &&
     [[ ! -e "$HOME/.cursor/rules/fe-review.mdc" && ! -e "$HOME/.cursor/rules/build.mdc" ]] &&
-    [[ ! -e "$GEMINI_SKILLS_DIR/fe-review.md" && -f "$GEMINI_SKILLS_DIR/grounding.md" ]] &&
-    ! grep -q '^name: fe-review' "$HOME/GEMINI.md" &&
-    [[ -z "$(tr -d '\n' < "$STATE_DIR/cursor")$(tr -d '\n' < "$STATE_DIR/gemini")" ]]
+    grep -q '^name: fe-review' "$HOME/GEMINI.md" && grep -q '^name: build' "$HOME/GEMINI.md" &&
+    ! grep -qF 'old gemini copy' "$HOME/GEMINI.md" &&
+    [[ -z "$(tr -d '\n' < "$STATE_DIR/cursor")" ]]
 )
 if [[ $? -ne 0 ]]; then
-    fail "skills did not land once in ~/.agents/skills, or Cursor/Gemini kept a second copy"
+    fail "skills missing from ~/.agents/skills, Cursor kept a second copy, or Gemini lost its workflow bodies"
     _cx=1
 fi
 rm -rf "$_cxt"

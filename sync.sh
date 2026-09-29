@@ -216,8 +216,8 @@ sync_adapter() {
 
     read_current_skills
     local current_skills=("${_current_skills[@]+"${_current_skills[@]}"}")
-    # Cursor and Gemini read the shared ~/.agents/skills the Codex adapter installs, so they
-    # define no installer. An empty list lets the removal loop take back their older copies.
+    # Cursor reads the shared ~/.agents/skills the Codex adapter installs, so it defines no
+    # installer. An empty list lets the removal loop take back its older copies.
     declare -f "install_${adapter}_skill" >/dev/null || current_skills=()
 
     # Remove skills that were installed but are no longer in the repo

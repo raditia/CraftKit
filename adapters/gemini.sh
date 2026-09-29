@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Gemini CLI: copies rule files to ~/.craftkit/gemini/ and maintains a managed section
-# in ~/GEMINI.md (the global Gemini context file). Skills and commands reach Gemini as
-# native skills through ~/.agents/skills, which the Codex adapter installs.
+# Gemini CLI: copies skill files to ~/.craftkit/gemini/ and maintains a
+# managed AI-SKILLS section in ~/GEMINI.md (the global Gemini context file).
 
 GEMINI_SKILLS_DIR="$HOME/.craftkit/gemini"
 GEMINI_MD="$HOME/GEMINI.md"
@@ -105,16 +104,22 @@ finalize_gemini() {
     fi
 }
 
-get_gemini_rule_dest() { echo "$GEMINI_SKILLS_DIR/${1}.md"; }
+get_gemini_dest() {
+    local skill_name="$1"
+    echo "$GEMINI_SKILLS_DIR/${skill_name}.md"
+}
 
-install_gemini_rule() {
+install_gemini_skill() {
+    local skill_name="$1"
+    local source_file="$2"
     mkdir -p "$GEMINI_SKILLS_DIR"
-    cp "$2" "$(get_gemini_rule_dest "$1")"
+    cp "$source_file" "$GEMINI_SKILLS_DIR/${skill_name}.md"
     _rebuild_gemini_md
 }
 
-uninstall_gemini_rule() {
-    rm -f "$(get_gemini_rule_dest "$1")"
+uninstall_gemini_skill() {
+    local skill_name="$1"
+    rm -f "$GEMINI_SKILLS_DIR/${skill_name}.md"
     if compgen -G "$GEMINI_SKILLS_DIR/*.md" &>/dev/null; then
         _rebuild_gemini_md
     else
@@ -122,6 +127,10 @@ uninstall_gemini_rule() {
     fi
 }
 
-# No installers: these take back the copies synced before skills moved to ~/.agents/skills.
-uninstall_gemini_skill()   { uninstall_gemini_rule "$1"; }
-uninstall_gemini_command() { uninstall_gemini_rule "$1"; }
+get_gemini_rule_dest()    { get_gemini_dest "$1"; }
+install_gemini_rule()     { install_gemini_skill "$@"; }
+uninstall_gemini_rule()   { uninstall_gemini_skill "$@"; }
+
+get_gemini_command_dest() { get_gemini_dest "$1"; }
+install_gemini_command()   { install_gemini_skill "$@"; }
+uninstall_gemini_command() { uninstall_gemini_skill "$@"; }

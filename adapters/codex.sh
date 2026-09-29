@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Native Codex skills keep workflow bodies out of the global instruction budget.
-# ~/.agents/skills is also read by Cursor and Gemini CLI, so this is the one skill install for
-# all three, and descriptions stay as authored: Codex shortens them itself within its budget.
+# ~/.agents/skills is also Cursor's skill install and is read by Gemini CLI, so descriptions
+# stay as authored: Codex shortens them itself within its budget.
 
 CODEX_SKILLS_DIR="$HOME/.agents/skills"
 CODEX_RULES_DIR="$HOME/.craftkit/codex/rules"
