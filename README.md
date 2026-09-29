@@ -138,7 +138,7 @@ cd ~/craftkit
 bash install.sh
 ```
 
-`install.sh` wires up the post-merge hook and runs the first sync. After that, `git pull` keeps every AI tool up to date automatically.
+`install.sh` wires up the post-merge and post-rewrite hooks and runs the first sync. Merge and rebase pulls then add, update, and remove installed skills automatically. Existing git installations should rerun `bash install.sh` once to add the rebase hook.
 
 **Requirements:** bash 3.2+, curl. macOS ships bash 3.2 by default.
 
@@ -239,7 +239,7 @@ layers act inside each AI tool:
 
 | Role | What | Where |
 |------|------|-------|
-| **CraftKit Gateway** | Every prompt and tool call passes through it ([full table](#enforcement-gates-hooks-that-refuse)): **Router** (`craftkit-routing.js`, UserPromptSubmit), **Loader** (`craftkit-platform-rules.js`, SessionStart), **Guards** (`gate-skill-first`, `gate-read-size`, `craftkit-read-cap`, PreToolUse), **Exit gates** (`gate-verify-on-stop`, `gate-announce-honored`, Stop) | `hooks/`, Claude Code only. Cursor, Gemini and Codex get the routing rule as text: advisory, not enforced |
+| **CraftKit Gateway** | Every prompt and tool call passes through it ([full table](#enforcement-gates-hooks-that-refuse)): **Router** (`craftkit-routing.js`, UserPromptSubmit), **Loader** (`craftkit-platform-rules.js`, SessionStart), **Guards** (`gate-skill-first`, `gate-read-size`, `craftkit-read-cap`, PreToolUse), **Exit gates** (`gate-verify-on-stop`, `gate-announce-honored`, Stop) | `hooks/`, Claude Code only. Cursor and Gemini get the routing rule as advisory text; Codex gets a short global guide and native skill descriptions |
 | **Orchestrators** | Run a workflow: resolve the feature once in Phase 0, pass the slug down, spawn skills and agents | `commands/*.md` |
 | **Skills and agents** | Do one job; skills reach Figma and Lark through the host's MCP client | `skills/`, `agents/` (Claude only) |
 
@@ -312,9 +312,9 @@ flowchart TB
 | Claude Code | `~/.claude/CLAUDE.md` (managed block) | `~/.claude/commands/<name>.md` → `/<name>` | `~/.claude/agents/<name>.md` |
 | Cursor | `~/.cursor/rules/*.mdc` (alwaysApply) | `~/.cursor/rules/*.mdc` (alwaysApply:false) | n/a |
 | Gemini CLI | `~/GEMINI.md` (managed block) | `~/GEMINI.md` (managed block) | n/a |
-| Codex CLI | `~/.codex/AGENTS.md` (managed block) | `~/.codex/AGENTS.md` (managed block) | n/a |
+| Codex CLI | `~/.codex/AGENTS.md` (short managed block, full rules in `~/.craftkit/codex/rules/`) | `~/.agents/skills/<name>/SKILL.md` (native skills with Codex-only short descriptions, including workflows) | n/a |
 
-Agents are Claude-only, since the other three tools have no cold sub-agent concept, so `sync.sh` skips the agent pass for them.
+CraftKit's named review agents currently install only for Claude. Codex supports custom subagents, but this adapter does not yet convert the Claude agent definitions. Codex workflows use the sequential fallback where those named agents are required.
 
 **Retired:** GitHub Copilot and Crush (supported through v1.23.0). Neither has a headless entry point, so neither can join cross-tool agent fan-out ([more](docs/design-notes.md#retired-tools)).
 

@@ -10,13 +10,15 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "==> Installing craftkit..."
 
-# Install git post-merge hook so 'git pull' auto-syncs + installs tools
+# Install hooks for merge and rebase pulls.
 if [[ -d "$REPO_DIR/.git" ]]; then
-    cp "$REPO_DIR/hooks/post-merge" "$REPO_DIR/.git/hooks/post-merge"
-    chmod +x "$REPO_DIR/.git/hooks/post-merge"
-    echo "    git post-merge hook installed"
+    for hook in post-merge post-rewrite; do
+        cp "$REPO_DIR/hooks/$hook" "$REPO_DIR/.git/hooks/$hook"
+        chmod +x "$REPO_DIR/.git/hooks/$hook"
+        echo "    git $hook hook installed"
+    done
 else
-    echo "    git post-merge hook skipped (not a git repo)"
+    echo "    git hooks skipped (not a git repo)"
 fi
 
 # sync.sh handles tool installation (rtk, caveman) + skill sync
@@ -25,7 +27,7 @@ AGENTIC_SETUP=1 "$REPO_DIR/sync.sh"
 
 echo ""
 if [[ -d "$REPO_DIR/.git" ]]; then
-    echo "Done. 'git pull' will now auto-sync skills and keep tools up to date."
+    echo "Done. Merge and rebase pulls will now auto-sync skills and keep tools up to date."
 else
     echo "Done. Run 'npm install -g @raditia/craftkit' to update, or pin a version with '@raditia/craftkit@x.y.z'."
 fi

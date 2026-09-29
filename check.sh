@@ -1352,7 +1352,7 @@ case "$_skills_loop" in
     *) fail "sync_adapter installs SKILL.md without rendering, so a skill's craftkitInject is silently dropped on every tool"; _si=1 ;;
 esac
 case "$_skills_loop" in
-    *'"install_${adapter}_skill" "$skill" "$rendered"'*) : ;;
+    *'local cmp_src="$rendered"'*'"install_${adapter}_skill" "$skill" "$cmp_src"'*) : ;;
     *) fail "sync_adapter renders but installs the raw source, so the rendered block never reaches any tool"; _si=1 ;;
 esac
 # Commands install on all four tools, so the commands pass renders for all of them too:
@@ -1360,7 +1360,7 @@ esac
 # planning-resolve without carrying it.
 _cmds_loop="$(awk '/^sync_commands_adapter\(\) \{/,/^\}/' "$REPO_DIR/sync.sh")"
 case "$_cmds_loop" in
-    *'craftkit_render_injected "$source_file" "$rendered"'*'"install_${adapter}_command" "$cmd" "$rendered"'*) : ;;
+    *'craftkit_render_injected "$source_file" "$rendered"'*'local cmp_src="$rendered"'*'"install_${adapter}_command" "$cmd" "$cmp_src"'*) : ;;
     *) fail "sync_commands_adapter installs commands unrendered, so on Cursor, Gemini and Codex a command names partials it does not carry"; _si=1 ;;
 esac
 rm -rf "$_six"
@@ -1724,6 +1724,43 @@ for _f in rules/grounding.md partials/grounding-claims.md; do
         || { fail "$_f does not name the bulk-read exception, so the one agent whose job is reading unhanded files reads as a violation of it"; _rg=1; }
 done
 [[ $_rg -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 37. Codex workflows must be native skills. A giant AGENTS.md exceeds the
+#     default instruction budget and hides project guidance.
+# ---------------------------------------------------------------------------
+check "Codex uses native skills and a compact AGENTS.md"
+_cx=0
+_cxt="$(mktemp -d)"
+if ! (
+    HOME="$_cxt"; export HOME
+    CODEX_AGENTS_MD="$HOME/.codex/AGENTS.md"
+    source "$REPO_DIR/adapters/codex.sh"
+    mkdir -p "$HOME/.codex" "$HOME/.agents/skills/foreign"
+    printf 'user guidance\n%s\n' "$_CODEX_SECTION_START" > "$CODEX_AGENTS_MD"
+    awk 'BEGIN{for(i=1;i<=10000;i++)print "obsolete workflow body"}' >> "$CODEX_AGENTS_MD"
+    echo "$_CODEX_SECTION_END" >> "$CODEX_AGENTS_MD"
+    echo "foreign skill" > "$HOME/.agents/skills/foreign/SKILL.md"
+    compact="$(effective_codex_skill_source fe-review "$REPO_DIR/skills/fe-review/SKILL.md")"
+    install_codex_rule grounding "$REPO_DIR/rules/grounding.md"
+    install_codex_skill fe-review "$compact"
+    install_codex_command build "$REPO_DIR/commands/build.md"
+    if install_codex_skill foreign "$REPO_DIR/skills/fe-review/SKILL.md" 2>/dev/null; then exit 1; fi
+    rm -f "$compact"
+    [[ -f "$HOME/.agents/skills/fe-review/SKILL.md" ]] &&
+    [[ -f "$HOME/.agents/skills/build/SKILL.md" ]] &&
+    [[ -f "$HOME/.craftkit/codex/rules/grounding.md" ]] &&
+    [[ $(sed -n 's/^description: //p' "$HOME/.agents/skills/fe-review/SKILL.md" | wc -c) -lt 100 ]] &&
+    [[ $(wc -c < "$CODEX_AGENTS_MD") -lt 8192 ]] &&
+    grep -qF 'user guidance' "$CODEX_AGENTS_MD" &&
+    ! grep -qF 'obsolete workflow body' "$CODEX_AGENTS_MD" &&
+    grep -qF 'foreign skill' "$HOME/.agents/skills/foreign/SKILL.md"
+); then
+    fail "Codex adapter did not migrate to native skills safely"
+    _cx=1
+fi
+rm -rf "$_cxt"
+[[ $_cx -eq 0 ]] && pass
 
 echo
 if [[ $FAILURES -eq 0 ]]; then

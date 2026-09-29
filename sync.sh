@@ -160,9 +160,8 @@ craftkit_strip_frontmatter() {
 # partials/<a>.md / rules/<a>.md / skills/<a>/SKILL.md are spliced in as a managed block
 # right after its own frontmatter, so the installed copy carries the live text instead of a
 # hand-maintained duplicate. No opt-in -> plain copy.
-# Tool-agnostic on purpose: agents and commands render only on Claude, which is the one tool
-# with the hosts, but a skill's body is its whole substance, so dropping an injected block
-# there would leave the other three tools with a skill missing its core table.
+# Tool-agnostic on purpose: commands and skills render for every adapter, while
+# agents render for Claude. A missing injected block leaves an installed workflow incomplete.
 craftkit_render_injected() {
     local src="$1" out="$2"
     local list
@@ -239,12 +238,18 @@ sync_adapter() {
         local rendered
         rendered="$(mktemp)"
         craftkit_render_injected "$source_file" "$rendered"
+        local cmp_src="$rendered" cmp_tmp=""
+        if declare -f "effective_${adapter}_skill_source" >/dev/null 2>&1; then
+            cmp_src="$("effective_${adapter}_skill_source" "$skill" "$rendered")"
+            cmp_tmp="$cmp_src"
+        fi
 
-        if [[ ! -f "$dest" ]] || ! diff -q "$rendered" "$dest" &>/dev/null; then
+        if [[ ! -f "$dest" ]] || ! diff -q "$cmp_src" "$dest" &>/dev/null; then
             echo "    + installing: $skill"
-            "install_${adapter}_skill" "$skill" "$rendered"
+            "install_${adapter}_skill" "$skill" "$cmp_src"
             changed=1
         fi
+        [[ -n "$cmp_tmp" ]] && rm -f "$cmp_tmp"
         rm -f "$rendered"
     done
 
@@ -393,11 +398,17 @@ sync_commands_adapter() {
         local rendered
         rendered="$(mktemp)"
         craftkit_render_injected "$source_file" "$rendered"
-        if [[ ! -f "$dest" ]] || ! diff -q "$rendered" "$dest" &>/dev/null; then
+        local cmp_src="$rendered" cmp_tmp=""
+        if declare -f "effective_${adapter}_command_source" >/dev/null 2>&1; then
+            cmp_src="$("effective_${adapter}_command_source" "$cmd" "$rendered")"
+            cmp_tmp="$cmp_src"
+        fi
+        if [[ ! -f "$dest" ]] || ! diff -q "$cmp_src" "$dest" &>/dev/null; then
             echo "    + command: $cmd"
-            "install_${adapter}_command" "$cmd" "$rendered"
+            "install_${adapter}_command" "$cmd" "$cmp_src"
             changed=1
         fi
+        [[ -n "$cmp_tmp" ]] && rm -f "$cmp_tmp"
         rm -f "$rendered"
     done
 
