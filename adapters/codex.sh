@@ -90,10 +90,18 @@ finalize_codex() {
 
 get_codex_dest() { echo "$CODEX_SKILLS_DIR/$1/SKILL.md"; }
 
+codex_skill_collision() {
+    local dest dir
+    dest="$(get_codex_dest "$1")"
+    dir="$(dirname "$dest")"
+    [[ -L "$dir" || -L "$dest" ]] && return 0
+    [[ -e "$dir" && ! -f "$dir/.craftkit-managed" ]]
+}
+
 install_codex_skill() {
     local name="$1" source_file="$2" dest
     dest="$(get_codex_dest "$name")"
-    if [[ -f "$dest" && ! -f "$(dirname "$dest")/.craftkit-managed" ]]; then
+    if codex_skill_collision "$name"; then
         echo "Codex skill collision at $dest; refusing to overwrite" >&2
         return 1
     fi

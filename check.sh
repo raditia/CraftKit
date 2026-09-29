@@ -1752,11 +1752,15 @@ _cxt="$(mktemp -d)"
     done
     source "$_cxt/lib.sh"
     for _a in codex cursor gemini; do source "$REPO_DIR/adapters/$_a.sh"; done
-    mkdir -p "$HOME/.codex" "$HOME/.agents/skills/foreign" "$HOME/.cursor/rules" "$GEMINI_SKILLS_DIR"
+    mkdir -p "$HOME/.codex" "$HOME/.agents/skills/foreign" \
+        "$HOME/.agents/skills/android-review" "$HOME/.agents/skills/ios-review" \
+        "$HOME/.agents/skills/define" "$HOME/.cursor/rules" "$GEMINI_SKILLS_DIR"
     printf 'user guidance\n%s\n' "$_CODEX_SECTION_START" > "$CODEX_AGENTS_MD"
     awk 'BEGIN{for(i=1;i<=10000;i++)print "obsolete workflow body"}' >> "$CODEX_AGENTS_MD"
     echo "$_CODEX_SECTION_END" >> "$CODEX_AGENTS_MD"
     echo "foreign skill" > "$HOME/.agents/skills/foreign/SKILL.md"
+    echo "foreign Android skill" > "$HOME/.agents/skills/android-review/SKILL.md"
+    echo "foreign command" > "$HOME/.agents/skills/define/SKILL.md"
     echo "old cursor copy" > "$HOME/.cursor/rules/fe-review.mdc"
     echo "old cursor copy" > "$HOME/.cursor/rules/build.mdc"
     echo "old gemini copy" > "$GEMINI_SKILLS_DIR/fe-review.md"
@@ -1769,7 +1773,7 @@ _cxt="$(mktemp -d)"
         for _a in codex cursor gemini; do
             sync_adapter "$_a" >/dev/null; sync_commands_adapter "$_a" >/dev/null
         done
-    done
+    done 2>"$_cxt/sync-warnings"
     if install_codex_skill foreign "$REPO_DIR/skills/fe-review/SKILL.md" 2>/dev/null; then exit 1; fi
     [[ -f "$HOME/.agents/skills/fe-review/SKILL.md" ]] &&
     [[ -f "$HOME/.agents/skills/build/SKILL.md" ]] &&
@@ -1779,6 +1783,14 @@ _cxt="$(mktemp -d)"
     grep -qF 'user guidance' "$CODEX_AGENTS_MD" &&
     ! grep -qF 'obsolete workflow body' "$CODEX_AGENTS_MD" &&
     grep -qF 'foreign skill' "$HOME/.agents/skills/foreign/SKILL.md" &&
+    grep -qF 'foreign Android skill' "$HOME/.agents/skills/android-review/SKILL.md" &&
+    grep -qF 'foreign command' "$HOME/.agents/skills/define/SKILL.md" &&
+    [[ ! -e "$HOME/.agents/skills/android-review/.craftkit-managed" ]] &&
+    [[ ! -e "$HOME/.agents/skills/ios-review/SKILL.md" ]] &&
+    [[ ! -e "$HOME/.agents/skills/define/.craftkit-managed" ]] &&
+    grep -q 'skipped unowned Codex skill: android-review' "$_cxt/sync-warnings" &&
+    grep -q 'skipped unowned Codex skill: ios-review' "$_cxt/sync-warnings" &&
+    grep -q 'skipped unowned Codex skill: define' "$_cxt/sync-warnings" &&
     [[ ! -e "$HOME/.cursor/rules/fe-review.mdc" && ! -e "$HOME/.cursor/rules/build.mdc" ]] &&
     grep -q '^name: fe-review' "$HOME/GEMINI.md" && grep -q '^name: build' "$HOME/GEMINI.md" &&
     ! grep -qF 'old gemini copy' "$HOME/GEMINI.md" &&

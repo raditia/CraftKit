@@ -209,7 +209,7 @@ craftkit_render_injected() {
 sync_adapter() {
     local adapter="$1"
     local state_file="$STATE_DIR/$adapter"
-    local changed=0
+    local changed=0 skipped=0
 
     read_state "$adapter"
     local installed_skills=("${_state_skills[@]+"${_state_skills[@]}"}")
@@ -238,6 +238,12 @@ sync_adapter() {
         local dest
         dest="$("get_${adapter}_dest" "$skill")"
 
+        if [[ "$adapter" == "codex" ]] && codex_skill_collision "$skill"; then
+            echo "    ! skipped unowned Codex skill: $skill ($dest)" >&2
+            skipped=1
+            continue
+        fi
+
         local rendered
         rendered="$(mktemp)"
         craftkit_render_injected "$source_file" "$rendered"
@@ -250,7 +256,7 @@ sync_adapter() {
         rm -f "$rendered"
     done
 
-    if [[ $changed -eq 0 ]]; then
+    if [[ $changed -eq 0 && $skipped -eq 0 ]]; then
         echo "    (up to date)"
     fi
 
@@ -363,7 +369,7 @@ sync_agents_adapter() {
 sync_commands_adapter() {
     local adapter="$1"
     local state_file="$STATE_DIR/${adapter}-commands"
-    local changed=0
+    local changed=0 skipped=0
 
     local installed_commands=()
     if [[ -f "$state_file" ]]; then
@@ -390,6 +396,11 @@ sync_commands_adapter() {
         local source_file="$COMMANDS_DIR/${cmd}.md"
         local dest
         dest="$("get_${adapter}_command_dest" "$cmd")"
+        if [[ "$adapter" == "codex" ]] && codex_skill_collision "$cmd"; then
+            echo "    ! skipped unowned Codex skill: $cmd ($dest)" >&2
+            skipped=1
+            continue
+        fi
         # Rendered for every adapter, as skills are: Cursor, Gemini and Codex install commands
         # too, and a command naming a partial it does not carry is a dangling instruction there.
         # Diffing the rendered text keeps the pass idempotent when only a partial moved on.
@@ -404,7 +415,7 @@ sync_commands_adapter() {
         rm -f "$rendered"
     done
 
-    [[ $changed -eq 0 ]] && echo "    commands: (up to date)"
+    [[ $changed -eq 0 && $skipped -eq 0 ]] && echo "    commands: (up to date)"
 
     printf '%s\n' "${current_commands[@]+"${current_commands[@]}"}" > "$state_file"
 }

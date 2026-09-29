@@ -1,4 +1,4 @@
-# craftkit `v1.47.1`
+# craftkit `v1.48.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -199,7 +199,7 @@ flowchart TB
         t4("Codex CLI")
     end
     subgraph S4["STAGE 4 · SESSION GATES"]
-        gates("Claude Code: enforced by hooks<br/>other tools: same rules as advisory text<br/>● routing + model tier  ● skill-first<br/>● read-size  ● verify-on-stop  ● announce")
+        gates("Claude Code: enforced by hooks<br/>Cursor/Gemini: advisory rules · Codex: short guide + skills<br/>● routing + model tier  ● skill-first<br/>● read-size  ● verify-on-stop  ● announce")
     end
     subgraph S5["STAGE 5 · OUTPUT"]
         out("Verified change, shipped")
@@ -315,6 +315,8 @@ flowchart TB
 | Codex CLI | `~/.codex/AGENTS.md` (short managed block, full rules in `~/.craftkit/codex/rules/`) | `~/.agents/skills/<name>/SKILL.md` (shared native skills, including workflows) | n/a |
 
 Codex and Cursor read skills from `~/.agents/skills/`, so they share one install there. Cursor does not copy that folder to Cloud Agents, so CraftKit skills reach local Cursor sessions only. Gemini CLI reads it too, but keeps its full `~/GEMINI.md` block: as native skills, workflows would load only on demand, behind a consent prompt on every activation. CraftKit's named review agents currently install only for Claude. Codex supports custom subagents, but this adapter does not yet convert the Claude agent definitions. Codex workflows use the sequential fallback where those named agents are required.
+
+If a skill name already belongs to another install in `~/.agents/skills/`, sync leaves that directory untouched, warns with its path, and continues installing the other skills. Remove or rename the conflicting directory if you want CraftKit's version of that skill.
 
 **Retired:** GitHub Copilot and Crush (supported through v1.23.0). Neither has a headless entry point, so neither can join cross-tool agent fan-out ([more](docs/design-notes.md#retired-tools)).
 

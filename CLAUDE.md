@@ -12,7 +12,7 @@ You will be running here under the very rules this repo defines (they are instal
 
 ```bash
 bash check.sh          # content integrity gate, run before every commit (exit 0 required)
-bash install.sh        # git-clone install: wires post-merge hook + runs first sync (ensure_tools)
+bash install.sh        # git-clone install: wires merge/rebase hooks + runs first sync (ensure_tools)
 bash sync.sh           # distribute rules/skills/commands/agents into all 4 tools (idempotent)
 AGENTIC_SETUP=1 bash sync.sh   # also run ensure_tools (installs/updates rtk, wires hooks), what install/postinstall use
 ```

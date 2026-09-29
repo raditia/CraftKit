@@ -7,6 +7,20 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.48.0 — 2026-09-29
+
+### Codex loads CraftKit workflows as native skills
+
+- Install skills and commands under `~/.agents/skills/` and keep Codex's global `AGENTS.md`
+  short, leaving room for project instructions. Full Codex rules remain in separate files.
+- Cursor reads the shared local skills, so sync removes its older agent-requested `.mdc`
+  workflow copies. Gemini keeps its full `GEMINI.md` workflow block to preserve its existing
+  always-available guidance.
+- Merge and rebase pulls sync added and deleted skills through Git hooks. Existing Git
+  installations need one `bash install.sh` run to add the rebase hook.
+- A foreign skill directory with the same name is left untouched. Sync reports the collision
+  and continues with other skills and commands instead of stopping the whole update.
+
 ## v1.47.1 — 2026-09-29
 
 ### Release workflow publishes to npm
