@@ -1,4 +1,4 @@
-# craftkit `v1.46.1`
+# craftkit `v1.47.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -1288,7 +1288,7 @@ flowchart LR
 | L4 Errors | On demand | Failing tests, lint, TypeScript errors | n/a, always live |
 | L5 History | Session | Conversation context | n/a |
 
-Every skill that reads intent uses one resolver, `partials/planning-resolve.md` ([why](docs/design-notes.md#intent-resolution)). Test cases have one reader contract, `partials/test-cases-resolve.md` (approved rows only, never derived from the diff), and Figma/Lark sources one checker, `partials/external-sources.md` (markers, not content; `cannot-verify` when no MCP is reachable).
+Every skill that reads intent uses one resolver, `partials/planning-resolve.md` ([why](docs/design-notes.md#intent-resolution)). Test cases have one reader contract, `partials/test-cases-resolve.md` (approved rows only, never derived from the diff), and Figma/Lark sources one checker, `partials/external-sources.md` (markers, not content; `cannot-verify` when no MCP is reachable). Failing tests heal by one contract, `partials/test-heal.md`, injected into `/fe-test`, `/android-test` and `/ios-test`: each failure is classified before any edit, and an assertion changes only when an approved test case or Spec line states the new value.
 
 ---
 

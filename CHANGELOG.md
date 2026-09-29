@@ -7,6 +7,29 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.47.0 — 2026-09-28
+
+### Test skills heal failing tests by one contract
+
+`/fe-test`, `/android-test` and `/ios-test` said only "fix failures; never skip", which left the
+model free to make a failing test pass by rewriting its assertion to match a regression. The
+suite then went green over the bug.
+
+- New `partials/test-heal.md`, injected into all three skills. Each failing test that existed
+  before the branch is classified before any edit: `rename`, `mock-shape`, `timing` and
+  `snapshot` heal with cited evidence (a `timing` heal cites the diff line that added the async
+  dependency, or stops); `expectation` stops and hands off to `/fix` unless an
+  approved test case or Spec line states the new value. Snapshots update by named test, never
+  in bulk. A heal outside the diff must cite the changed symbol, and a wider run afterwards
+  reverts any heal that adds a failure.
+- The host skills' "touch only changed files" lines now name the cited-heal exception, and each
+  run step names the wider re-run, so the skill and the partial cannot be read against each other.
+- Every heal and stop is reported as a `healed:` / `stopped:` line with its evidence.
+- `check.sh` check 32b2 fails when a test skill stops injecting the partial, or the partial
+  loses its stop-without-intent, no-bulk-update, or no-retry line. Confirmed failing with one inject
+  removed.
+- E2E locator healing and retries are out of scope; see `docs/planning/test-heal.md`.
+
 ## v1.46.1 — 2026-09-24
 
 ### npm installs ship partials/

@@ -1479,6 +1479,28 @@ done
 [[ $_tc -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
+# 32b2. Failing tests heal by one contract. Each test skill injects the same partial,
+#       so none can edit an assertion to match a regression by a looser rule, and the
+#       partial keeps the three lines that stop it: no intent means stop, a snapshot never
+#       bulk-updates, and a timing failure is never retried.
+# ---------------------------------------------------------------------------
+check "test skills heal failures by one contract"
+_th=0
+[[ -f "$PARTIALS_DIR/test-heal.md" ]] \
+    || { fail "partials/test-heal.md is missing, so each test skill heals failing tests by its own rule"; _th=1; }
+grep -q "No intent file, always STOP" "$PARTIALS_DIR/test-heal.md" 2>/dev/null \
+    || { fail "test-heal no longer stops an expectation change without intent, so a regression can be healed green"; _th=1; }
+grep -q "never a bulk update" "$PARTIALS_DIR/test-heal.md" 2>/dev/null \
+    || { fail "test-heal no longer forbids bulk snapshot updates, so one heal rewrites every failing snapshot"; _th=1; }
+grep -q "Never add a retry" "$PARTIALS_DIR/test-heal.md" 2>/dev/null \
+    || { fail "test-heal no longer bans retries, so a timing failure can be retried until it passes"; _th=1; }
+for _ths in fe-test android-test ios-test; do
+    grep -q '^craftkitInject:.*test-heal' "$SKILLS_DIR/$_ths/SKILL.md" \
+        || { fail "skills/$_ths does not inject test-heal, so it heals failing tests by its own rule"; _th=1; }
+done
+[[ $_th -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
 # 32c. External sources stay caller-scoped. The context skills read a feature's
 #      sources only from a slug their caller passed: resolving intent themselves
 #      would make a standalone /fe-context stop and ask which feature applies,

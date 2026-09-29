@@ -2,7 +2,7 @@
 name: android-test
 description: Write or improve JUnit + MockK unit tests for an Android Presenter (or StateFlow ViewModel): mock injected collaborators, spy the ViewModel, assert on emitted state and events. Turbine for Flow.
 alwaysApply: false
-craftkitInject: planning-resolve, test-cases-resolve
+craftkitInject: planning-resolve, test-cases-resolve, test-heal
 ---
 
 **Commands:** `git diff <base>...HEAD`, `./gradlew :<module>:testGeneralDebugUnitTest`, `./gradlew :<module>:lintGeneralDebug`
@@ -99,14 +99,14 @@ When the feature has test cases (`test-cases-resolve` above), every approved cas
 
 ## Workflow
 
-1. **Diff first:** `git diff <base>...HEAD --name-only`; touch only changed Presenters.
+1. **Diff first:** `git diff <base>...HEAD --name-only`; touch only changed Presenters, except a cited `rename`/`mock-shape` heal per `test-heal`.
 2. **Read a sibling test** to match MockK style + reuse `:shared-test` fixtures.
 3. **Write tests** for every behavior path.
 4. **Run:** all must pass:
    ```bash
    ./gradlew :<module>:testGeneralDebugUnitTest
    ```
-   (Or via the Fastlane unit-test lane with coverage.) Fix failures; never `@Ignore` a test to go green.
+   (Or via the Fastlane unit-test lane with coverage.) Fix failures; never `@Ignore` a test to go green. A test that existed before this branch is healed only per **Healing a failing test** (`test-heal`), above; after any heal, re-run the module's whole unit suite as it requires.
 5. **Lint:** `./gradlew :<module>:lintGeneralDebug`; fix all.
 6. **Done:** report tests added, pass/fail count, and any Presenter path unreachable without a production refactor (flag, don't silently skip).
 
