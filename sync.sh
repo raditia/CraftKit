@@ -84,7 +84,7 @@ read_state() {
     _state_skills=()
     if [[ -f "$state_file" ]]; then
         while IFS= read -r line; do
-            [[ -n "$line" ]] && _state_skills+=("$line")
+            [[ -z "$line" ]] || _state_skills+=("$line")
         done < "$state_file"
     fi
 }
@@ -216,6 +216,9 @@ sync_adapter() {
 
     read_current_skills
     local current_skills=("${_current_skills[@]+"${_current_skills[@]}"}")
+    # Cursor and Gemini read the shared ~/.agents/skills the Codex adapter installs, so they
+    # define no installer. An empty list lets the removal loop take back their older copies.
+    declare -f "install_${adapter}_skill" >/dev/null || current_skills=()
 
     # Remove skills that were installed but are no longer in the repo
     for skill in "${installed_skills[@]+"${installed_skills[@]}"}"; do
@@ -238,18 +241,12 @@ sync_adapter() {
         local rendered
         rendered="$(mktemp)"
         craftkit_render_injected "$source_file" "$rendered"
-        local cmp_src="$rendered" cmp_tmp=""
-        if declare -f "effective_${adapter}_skill_source" >/dev/null 2>&1; then
-            cmp_src="$("effective_${adapter}_skill_source" "$skill" "$rendered")"
-            cmp_tmp="$cmp_src"
-        fi
 
-        if [[ ! -f "$dest" ]] || ! diff -q "$cmp_src" "$dest" &>/dev/null; then
+        if [[ ! -f "$dest" ]] || ! diff -q "$rendered" "$dest" &>/dev/null; then
             echo "    + installing: $skill"
-            "install_${adapter}_skill" "$skill" "$cmp_src"
+            "install_${adapter}_skill" "$skill" "$rendered"
             changed=1
         fi
-        [[ -n "$cmp_tmp" ]] && rm -f "$cmp_tmp"
         rm -f "$rendered"
     done
 
@@ -377,6 +374,7 @@ sync_commands_adapter() {
 
     read_current_commands
     local current_commands=("${_current_commands[@]+"${_current_commands[@]}"}")
+    declare -f "install_${adapter}_command" >/dev/null || current_commands=()
 
     # Remove commands that were installed but no longer exist in commands/
     for cmd in "${installed_commands[@]+"${installed_commands[@]}"}"; do
@@ -398,17 +396,11 @@ sync_commands_adapter() {
         local rendered
         rendered="$(mktemp)"
         craftkit_render_injected "$source_file" "$rendered"
-        local cmp_src="$rendered" cmp_tmp=""
-        if declare -f "effective_${adapter}_command_source" >/dev/null 2>&1; then
-            cmp_src="$("effective_${adapter}_command_source" "$cmd" "$rendered")"
-            cmp_tmp="$cmp_src"
-        fi
-        if [[ ! -f "$dest" ]] || ! diff -q "$cmp_src" "$dest" &>/dev/null; then
+        if [[ ! -f "$dest" ]] || ! diff -q "$rendered" "$dest" &>/dev/null; then
             echo "    + command: $cmd"
-            "install_${adapter}_command" "$cmd" "$cmp_src"
+            "install_${adapter}_command" "$cmd" "$rendered"
             changed=1
         fi
-        [[ -n "$cmp_tmp" ]] && rm -f "$cmp_tmp"
         rm -f "$rendered"
     done
 

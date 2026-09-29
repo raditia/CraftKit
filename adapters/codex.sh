@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Native Codex skills keep workflow bodies out of the global instruction budget.
+# ~/.agents/skills is also read by Cursor and Gemini CLI, so this is the one skill install for
+# all three, and descriptions stay as authored: Codex shortens them itself within its budget.
 
 CODEX_SKILLS_DIR="$HOME/.agents/skills"
 CODEX_RULES_DIR="$HOME/.craftkit/codex/rules"
@@ -87,35 +89,6 @@ finalize_codex() {
 }
 
 get_codex_dest() { echo "$CODEX_SKILLS_DIR/$1/SKILL.md"; }
-
-_codex_compact_description() {
-    local source_file="$2" rendered
-    rendered="$(mktemp)"
-    python3 - "$source_file" "$rendered" <<'PYEOF'
-import json, sys
-source_path, output_path = sys.argv[1], sys.argv[2]
-with open(source_path) as f:
-    lines = f.readlines()
-in_frontmatter = False
-for i, line in enumerate(lines):
-    if i == 0 and line.strip() == '---':
-        in_frontmatter = True
-        continue
-    if in_frontmatter and line.strip() == '---':
-        break
-    if in_frontmatter and line.startswith('description:'):
-        description = line.partition(':')[2].strip().strip('"')
-        if len(description) > 80:
-            description = description[:77].rsplit(' ', 1)[0] + '...'
-        lines[i] = 'description: ' + json.dumps(description, ensure_ascii=False) + '\n'
-        break
-with open(output_path, 'w') as f:
-    f.writelines(lines)
-PYEOF
-    echo "$rendered"
-}
-effective_codex_skill_source() { _codex_compact_description "$@"; }
-effective_codex_command_source() { _codex_compact_description "$@"; }
 
 install_codex_skill() {
     local name="$1" source_file="$2" dest

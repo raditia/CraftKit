@@ -1352,7 +1352,7 @@ case "$_skills_loop" in
     *) fail "sync_adapter installs SKILL.md without rendering, so a skill's craftkitInject is silently dropped on every tool"; _si=1 ;;
 esac
 case "$_skills_loop" in
-    *'local cmp_src="$rendered"'*'"install_${adapter}_skill" "$skill" "$cmp_src"'*) : ;;
+    *'"install_${adapter}_skill" "$skill" "$rendered"'*) : ;;
     *) fail "sync_adapter renders but installs the raw source, so the rendered block never reaches any tool"; _si=1 ;;
 esac
 # Commands install on all four tools, so the commands pass renders for all of them too:
@@ -1360,7 +1360,7 @@ esac
 # planning-resolve without carrying it.
 _cmds_loop="$(awk '/^sync_commands_adapter\(\) \{/,/^\}/' "$REPO_DIR/sync.sh")"
 case "$_cmds_loop" in
-    *'craftkit_render_injected "$source_file" "$rendered"'*'local cmp_src="$rendered"'*'"install_${adapter}_command" "$cmd" "$cmp_src"'*) : ;;
+    *'craftkit_render_injected "$source_file" "$rendered"'*'"install_${adapter}_command" "$cmd" "$rendered"'*) : ;;
     *) fail "sync_commands_adapter installs commands unrendered, so on Cursor, Gemini and Codex a command names partials it does not carry"; _si=1 ;;
 esac
 rm -rf "$_six"
@@ -1726,37 +1726,65 @@ done
 [[ $_rg -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
-# 37. Codex workflows must be native skills. A giant AGENTS.md exceeds the
-#     default instruction budget and hides project guidance.
+# 37. Workflows install once, as native skills in ~/.agents/skills, which Codex,
+#     Cursor and Gemini CLI all read. A giant AGENTS.md exceeds Codex's default
+#     instruction budget, and a second per-tool copy lists every skill twice in
+#     Cursor and Gemini. Runs the real sync passes, so the migration that takes
+#     back the older Cursor and Gemini copies is exercised, not just the installer.
 # ---------------------------------------------------------------------------
-check "Codex uses native skills and a compact AGENTS.md"
+check "one shared native skill install, compact Codex AGENTS.md"
 _cx=0
 _cxt="$(mktemp -d)"
-if ! (
+# A plain subshell, not `if ! (...)`: a tested command disables set -e for everything it
+# calls, which would hide a sync pass that aborts the real run.
+(
+    set -euo pipefail
     HOME="$_cxt"; export HOME
-    CODEX_AGENTS_MD="$HOME/.codex/AGENTS.md"
-    source "$REPO_DIR/adapters/codex.sh"
-    mkdir -p "$HOME/.codex" "$HOME/.agents/skills/foreign"
+    STATE_DIR="$HOME/.craftkit-state"
+    SKILLS_DIR="$REPO_DIR/skills"; COMMANDS_DIR="$REPO_DIR/commands"
+    RULES_DIR="$REPO_DIR/rules"; PARTIALS_DIR="$REPO_DIR/partials"
+    mkdir -p "$STATE_DIR"
+    sed -n '/^_CRAFTKIT_INJECTED_START=/p;/^_CRAFTKIT_INJECTED_END=/p' "$REPO_DIR/sync.sh" > "$_cxt/lib.sh"
+    for _fn in contains read_state read_current_skills read_current_commands craftkit_inject_list \
+               craftkit_strip_frontmatter craftkit_render_injected sync_adapter sync_commands_adapter; do
+        awk -v f="$_fn() {" '$0==f{p=1} p{print} p&&/^}/{exit}' "$REPO_DIR/sync.sh" >> "$_cxt/lib.sh"
+    done
+    source "$_cxt/lib.sh"
+    for _a in codex cursor gemini; do source "$REPO_DIR/adapters/$_a.sh"; done
+    mkdir -p "$HOME/.codex" "$HOME/.agents/skills/foreign" "$HOME/.cursor/rules" "$GEMINI_SKILLS_DIR"
     printf 'user guidance\n%s\n' "$_CODEX_SECTION_START" > "$CODEX_AGENTS_MD"
     awk 'BEGIN{for(i=1;i<=10000;i++)print "obsolete workflow body"}' >> "$CODEX_AGENTS_MD"
     echo "$_CODEX_SECTION_END" >> "$CODEX_AGENTS_MD"
     echo "foreign skill" > "$HOME/.agents/skills/foreign/SKILL.md"
-    compact="$(effective_codex_skill_source fe-review "$REPO_DIR/skills/fe-review/SKILL.md")"
+    echo "old cursor copy" > "$HOME/.cursor/rules/fe-review.mdc"
+    echo "old cursor copy" > "$HOME/.cursor/rules/build.mdc"
+    echo "old gemini copy" > "$GEMINI_SKILLS_DIR/fe-review.md"
+    echo fe-review > "$STATE_DIR/cursor"; echo build > "$STATE_DIR/cursor-commands"
+    echo fe-review > "$STATE_DIR/gemini"
     install_codex_rule grounding "$REPO_DIR/rules/grounding.md"
-    install_codex_skill fe-review "$compact"
-    install_codex_command build "$REPO_DIR/commands/build.md"
+    install_gemini_rule grounding "$REPO_DIR/rules/grounding.md"
+    # Twice: the second pass reads the empty state the migration leaves behind.
+    for _pass in 1 2; do
+        for _a in codex cursor gemini; do
+            sync_adapter "$_a" >/dev/null; sync_commands_adapter "$_a" >/dev/null
+        done
+    done
     if install_codex_skill foreign "$REPO_DIR/skills/fe-review/SKILL.md" 2>/dev/null; then exit 1; fi
-    rm -f "$compact"
     [[ -f "$HOME/.agents/skills/fe-review/SKILL.md" ]] &&
     [[ -f "$HOME/.agents/skills/build/SKILL.md" ]] &&
     [[ -f "$HOME/.craftkit/codex/rules/grounding.md" ]] &&
-    [[ $(sed -n 's/^description: //p' "$HOME/.agents/skills/fe-review/SKILL.md" | wc -c) -lt 100 ]] &&
+    [[ "$(grep -m1 '^description:' "$HOME/.agents/skills/fe-review/SKILL.md")" == "$(grep -m1 '^description:' "$REPO_DIR/skills/fe-review/SKILL.md")" ]] &&
     [[ $(wc -c < "$CODEX_AGENTS_MD") -lt 8192 ]] &&
     grep -qF 'user guidance' "$CODEX_AGENTS_MD" &&
     ! grep -qF 'obsolete workflow body' "$CODEX_AGENTS_MD" &&
-    grep -qF 'foreign skill' "$HOME/.agents/skills/foreign/SKILL.md"
-); then
-    fail "Codex adapter did not migrate to native skills safely"
+    grep -qF 'foreign skill' "$HOME/.agents/skills/foreign/SKILL.md" &&
+    [[ ! -e "$HOME/.cursor/rules/fe-review.mdc" && ! -e "$HOME/.cursor/rules/build.mdc" ]] &&
+    [[ ! -e "$GEMINI_SKILLS_DIR/fe-review.md" && -f "$GEMINI_SKILLS_DIR/grounding.md" ]] &&
+    ! grep -q '^name: fe-review' "$HOME/GEMINI.md" &&
+    [[ -z "$(tr -d '\n' < "$STATE_DIR/cursor")$(tr -d '\n' < "$STATE_DIR/gemini")" ]]
+)
+if [[ $? -ne 0 ]]; then
+    fail "skills did not land once in ~/.agents/skills, or Cursor/Gemini kept a second copy"
     _cx=1
 fi
 rm -rf "$_cxt"
