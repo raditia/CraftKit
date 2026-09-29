@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Git post-rewrite hook: sync after a successful rebase pull.
+set -euo pipefail
+
+[[ "${1:-}" == "rebase" ]] || exit 0
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+"$REPO_DIR/sync.sh"

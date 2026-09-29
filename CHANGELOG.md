@@ -7,7 +7,7 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
-## v1.48.0 — 2026-09-29
+## v1.49.0 — 2026-09-29
 
 ### /cross-review: Claude and Codex review the same diff, then check each other
 
@@ -35,11 +35,23 @@ model twice. `/cross-review` puts two providers on one diff.
   owner-only directory under `~/.craftkit-state/cross-review/`, so a disagreement can be reproduced.
 - `commands/cross-review.md` is the host's adjudication table: consensus kept, disputes settled
   by reading the cited lines, unverified claims capped at `[WARNING]`. README gains a flow diagram.
-- `check.sh` check 37 drives the script against stub CLIs: healthy runs, every fail-closed path,
+- `check.sh` check 38 drives the script against stub CLIs: healthy runs, every fail-closed path,
   untracked exclusion, tolerated layouts, and a critique that skips a finding.
-- `sync.sh`: `read_state` returns 0 on an empty state file. Before, `set -e` ended the sync
-  silently at the first adapter with no skills, so every adapter after it went unsynced.
 - `prune_orphan_staging` skips `~/.craftkit/bin`, which is not an adapter staging dir.
+
+## v1.48.0 — 2026-09-29
+
+### Codex loads CraftKit workflows as native skills
+
+- Install skills and commands under `~/.agents/skills/` and keep Codex's global `AGENTS.md`
+  short, leaving room for project instructions. Full Codex rules remain in separate files.
+- Cursor reads the shared local skills, so sync removes its older agent-requested `.mdc`
+  workflow copies. Gemini keeps its full `GEMINI.md` workflow block to preserve its existing
+  always-available guidance.
+- Merge and rebase pulls sync added and deleted skills through Git hooks. Existing Git
+  installations need one `bash install.sh` run to add the rebase hook.
+- A foreign skill directory with the same name is left untouched. Sync reports the collision
+  and continues with other skills and commands instead of stopping the whole update.
 
 ## v1.47.1 — 2026-09-29
 

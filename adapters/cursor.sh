@@ -1,24 +1,8 @@
 #!/usr/bin/env bash
-# Cursor: installs skills as user-level rules in ~/.cursor/rules/
+# Cursor: installs rules as user-level rules in ~/.cursor/rules/. Skills and commands reach
+# Cursor as native skills through ~/.agents/skills, which the Codex adapter installs.
 
 CURSOR_RULES_DIR="$HOME/.cursor/rules"
-
-get_cursor_dest() {
-    local skill_name="$1"
-    echo "$CURSOR_RULES_DIR/${skill_name}.mdc"
-}
-
-install_cursor_skill() {
-    local skill_name="$1"
-    local source_file="$2"
-    mkdir -p "$CURSOR_RULES_DIR"
-    cp "$source_file" "$CURSOR_RULES_DIR/${skill_name}.mdc"
-}
-
-uninstall_cursor_skill() {
-    local skill_name="$1"
-    rm -f "$CURSOR_RULES_DIR/${skill_name}.mdc"
-}
 
 get_cursor_rule_dest() { echo "$CURSOR_RULES_DIR/${1}.mdc"; }
 
@@ -77,6 +61,6 @@ effective_cursor_rule_source() {
 
 uninstall_cursor_rule() { rm -f "$CURSOR_RULES_DIR/${1}.mdc"; }
 
-get_cursor_command_dest() { get_cursor_dest "$1"; }
-install_cursor_command()   { install_cursor_skill "$@"; }
-uninstall_cursor_command() { uninstall_cursor_skill "$@"; }
+# No installers: these take back the .mdc copies synced before skills moved to ~/.agents/skills.
+uninstall_cursor_skill()   { uninstall_cursor_rule "$1"; }
+uninstall_cursor_command() { uninstall_cursor_rule "$1"; }
