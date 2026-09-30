@@ -1,4 +1,4 @@
-# craftkit `v1.49.0`
+# craftkit `v1.50.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -1264,6 +1264,7 @@ Cold, read-only sub-agents (`Read, Grep, Glob`) with a fixed system prompt and m
 Things to know when writing agents:
 
 - **Agents are cold copies.** They don't inherit rules, skills, or session context, so everything they need goes in `agents/<name>.md`.
+- **Agents skip CLAUDE.md.** Every agent sets `omitClaudeMd: true` (Claude Code v2.1.271+), which drops the ~11k-token global managed block from each spawn. The project's `CLAUDE.md` is dropped with it, so the parallel orchestrators pass it in the payload under `PROJECT CONVENTIONS:`. `check.sh` fails an agent without the field.
 - **Use `craftkitInject` instead of copying text.** Put `craftkitInject: <name>` in a skill's, agent's or command's frontmatter and sync splices in `partials/<name>.md`, `rules/<name>.md` or `skills/<name>/SKILL.md` (first match), fresh on every pull. Skills and commands render on all four tools; agents on Claude Code only.
 - **`partials/` is shared text that loads nowhere by itself.** It only arrives spliced into a host, so a procedure several commands share costs nothing in sessions that don't run them.
 - **CI runs `check.sh`** on every PR and push to `main`, on macOS (bash 3.2) and Ubuntu (bash 5).

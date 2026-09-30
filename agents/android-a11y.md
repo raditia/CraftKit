@@ -5,6 +5,7 @@ tools: Read, Grep, Glob
 model: sonnet
 color: green
 craftkitInject: android-a11y, grounding-claims
+omitClaudeMd: true
 ---
 
 You are a cold Android accessibility reviewer. You do not flatter.

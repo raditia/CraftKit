@@ -854,8 +854,14 @@ process.exit(got.join() === "1,2,3,0" ? 0 : (console.log(got.join()), 1));
     # come from tool calls alone. Caught during this change: both gates were blind to it,
     # which is the route an agent bypassing a skill is most likely to take.
     if command -v git >/dev/null 2>&1; then
+        echo x > "$_gx/proj/Old.tsx"; echo x > "$_gx/proj/Mode.ts"
         (cd "$_gx/proj" && git init -q . && git add -A && git commit -qm init >/dev/null 2>&1) || true
         echo x > "$_gx/proj/ViewX.tsx"
+        # Porcelain prints a rename as "old -> new" and quotes a name with a space; a chmod
+        # moves ctime, not mtime. Each once slipped past the turn-start cut.
+        (cd "$_gx/proj" && git mv Old.tsx Moved.tsx) || true
+        echo x > "$_gx/proj/View Y.tsx"
+        touch -t 200101010000 "$_gx/proj/Mode.ts" && chmod +x "$_gx/proj/Mode.ts"
         python3 - "$_gx" << 'PYEOF'
 import json, sys
 gx = sys.argv[1]
@@ -876,6 +882,12 @@ cases = {"shell": turn("edit", "sed -i '' s/a/b/ ViewX.tsx"),
          "delegated": [{"type": "user", "message": {"role": "user", "content": "build it"}},
                        {"type": "assistant", "message": {"role": "assistant", "content": [
                            {"type": "tool_use", "name": "Agent", "input": {"prompt": "implement"}}]}}]}
+# The same delegating turn, dated after ViewX.tsx was written (stale dirt) and before it
+# (the agent wrote it). Only the second may block.
+for name, ts in (("delegated-stale", "2999-01-01T00:00:00.000Z"),
+                 ("delegated-fresh", "2000-01-01T00:00:00.000Z"),
+                 ("delegated-chmod", "2010-01-01T00:00:00.000Z")):
+    cases[name] = [dict(cases["delegated"][0], timestamp=ts), cases["delegated"][1]]
 for name, lines in cases.items():
     with open("%s/%s.jsonl" % (gx, name), "w") as f:
         f.write("\n".join(json.dumps(x) for x in lines) + "\n")
@@ -892,6 +904,17 @@ PYEOF
         # land in ITS transcript, so the parent's turn shows no edits at all.
         _stopgate "$_gx/delegated.jsonl" | grep -q '"decision":"block"' \
             || { fail "stop gate misses edits made by a spawned agent, so delegating skips verification"; _gd=1; }
+        # Any shell redirect or agent spawn used to pull in every file dirty before the
+        # session, so one stale untracked doc gated every delegating turn. Found when this
+        # gate kept naming a planning doc last touched the day before.
+        _stopgate "$_gx/delegated-stale.jsonl" | grep -q '"decision"' \
+            && { fail "stop gate blames a delegating turn for a file dirty before the turn began"; _gd=1; }
+        _stopgate "$_gx/delegated-fresh.jsonl" | grep -q '"decision":"block"' \
+            || { fail "stop gate's turn-start cut drops a file the turn itself modified"; _gd=1; }
+        _stopgate "$_gx/delegated-fresh.jsonl" | grep -q 'View Y.tsx' \
+            || { fail "stop gate drops a turn-edited file whose name git quotes (a space)"; _gd=1; }
+        _stopgate "$_gx/delegated-chmod.jsonl" | grep -q 'Mode.ts' \
+            || { fail "stop gate drops a chmod-only change, since chmod leaves mtime alone"; _gd=1; }
     fi
     mkdir -p "$_gx/proj/.claude/skills/zzz-fixture-skill"
     _announcegate() {
@@ -1904,6 +1927,25 @@ _crrun > "$_crx/out"; grep -q "diff exceeds 256 KiB" "$_crx/out" \
     || { fail "routing hook does not bypass a panelist"; _cr=1; }
 rm -rf "$_crx"
 [[ $_cr -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 39. Agents skip CLAUDE.md, and the orchestrators hand them the project's own.
+#     Every spawn inherited the ~11k-token CRAFTKIT managed block and used none
+#     of it, since the rules an agent needs arrive through craftkitInject. The
+#     field drops the project CLAUDE.md too, so the parallel orchestrators must
+#     carry it in the payload or a reviewer loses the conventions it judges by.
+# ---------------------------------------------------------------------------
+check "agents omit CLAUDE.md, orchestrators pass project conventions"
+_oc=0
+for a in $(agent_names); do
+    awk 'NR>1 && /^---$/{exit} /^omitClaudeMd:[[:space:]]*true[[:space:]]*$/{f=1} END{exit !f}' "$AGENTS_DIR/$a.md" \
+        || { fail "agents/$a.md lacks omitClaudeMd: true in its frontmatter, so every spawn re-bills the global managed block"; _oc=1; }
+done
+for _o in parallel-review parallel-ship parallel-build; do
+    grep -q "PROJECT CONVENTIONS:" "$COMMANDS_DIR/$_o.md" \
+        || { fail "commands/$_o.md has no PROJECT CONVENTIONS: in its CONTEXT: payload, so its agents never see the project CLAUDE.md"; _oc=1; }
+done
+[[ $_oc -eq 0 ]] && pass
 
 echo
 if [[ $FAILURES -eq 0 ]]; then

@@ -51,13 +51,29 @@ function wroteViaShell(commands) {
     />>?\s*(?!\/dev\/|&)[^\s;&|]+/.test(c));
 }
 
-// Only consulted once the turn is known to have written something, so a working tree
-// that was already dirty before the session cannot trigger the gate on its own.
-function gitDirty(cwd) {
+// Only consulted once the turn is known to have written something, and only files modified
+// since the turn began count. Without the cut, any shell redirect or agent spawn made
+// every file already dirty before the session look like this turn's edit, so one stale
+// untracked doc gated every delegating turn. ctime joins mtime because a chmod moves only
+// ctime. A missing file (deleted) or an unknown start time counts, failing toward the gate
+// firing.
+function gitDirty(cwd, since) {
+  const git = args => execFileSync('git', ['-C', cwd].concat(args),
+    { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] });
   try {
-    const out = execFileSync('git', ['-C', cwd, 'status', '--porcelain', '--untracked-files=all'],
-      { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] });
-    return out.split('\n').filter(Boolean).map(l => l.slice(3).trim()).filter(Boolean);
+    const root = git(['rev-parse', '--show-toplevel']).trim();
+    // -z leaves names unquoted and prints a rename or copy as "XY dest\0source".
+    const entries = git(['status', '--porcelain', '-z', '--untracked-files=all']).split('\0');
+    const files = [];
+    for (let i = 0; i < entries.length; i++) {
+      if (!entries[i]) continue;
+      files.push(path.join(root, entries[i].slice(3)));
+      if (/[RC]/.test(entries[i].slice(0, 2))) i++;
+    }
+    return files.filter(f => {
+      if (!Number.isFinite(since)) return true;
+      try { const s = fs.statSync(f); return Math.max(s.mtimeMs, s.ctimeMs) >= since; } catch (e) { return true; }
+    });
   } catch (e) {
     return [];
   }
@@ -90,7 +106,7 @@ process.stdin.on('end', () => {
   // click-through trainer these gates are written to avoid.
   const THROWAWAY = /\/scratchpad\/|^\/tmp\/|^\/private\/tmp\/|^\/var\/folders\//;
   let touched = turn.edits.filter(f => !THROWAWAY.test(f));
-  if (wroteViaShell(turn.commands) || turn.delegated) touched = touched.concat(gitDirty(cwd));
+  if (wroteViaShell(turn.commands) || turn.delegated) touched = touched.concat(gitDirty(cwd, turn.startedAt));
   touched = touched.filter((f, i) => touched.indexOf(f) === i);
   const edited = gate.gatesEveryFile ? touched : touched.filter(f => CODE_EXT.test(f));
   if (!edited.length) return pass();

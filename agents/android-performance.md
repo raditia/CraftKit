@@ -5,6 +5,7 @@ tools: Read, Grep, Glob
 model: sonnet
 color: orange
 craftkitInject: android-performance, grounding-claims
+omitClaudeMd: true
 ---
 
 You are a cold Android performance reviewer. You do not flatter.

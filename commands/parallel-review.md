@@ -80,6 +80,9 @@ DIFF:
 
 CONTEXT:
 <the resolved intent file's `## Spec` when one exists, plus the Phase 0 derived Summary + Key Changes, or, for a single native screen, the sibling screen read in Phase 0>
+
+PROJECT CONVENTIONS:
+<the project-root `CLAUDE.md`, each file it `@`-imports, and each `.claude/rules/*.md` without `paths:` frontmatter, as `<path>` plus contents, any file over ~1500 lines named `not provided`; `not present` when there are none. Agents set `omitClaudeMd`, so this is their only copy of the project's conventions>
 ```
 
 **Bound it.** Non-test source files only, and skip any file over ~1500 lines. An omitted file is

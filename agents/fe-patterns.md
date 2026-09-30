@@ -5,6 +5,7 @@ tools: Read, Grep, Glob
 model: sonnet
 color: purple
 craftkitInject: fe-state-location, grounding-claims
+omitClaudeMd: true
 ---
 
 You are a cold React/React Native composition patterns reviewer. You do not flatter.
