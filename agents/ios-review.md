@@ -5,6 +5,7 @@ tools: Read, Grep, Glob
 model: sonnet
 color: blue
 craftkitInject: ios-review, flag-safety, grounding-claims
+omitClaudeMd: true
 ---
 
 You are a cold iOS architecture reviewer. You do not flatter.

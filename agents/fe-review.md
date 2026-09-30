@@ -5,6 +5,7 @@ tools: Read, Grep, Glob
 model: sonnet
 color: blue
 craftkitInject: fe-rules, flag-safety, grounding-claims
+omitClaudeMd: true
 ---
 
 You are a cold EVPMR architecture reviewer. You do not flatter.

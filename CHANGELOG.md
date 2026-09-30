@@ -7,6 +7,44 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.50.0 — 2026-09-30
+
+### Cold agents skip CLAUDE.md
+
+Every agent spawn loaded every CLAUDE.md layer: the ~45 KB CRAFTKIT managed block, the
+project `CLAUDE.md` and its imports. None of it was needed, since the rules an agent works
+by already arrive through `craftkitInject`. A `bulk-read` probe that made no tool calls cost
+32.6k tokens, and a third of that was the global block alone.
+
+- All 16 `agents/*.md` set `omitClaudeMd: true` (Claude Code v2.1.271+). The same probe
+  now costs 6.6k, and `fe-review` 9.4k. Org managed policy still reaches both agents, which
+  the go/no-go probe checked alongside the absence of three phrases found only in the managed block.
+- The field drops the project `CLAUDE.md` too, which a second probe confirmed. The
+  `CONTEXT:` payload in `parallel-review`, `parallel-ship` and `parallel-build` now carries a
+  `PROJECT CONVENTIONS:` entry: the root `CLAUDE.md`, its `@`-imports, and the
+  `.claude/rules/*.md` files without `paths:`, or `not present` when there are none. Agents
+  spawned outside those three (`plan-roaster`, `eval-judge`, `bulk-read`) judge plans, scores or
+  one named file, so they go without it. `CLAUDE.local.md`, nested `CLAUDE.md` files and
+  path-scoped rules are not carried either, which is a known gap.
+- `check.sh` check 39 fails an agent without the field and a template without the entry.
+- Authoring rule #4 in the repo `CLAUDE.md` and the README agents notes say so.
+- To roll back, delete the field. Nothing on disk changes shape.
+
+### Stop gate stops blaming a turn for files dirty before it
+
+When a turn wrote through the shell or spawned an agent, the verification gate added every
+dirty file in the working tree to that turn's edits. So one untracked planning doc, last
+touched the day before, blocked every turn that delegated work.
+
+- `gitDirty` counts only files modified since the prompt that opened the turn (`startedAt`,
+  now read from the transcript by `craftkit-transcript.js`). It compares `max(mtime, ctime)`,
+  because a chmod moves only ctime. A deleted file, or a turn with no start time, still counts,
+  so the gate errs on the side of firing.
+- `git status --porcelain -z` replaces the line-based parse. A rename now resolves to its new
+  name instead of `old -> new`, and a name with a space is no longer quoted.
+- `check.sh` check 23 gains fixtures for a stale delegating turn, a fresh one, a `git mv`,
+  a quoted name and a chmod-only change. The last three failed before the fix.
+
 ## v1.49.0 — 2026-09-29
 
 ### /cross-review: Claude and Codex review the same diff, then check each other

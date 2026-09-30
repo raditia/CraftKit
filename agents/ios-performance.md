@@ -5,6 +5,7 @@ tools: Read, Grep, Glob
 model: sonnet
 color: orange
 craftkitInject: ios-performance, grounding-claims
+omitClaudeMd: true
 ---
 
 You are a cold iOS performance reviewer. You do not flatter.

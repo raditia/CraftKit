@@ -134,11 +134,12 @@ function turnIdOf(entry, text) {
 // skill lives when no Skill call followed it), notification (the turn was opened by a
 // background-task event rather than a prompt), and priorSkills (Skill calls in EARLIER
 // turns of this session, so a gate can spare a continuation of already-routed work,
-// counted across the whole file when the tail window missed the session start).
+// counted across the whole file when the tail window missed the session start), and
+// startedAt (epoch ms of the prompt that opened the turn, NaN when the entry has none).
 function currentTurn(transcriptPath) {
   const out = { edits: [], commands: [], skills: [], slashCommand: false, readable: false,
                 turnId: '', sidechain: false, delegated: false, slashCommands: [],
-                assistantText: '', notification: false, priorSkills: 0 };
+                assistantText: '', notification: false, priorSkills: 0, startedAt: NaN };
   const tail = readTailLines(transcriptPath);
   const lines = tail.lines;
   if (!lines.length) return out;
@@ -180,6 +181,7 @@ function currentTurn(transcriptPath) {
     while ((sc = scRe.exec(text)) !== null) out.slashCommands.push(sc[1]);
     out.turnId = turnIdOf(entries[start], text);
     out.sidechain = entries[start].isSidechain === true;
+    out.startedAt = Date.parse(entries[start].timestamp);
   }
 
   const said = [];
