@@ -7,6 +7,30 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.51.0 — 2026-09-30
+
+### Codex loads CraftKit rules and checks verification at Stop
+
+Codex previously installed full rules as files but loaded only a short guide into the
+session. Skill and workflow routing depended on the agent choosing to read and follow them.
+
+- `adapters/codex.sh` registers a native Codex gateway in `~/.codex/hooks.json` while
+  preserving other hooks. Codex requires a `/hooks` review and trust before it runs.
+- `SessionStart` loads the full applicable rule bodies, including platform-scoped rules only
+  where their platform matches. `UserPromptSubmit` supplies routing guidance and the
+  installed body of an explicitly requested `$skill` or leading `/command`.
+- `Stop` compares the working tree with its turn-start snapshot and continues a turn that
+  edited files but skipped the project's verification command. It preserves the baseline
+  across its automatic continuation and limits blocks to two. Pre-existing dirty files do
+  not trigger the gate.
+- `check.sh` exercises rule scoping, explicit command loading, pre-existing edits,
+  verification continuations, and idempotent hook registration. A live Codex smoke test
+  confirmed that skipping verification after an edit triggers the Stop continuation.
+
+The runtime does not expose native skill activation as a stable hook event, so following a
+skill's instructions remains an agent responsibility; the verification command is the
+mechanically enforced part.
+
 ## v1.50.0 — 2026-09-30
 
 ### Cold agents skip CLAUDE.md

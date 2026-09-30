@@ -1,4 +1,4 @@
-# craftkit `v1.50.0`
+# craftkit `v1.51.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -200,7 +200,7 @@ flowchart TB
         t4("Codex CLI")
     end
     subgraph S4["STAGE 4 · SESSION GATES"]
-        gates("Claude Code: enforced by hooks<br/>Cursor/Gemini: advisory rules · Codex: short guide + skills<br/>● routing + model tier  ● skill-first<br/>● read-size  ● verify-on-stop  ● announce")
+        gates("Claude Code: routing and enforcement hooks<br/>Codex: rule loader + routing + verify-on-stop hooks<br/>Cursor/Gemini: advisory rules")
     end
     subgraph S5["STAGE 5 · OUTPUT"]
         out("Verified change, shipped")
@@ -240,7 +240,7 @@ layers act inside each AI tool:
 
 | Role | What | Where |
 |------|------|-------|
-| **CraftKit Gateway** | Every prompt and tool call passes through it ([full table](#enforcement-gates-hooks-that-refuse)): **Router** (`craftkit-routing.js`, UserPromptSubmit), **Loader** (`craftkit-platform-rules.js`, SessionStart), **Guards** (`gate-skill-first`, `gate-read-size`, `craftkit-read-cap`, PreToolUse), **Exit gates** (`gate-verify-on-stop`, `gate-announce-honored`, Stop) | `hooks/`, Claude Code only. Cursor and Gemini get the routing rule as advisory text; Codex gets a short global guide. Codex and Cursor discover skills natively from `~/.agents/skills/` |
+| **CraftKit Gateway** | Claude uses the [routing, loader, guard, and exit hooks](#enforcement-gates-hooks-that-refuse). Codex loads applicable rule bodies at SessionStart, injects routing guidance on each prompt, and checks verification at Stop. | `hooks/`; Claude and Codex use native hooks. Cursor and Gemini get advisory text. Codex and Cursor discover skills from `~/.agents/skills/` |
 | **Orchestrators** | Run a workflow: resolve the feature once in Phase 0, pass the slug down, spawn skills and agents | `commands/*.md` |
 | **Skills and agents** | Do one job; skills reach Figma and Lark through the host's MCP client | `skills/`, `agents/` (Claude only) |
 
@@ -273,7 +273,7 @@ flowchart TB
     subgraph R1["INSTALL TIME"]
         D("Distributor<br/>sync.sh + adapters/")
     end
-    subgraph GW["GATEWAY · hooks/ · Claude Code only · does not see MCP calls"]
+    subgraph GW["GATEWAY · hooks/ · Claude Code and Codex"]
         direction LR
         L("Loader<br/>SessionStart") ~~~ R("Router<br/>UserPromptSubmit") ~~~ G("Guards<br/>PreToolUse") ~~~ X("Exit gates<br/>Stop")
     end
@@ -313,7 +313,7 @@ flowchart TB
 | Claude Code | `~/.claude/CLAUDE.md` (managed block) | `~/.claude/commands/<name>.md` → `/<name>` | `~/.claude/agents/<name>.md` |
 | Cursor | `~/.cursor/rules/*.mdc` (alwaysApply) | `~/.agents/skills/<name>/SKILL.md` (shared native skills, local only) | n/a |
 | Gemini CLI | `~/GEMINI.md` (managed block) | `~/GEMINI.md` (managed block), and also lists the shared `~/.agents/skills/` | n/a |
-| Codex CLI | `~/.codex/AGENTS.md` (short managed block, full rules in `~/.craftkit/codex/rules/`) | `~/.agents/skills/<name>/SKILL.md` (shared native skills, including workflows) | n/a |
+| Codex CLI | `~/.codex/AGENTS.md` (short managed block); `~/.codex/hooks.json` loads applicable full rules from `~/.craftkit/codex/rules/` at session start | `~/.agents/skills/<name>/SKILL.md` (shared native skills, including workflows) | n/a |
 
 Codex and Cursor read skills from `~/.agents/skills/`, so they share one install there. Cursor does not copy that folder to Cloud Agents, so CraftKit skills reach local Cursor sessions only. Gemini CLI reads it too, but keeps its full `~/GEMINI.md` block: as native skills, workflows would load only on demand, behind a consent prompt on every activation. CraftKit's named review agents currently install only for Claude. Codex supports custom subagents, but this adapter does not yet convert the Claude agent definitions. Codex workflows use the sequential fallback where those named agents are required.
 
@@ -390,6 +390,8 @@ Nearest ancestor wins, so `"write tests for this"` in an Android repo resolves t
 
 Routing context is only text: an agent can read it, announce the right skill, and hand-roll the work anyway. These hooks close that gap. The four gates can stop a call; the other two only inject context.
 
+Codex installs [`craftkit-codex.js`](hooks/craftkit-codex.js) into `~/.codex/hooks/` and registers `SessionStart`, `UserPromptSubmit`, `PostToolUse` on Bash, and `Stop` in `~/.codex/hooks.json`. It loads applicable rule bodies and injects the installed body for an explicit `$skill` or leading `/command` request. It also prompts intent-based skill routing and blocks an edited turn that skipped the project verification command. Codex requires a one-time **`/hooks` review and trust** of the new definitions before they run. Native skill activation is not exposed as a stable hook event, so the gateway cannot prove that a skill body was followed; verification is the enforced part. `CRAFTKIT_GATE=off` disables it.
+
 | Hook | Event | What it does |
 |------|-------|--------------|
 | [`craftkit-routing.js`](hooks/craftkit-routing.js) | `UserPromptSubmit` | Injects the routing table, platform, model tiers, and any locally installed skills. Advisory |
@@ -418,7 +420,7 @@ How the gates behave:
 | `CRAFTKIT_READ_CAP=off` | `craftkit-read-cap.js` |
 | `CRAFTKIT_ALLOW_DOWNGRADE=1` | The sync downgrade guard |
 
-Removing a hook from `_CRAFTKIT_HOOKS` uninstalls it on the next sync. The reasoning behind each behavior above, with the measurements: [design notes](docs/design-notes.md#enforcement-gates).
+Removing a Claude hook from `_CRAFTKIT_HOOKS` uninstalls it on the next sync. The reasoning behind each behavior above, with the measurements: [design notes](docs/design-notes.md#enforcement-gates).
 
 ---
 
