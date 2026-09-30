@@ -43,6 +43,11 @@ subagents were running or what each was doing without attaching to them one by o
   30 minutes is labelled quiet rather than dropped, since one long tool call looks the same;
   one whose stop and session end both never fired is hidden after a day. The status line
   counts those files instead of re-reading the whole log.
+- Each subagent box shows its model and tokens (input, cache and output, summed per reply,
+  with output also on its own), and the tree line totals every subagent in the session.
+  Both come from Claude Code's subagent transcript, found by session and agent id and read
+  incrementally; a reply streamed over several lines counts once. Codex shows only the
+  model its events carry.
 - Several sessions at once: a numbered strip lists every Claude and Codex session active in
   the last 30 minutes and not ended, in start order, with a short session id. Arrows or 1-9
   pin one by session id, `a` follows the newest (holding the current one until it has been

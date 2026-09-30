@@ -85,7 +85,7 @@ def load(path):
             continue
         # Only a real start makes an agent: Claude Code's internal helpers fire SubagentStop alone.
         if ev == "SubagentStart":
-            s["agents"][aid] = {"type": e.get("type") or "agent", "start": e.get("ts"), "end": None, "tools": 0, "last": ""}
+            s["agents"][aid] = {"type": e.get("type") or "agent", "start": e.get("ts"), "end": None, "tools": 0, "last": "", "model": e.get("model")}
         a = s["agents"].get(aid)
         if a is None: continue
         s["recent"].append(e)
@@ -115,6 +115,49 @@ def live_agents(sid, now, count_only=False):
     return out
 
 def sid_of(path): return os.path.basename(path)[:-6]
+
+USAGE = {}
+PROJECTS = os.path.expanduser("~/.claude/projects")
+
+def human(n): return f"{n / 1e6:.1f}M" if n >= 999_950 else f"{n / 1e3:.1f}k" if n >= 1e3 else str(n)
+
+def agent_usage(sid, aid, src="claude"):
+    """Model and tokens of one Claude subagent, from its own transcript (<project>/<session>/subagents/agent-<id>.jsonl).
+    Read incrementally like the event log; a reply streamed over several lines shares one message id and counts once."""
+    u = USAGE.setdefault((sid, aid), {"path": None, "pos": 0, "seen": set(), "total": 0, "out": 0, "model": None, "retry": 0})
+    if not u["path"]:
+        # Codex keeps no Claude transcript, and a missing one is looked for again at most every 5s,
+        # so a dashboard left open does not glob for every agent on every frame.
+        if src == "codex" or time.time() < u["retry"]: return u
+        hits = glob.glob(f"{PROJECTS}/*/{glob.escape(sid)}/subagents/agent-{glob.escape(aid)}.jsonl")
+        if not hits:
+            u["retry"] = time.time() + 5
+            return u
+        u["path"] = hits[0]
+    try:
+        with open(u["path"], "rb") as f:
+            f.seek(u["pos"]); chunk = f.read()
+    except OSError:
+        return u
+    end = chunk.rfind(b"\n") + 1
+    u["pos"] += end
+    for line in chunk[:end].splitlines():
+        # Tool results and prompts can be large; only replies carry usage, so skip the rest unparsed.
+        if b'"assistant"' not in line: continue
+        try: e = json.loads(line)
+        except (ValueError, RecursionError): continue
+        m = e.get("message") if isinstance(e, dict) and e.get("type") == "assistant" else None
+        if not isinstance(m, dict): continue
+        mid = m.get("id")
+        if isinstance(mid, str) and mid:
+            if mid in u["seen"]: continue
+            u["seen"].add(mid)
+        if isinstance(m.get("model"), str): u["model"] = clean(m["model"])
+        t = m.get("usage") if isinstance(m.get("usage"), dict) else {}
+        n = lambda k: t.get(k) if isinstance(t.get(k), int) else 0
+        u["out"] += n("output_tokens")
+        u["total"] += n("input_tokens") + n("cache_creation_input_tokens") + n("cache_read_input_tokens") + n("output_tokens")
+    return u
 def ended(path): return os.path.exists(f"{DIR}/{sid_of(path)}.ended")
 
 META = {}
@@ -208,8 +251,10 @@ def render(frame):
         if not isinstance(st, dict): st = {}
     except (OSError, ValueError): st = {}
     live = live_agents(sid, now)
-    running = [dict(agents.get(aid) or {"type": t, "start": None, "end": None, "tools": 0, "last": ""}, seen=seen) for aid, (t, seen) in live.items()]
+    running = [dict(agents.get(aid) or {"type": t, "start": None, "end": None, "tools": 0, "last": "", "model": None}, seen=seen, aid=aid) for aid, (t, seen) in live.items()]
     done = sum(1 for a in agents.values() if a["end"])
+    spent = sum(agent_usage(sid, aid, state["src"])["total"] for aid in set(agents) | set(live))
+    used = f" · subagents used {human(spent)} tokens" if spent else ""
 
     tool = "Codex" if state["src"] == "codex" else "Claude Code"
     model = clean((st.get("model") or {}).get("display_name")) or state["model"] or "?"
@@ -235,7 +280,7 @@ def render(frame):
 
     out.append(c("dim", "      │"))
     if running:
-        out.append(c("dim", f"      ├─ {len(running)} subagent(s) running · {done} done"))
+        out.append(c("dim", f"      ├─ {len(running)} subagent(s) running · {done} done{used}"))
         shown = sorted(running, key=lambda a: a["start"] or now)[:6]
         bw = 30
         per_row = max(1, (cols + 2) // (bw + 2))
@@ -244,8 +289,13 @@ def render(frame):
             elapsed = max(0, now - a["start"]) if isinstance(a["start"], (int, float)) else 0
             idle = now - a["seen"]
             state_label = c("dim", f"◌ quiet {dur(idle)}") if idle > QUIET else c("warn", SPIN[frame % 4] + " running")
+            u = agent_usage(sid, a["aid"], state["src"])
+            amodel = (u["model"] or a.get("model") or "").replace("claude-", "") or "model ?"
+            spend = f"{human(u['total'])} tok · {human(u['out'])} out" if u["total"] else "tokens n/a"
             boxes.append(box(cut(str(a["type"]), bw - 4), [
                 f'{state_label}  {c("dim", dur(elapsed))}',
+                c("agent", cut(amodel, bw - 4)),
+                c("dim", cut(spend, bw - 4)),
                 f"{a['tools']} tool call(s)",
                 c("dim", cut(a["last"] or "starting…", bw - 4)),
             ], bw, "agent"))
@@ -253,7 +303,7 @@ def render(frame):
             out += side_by_side(boxes[i:i + per_row])
         if len(running) > len(shown): out.append(c("dim", f"  … {len(running) - len(shown)} more running"))
     else:
-        out.append(c("dim", f"      └─ no subagents running · {done} done"))
+        out.append(c("dim", f"      └─ no subagents running · {done} done{used}"))
 
     log = []
     names = {aid: a["type"] for aid, a in agents.items()}

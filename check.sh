@@ -2160,6 +2160,14 @@ sys.exit(0 if ok and mode==0o600 and dmode==0o700 else 1)" \
     for _i in 1 2 3 4 5 6 7 8 9; do _cx "{\"hook_event_name\":\"SubagentStart\",\"session_id\":\"many-$_i\",\"cwd\":\"/w/m$_i\",\"agent_id\":\"k$_i\",\"agent_type\":\"kbox-$_i\"}"; done
     HOME="$_dbx" LINES=24 COLUMNS=100 python3 "$REPO_DIR/scripts/dashboard.py" many-5 < /dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q '│ kbox-5' \
         || { fail "with many sessions on a small screen the strip pushes the subagent boxes off"; _db=1; }
+    _tr="$_dbx/.claude/projects/p/tok-1/subagents"; mkdir -p "$_tr"
+    printf '%s' '{"hook_event_name":"SubagentStart","session_id":"tok-1","cwd":"/w/tok-proj","agent_id":"tk1","agent_type":"tok-box"}' | HOME="$_dbx" node "$REPO_DIR/hooks/craftkit-agent-log.js"
+    { echo '{"type":"assistant","message":{"id":"m1","model":"claude-sonnet-5-5","usage":{"input_tokens":1000,"cache_read_input_tokens":500,"output_tokens":200}}}'
+      echo '{"type":"assistant","message":{"id":"m1","model":"claude-sonnet-5-5","usage":{"input_tokens":1000,"cache_read_input_tokens":500,"output_tokens":200}}}'
+      echo '{"type":"assistant","message":{"id":"m2","model":"claude-sonnet-5-5","usage":{"input_tokens":300,"output_tokens":100}}}'; } > "$_tr/agent-tk1.jsonl"
+    _tok="$(HOME="$_dbx" python3 "$REPO_DIR/scripts/dashboard.py" tok-1 < /dev/null | sed 's/\x1b\[[0-9;]*m//g')"
+    printf '%s' "$_tok" | grep -q '│ sonnet-5-5' && printf '%s' "$_tok" | grep -q '2.1k tok · 300 out' && printf '%s' "$_tok" | grep -q 'subagents used 2.1k tokens' \
+        || { fail "a subagent box does not show its model and tokens, or a streamed reply was counted twice"; _db=1; }
     _dbrun 0 >/dev/null; _back="$(_dbstate)"
     [[ "$_back" == "$_off" ]] \
         || { fail "turning the dashboard off left traces: $(diff <(printf '%s\n' "$_off") <(printf '%s\n' "$_back") | grep '^>' | tr '\n' ';')"; _db=1; }
