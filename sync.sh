@@ -44,6 +44,24 @@ if [[ -n "$_ck_repo_version" && -f "$_ck_version_file" && -z "${CRAFTKIT_ALLOW_D
     fi
 fi
 
+# flag: CRAFTKIT_DASHBOARD. off: no agent-log hook, status line or ccdash installed, and a sync removes any left from when it was on, logs included. remove: if the dashboard ever becomes default-on.
+# The choice persists in a state file because the post-merge hook syncs without the
+# caller's environment, and an opt-in that a git pull silently undid would not be one.
+# Resolved after the downgrade guard, so a refused sync never flips it.
+craftkit_dashboard_resolve() {
+    local state="$STATE_DIR/dashboard"
+    case "$(printf '%s' "${CRAFTKIT_DASHBOARD:-}" | tr '[:upper:]' '[:lower:]')" in
+        "") ;;
+        1|on|true|yes) : > "$state" ;;
+        0|off|false|no) rm -f "$state" ;;
+        *) echo "Warning: CRAFTKIT_DASHBOARD='$CRAFTKIT_DASHBOARD' not understood (use 1 or 0); dashboard setting unchanged" >&2 ;;
+    esac
+    CRAFTKIT_DASHBOARD_ON=0
+    [[ -f "$state" ]] && CRAFTKIT_DASHBOARD_ON=1
+    return 0
+}
+craftkit_dashboard_resolve
+
 source "$REPO_DIR/adapters/claude.sh"
 source "$REPO_DIR/adapters/cursor.sh"
 source "$REPO_DIR/adapters/gemini.sh"
@@ -516,7 +534,8 @@ prune_orphan_staging() {
     for d in "$staging"/*; do
         [[ -d "$d" ]] || continue
         base="$(basename "$d")"
-        [[ "$base" == "bin" ]] && continue
+        # bin holds synced scripts; agent-tree is the dashboard's logs, removed by sync_bin when it is off.
+        [[ "$base" == "bin" || "$base" == "agent-tree" ]] && continue
         live=0
         for adapter in "${ADAPTERS[@]}"; do
             case "$base" in "$adapter"|"$adapter"-*) live=1; break ;; esac
@@ -574,18 +593,47 @@ done
 
 # cross-review.sh is run by a synced command, and an installed command cannot know where
 # this repo lives, so the script gets a fixed path every tool can reach.
+# The dashboard viewer and its launcher ride along only while the dashboard is opted into.
 sync_bin() {
-    local src="$REPO_DIR/scripts/cross-review.sh" dest="$HOME/.craftkit/bin/cross-review.sh"
+    local bin="$HOME/.craftkit/bin" link="$HOME/.local/bin/ccdash" name changed=0 names="cross-review.sh"
     echo ""
     echo "[bin]"
-    if cmp -s "$src" "$dest"; then
-        echo "    bin: (up to date)"
-        return
+    mkdir -p "$bin"
+    [[ "$CRAFTKIT_DASHBOARD_ON" == 1 ]] && names="$names dashboard.py ccdash"
+    for name in $names; do
+        cmp -s "$REPO_DIR/scripts/$name" "$bin/$name" && continue
+        cp "$REPO_DIR/scripts/$name" "$bin/$name" || return 1
+        chmod +x "$bin/$name" || return 1
+        echo "    + $name"
+        changed=1
+    done
+    if [[ "$CRAFTKIT_DASHBOARD_ON" == 1 ]]; then
+        if [[ -d "$HOME/.local/bin" && ! -e "$link" && ! -L "$link" ]]; then
+            ln -s "$bin/ccdash" "$link" && echo "    + ccdash -> ~/.local/bin" && changed=1
+        fi
+        if [[ -e "$link" && "$(readlink "$link" 2>/dev/null)" != "$bin/ccdash" ]]; then
+            echo "    ! ~/.local/bin/ccdash is not CraftKit's, left as is; remove it to get the synced one"
+        else
+            case "$(command -v ccdash 2>/dev/null)" in
+                "$link"|"$bin/ccdash") ;;
+                *) echo "    ! ccdash is not on PATH; add ~/.local/bin (or $bin) to PATH, or run $bin/ccdash" ;;
+            esac
+        fi
+    else
+        for name in dashboard.py ccdash; do
+            [[ -f "$bin/$name" ]] || continue
+            rm -f "$bin/$name" && echo "    - $name" && changed=1
+        done
+        if [[ "$(readlink "$link" 2>/dev/null)" == "$bin/ccdash" ]]; then
+            rm -f "$link" && echo "    - ccdash link" && changed=1
+        fi
+        # The logs hold tool commands and file paths; off means they go too.
+        if [[ -d "$HOME/.craftkit/agent-tree" ]]; then
+            rm -rf "$HOME/.craftkit/agent-tree" && echo "    - agent-tree logs" && changed=1
+        fi
     fi
-    mkdir -p "$(dirname "$dest")"
-    cp "$src" "$dest" || return 1
-    chmod +x "$dest" || return 1
-    echo "    + cross-review.sh"
+    [[ $changed -eq 0 ]] && echo "    bin: (up to date)"
+    return 0
 }
 sync_bin
 

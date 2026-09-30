@@ -29,6 +29,16 @@ _CRAFTKIT_HOOKS=(
     "craftkit-drift.js%-%%"
     "craftkit-filesize.js%-%%"
 )
+# Agent dashboard (opt-in): joins _CRAFTKIT_HOOKS only when CRAFTKIT_DASHBOARD_ON=1, so with
+# it off _claude_prune_hooks removes whatever an earlier opted-in sync installed. One script
+# per event row, because the table carries a single event per entry.
+_CRAFTKIT_DASHBOARD_HOOKS=(
+    "craftkit-agent-log.js%SubagentStart%%"
+    "craftkit-agent-log.js%SubagentStop%%"
+    "craftkit-agent-log.js%PostToolUse%%"
+    "craftkit-agent-log.js%SessionEnd%%"
+    "craftkit-statusline.js%-%%"
+)
 _CLAUDE_SECTION_START="<!-- BEGIN CRAFTKIT (managed: do not edit manually) -->"
 _CLAUDE_SECTION_END="<!-- END CRAFTKIT -->"
 
@@ -331,7 +341,7 @@ _craftkit_hook_unwire_settings() {
     [[ ! -f "$CLAUDE_SETTINGS" ]] && return
     local scripts h
     scripts=""
-    for h in "${_CRAFTKIT_HOOKS[@]}"; do
+    for h in "${_CRAFTKIT_HOOKS[@]}" "${_CRAFTKIT_DASHBOARD_HOOKS[@]}"; do
         scripts="$scripts$(echo "$h" | cut -d'%' -f1) "
     done
     python3 - "$CLAUDE_SETTINGS" "$scripts" << 'PYEOF'
@@ -372,12 +382,12 @@ _claude_prune_hooks() {
         while read -r old; do
             [[ -z "$old" ]] && continue
             case " $current " in *" $old "*) continue ;; esac
-            rm -f "$CLAUDE_HOOKS_DIR/$old"
             _craftkit_hook_unregister "$old"
+            rm -f "$CLAUDE_HOOKS_DIR/$old"
             echo "    - removing hook: ${old%.js}"
         done < "$state"
     fi
-    printf '%s\n' $current > "$state"
+    printf '%s\n' $current | awk '!seen[$0]++' > "$state"
 }
 
 # Drops every settings.json entry whose command names this script, and any hook group left
@@ -410,8 +420,102 @@ with open(path, "w") as f:
 PYEOF
 }
 
+# statusLine is a single slot. An empty one gets the dashboard line; one the user already has is
+# saved under the state dir and wrapped (the script runs it first and appends), then restored
+# exactly when the dashboard goes off.
+_claude_statusline_wire() {
+    [[ -f "$CLAUDE_SETTINGS" || "$1" == 1 ]] || return 0
+    [[ -f "$CLAUDE_SETTINGS" ]] || ( umask 077; mkdir -p "$(dirname "$CLAUDE_SETTINGS")"; echo '{}' > "$CLAUDE_SETTINGS" )
+    python3 - "$CLAUDE_SETTINGS" "$1" "$(_resolve_node_bin)" "$CLAUDE_HOOKS_DIR/craftkit-statusline.js" "$STATE_DIR/statusline.json" << 'PYEOF'
+import json, os, re, stat, sys
+path, on, node, script, saved_path = sys.argv[1], sys.argv[2] == '1', sys.argv[3], sys.argv[4], sys.argv[5]
+try:
+    with open(path) as f:
+        settings = json.load(f)
+    assert isinstance(settings, dict)
+except (ValueError, AssertionError):
+    if on:
+        print('    ! settings.json is not a JSON object, status line left alone')
+    sys.exit(0)
+
+def write(target, data):
+    # Through a symlink and created with the target's own mode, so a dotfiles link survives and
+    # a 0600 file holding env secrets is never readable by others, not even as the temp copy.
+    real = os.path.realpath(target)
+    mode = stat.S_IMODE(os.stat(real).st_mode) if os.path.exists(real) else 0o600
+    tmp = real + '.tmp'
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+    try:
+        os.fchmod(fd, mode)
+        with os.fdopen(fd, 'w') as f:
+            json.dump(data, f, indent=2)
+            f.write('\n')
+        os.replace(tmp, real)
+    except BaseException:
+        if os.path.exists(tmp): os.remove(tmp)
+        raise
+
+def load_saved():
+    try:
+        with open(saved_path) as f:
+            saved = json.load(f)
+        return saved if isinstance(saved, dict) and isinstance(saved.get('command'), str) else None
+    except (OSError, ValueError):
+        return None
+
+def drop_saved():
+    if os.path.exists(saved_path): os.remove(saved_path)
+
+command = '"%s" "%s"' % (node, script)
+current = settings.get('statusLine')
+cmd = current.get('command') if isinstance(current, dict) else None
+# Ours is exactly our command line, with any node path; anything else that merely mentions the
+# script is the user's own edit and is never overwritten or wrapped.
+ours = isinstance(cmd, str) and re.fullmatch(r'"[^"]*" %s' % re.escape('"%s"' % script), cmd) is not None
+mentions = isinstance(cmd, str) and 'craftkit-statusline.js' in cmd and not ours
+if on and not current:
+    drop_saved()
+    settings['statusLine'] = {'type': 'command', 'command': command, 'refreshInterval': 5}
+    print('    + status line: craftkit-statusline')
+elif on and (mentions or not isinstance(cmd, str)):
+    print('    ! statusLine left as is (it is not a plain command, or already calls the dashboard line); effort/ctx/cost may be missing')
+    sys.exit(0)
+elif on and not ours:
+    write(saved_path, current)
+    settings['statusLine'] = dict(current, command=command, refreshInterval=current.get('refreshInterval', 5))
+    print('    + status line: craftkit-statusline, wrapping your existing one')
+elif on and cmd != command:
+    current['command'] = command
+elif not on and ours:
+    original = load_saved()
+    if original:
+        # Their command back, plus any key they changed while wrapped; refreshInterval only if they had one.
+        restored = dict(current, command=original['command'])
+        if 'refreshInterval' in original: restored['refreshInterval'] = original['refreshInterval']
+        elif restored.get('refreshInterval') == 5: restored.pop('refreshInterval')
+        settings['statusLine'] = restored
+        print('    - status line: craftkit-statusline, your own restored')
+    else:
+        del settings['statusLine']
+        print('    - status line: craftkit-statusline')
+elif not on:
+    drop_saved()
+    sys.exit(0)
+else:
+    sys.exit(0)
+write(path, settings)
+if not on: drop_saved()
+PYEOF
+}
+
 install_claude_craftkit_hook() {
     mkdir -p "$CLAUDE_HOOKS_DIR"
+    # flag: CRAFTKIT_DASHBOARD (resolved in sync.sh). off: the table stays as before and prune drops the dashboard rows. remove: if the dashboard ever becomes default-on.
+    if [[ "${CRAFTKIT_DASHBOARD_ON:-0}" == 1 ]] && ! printf '%s\n' "${_CRAFTKIT_HOOKS[@]}" | grep -q '^craftkit-agent-log.js%'; then
+        _CRAFTKIT_HOOKS+=("${_CRAFTKIT_DASHBOARD_HOOKS[@]}")
+    fi
+    # Before the prune, so settings.json never points at a status line script already deleted.
+    _claude_statusline_wire "${CRAFTKIT_DASHBOARD_ON:-0}"
     _claude_prune_hooks
     local h script src dest
     for h in "${_CRAFTKIT_HOOKS[@]}"; do

@@ -1,0 +1,56 @@
+#!/bin/bash
+# ccdash [n]: open the CraftKit agent dashboard (Claude Code and Codex sessions); esc or q closes it.
+# n is a number from the dashboard's session strip. It is turned into that session's id before any
+# window opens, so the window keeps watching that session even if the strip renumbers.
+#   in tmux                      -> popup, or a side-by-side pane when n is given (or tmux < 3.2)
+#   from a chat (! ccdash 2)     -> a separate iTerm or Terminal window on macOS, one snapshot elsewhere
+#   plain terminal               -> full screen in this terminal
+D="$HOME/.craftkit/bin/dashboard.py"
+SID=""
+if [ -n "$1" ]; then
+    case "$1" in
+        [1-9]) SID="$(python3 "$D" --resolve "$1")" || { echo "no session $1 right now; run ccdash without a number to see the strip"; exit 1; } ;;
+        *) echo "usage: ccdash [1-9]   (a number from the dashboard's session strip)"; exit 2 ;;
+    esac
+fi
+# Run directly as an array, so a HOME with spaces survives; the %q string is for the routes that
+# hand a command line to another shell (tmux, osascript).
+RUN=(nice -n 10 python3 "$D" ${SID:+"$SID"})
+CMD="nice -n 10 python3 $(printf '%q' "$D") ${SID:+$(printf '%q' "$SID")}"
+
+if [ -n "$TMUX" ]; then
+    # display-popup arrived in tmux 3.2 and shows one at a time, so a pinned view, meant to sit
+    # beside others, gets a pane instead.
+    case "$SID:$(tmux -V | tr -dc '0-9.' | cut -d. -f1-2)" in
+        :3.[2-9]*|:[4-9]*|:[1-9][0-9]*) tmux display-popup -E -w 90% -h 85% "$CMD" ;;
+        *) tmux split-window -h "$CMD" ;;
+    esac
+elif [ -t 0 ]; then
+    exec "${RUN[@]}"
+elif command -v osascript >/dev/null; then
+    if [ "$TERM_PROGRAM" = "iTerm.app" ]; then
+        SCRIPT='on run argv
+    tell application "iTerm"
+        create window with default profile command (item 1 of argv)
+        activate
+    end tell
+end run'
+    else
+        SCRIPT='on run argv
+    tell application "Terminal"
+        set t to do script "clear; exec " & (item 1 of argv)
+        set number of rows of (first window whose tabs contains t) to 42
+        set number of columns of (first window whose tabs contains t) to 104
+        activate
+    end tell
+end run'
+    fi
+    if osascript -e "$SCRIPT" "$CMD" >/dev/null 2>&1; then
+        echo "dashboard opened in a new window${1:+ for session $1} (esc to close)"
+    else
+        echo "could not open a window (allow it under System Settings > Privacy & Security > Automation); run ccdash in a terminal tab instead"
+    fi
+else
+    "${RUN[@]}"
+    echo "(snapshot; run ccdash in a terminal tab for the live view)"
+fi
