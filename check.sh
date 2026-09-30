@@ -1086,13 +1086,85 @@ _ht=0
 _table="$(bash -c ". '$REPO_DIR/adapters/claude.sh' >/dev/null 2>&1; printf '%s\n' \"\${_CRAFTKIT_HOOKS[@]}\"" | cut -d'%' -f1 | sort)"
 for _f in "$REPO_DIR"/hooks/*.js; do
     _b="$(basename "$_f")"
-    echo "$_table" | grep -qx "$_b" || { fail "hooks/$_b is in no _CRAFTKIT_HOOKS entry, so sync never installs it"; _ht=1; }
+    if ! echo "$_table" | grep -qx "$_b"; then
+        if [[ "$_b" != "craftkit-codex.js" ]] || ! grep -qF "for script in craftkit-codex.js craftkit-platform.js" "$REPO_DIR/adapters/codex.sh"; then
+            fail "hooks/$_b is in no adapter hook entry, so sync never installs it"
+            _ht=1
+        fi
+    fi
 done
 for _b in $_table; do
     [[ -f "$REPO_DIR/hooks/$_b" ]] || { fail "_CRAFTKIT_HOOKS names $_b, but hooks/$_b does not exist"; _ht=1; }
     grep -q "$_b" "$README" || { fail "$_b is installed but undocumented in README"; _ht=1; }
 done
 [[ $_ht -eq 0 ]] && pass
+
+# 24b. Codex hooks load full applicable rules and block a turn that edits without
+# verification. Its native transcript is not a stable API, so exercise lifecycle payloads
+# directly, including a dirty file that predates the turn and an automatic continuation.
+check "Codex gateway loads rules and enforces verification"
+_cx=0
+if ! command -v node >/dev/null 2>&1; then
+    echo "    skipped (node not on PATH)"
+else
+    _cxf="$(mktemp -d)"
+    mkdir -p "$_cxf/home/.craftkit/codex/rules" "$_cxf/repo"
+    cp "$REPO_DIR/rules/grounding.md" "$REPO_DIR/rules/fe-rules.md" "$_cxf/home/.craftkit/codex/rules/"
+    (cd "$_cxf/repo" && git init -q && git -c user.email=c@k -c user.name=ck commit -q --allow-empty -m base)
+    echo x > "$_cxf/repo/old.ts"
+    echo '#!/bin/sh' > "$_cxf/repo/check.sh"
+    _codexhook() {
+        printf '%s' "$1" | HOME="$_cxf/home" node "$REPO_DIR/hooks/craftkit-codex.js"
+    }
+    _out="$(_codexhook "{\"hook_event_name\":\"SessionStart\",\"cwd\":\"$_cxf/repo\"}")"
+    printf '%s' "$_out" | grep -q 'CraftKit installed rules' \
+        || { fail "Codex SessionStart does not inject rule bodies"; _cx=1; }
+    [[ "$_out" == *'Layer constraints'* ]] \
+        && { fail "Codex SessionStart injects FE rules into a non-FE repo"; _cx=1; }
+    echo '{}' > "$_cxf/repo/package.json"
+    _out="$(_codexhook "{\"hook_event_name\":\"SessionStart\",\"cwd\":\"$_cxf/repo\"}")"
+    [[ "$_out" == *'Layer constraints'* ]] \
+        || { fail "Codex SessionStart omits platform-scoped FE rules in an FE repo"; _cx=1; }
+    mkdir -p "$_cxf/home/.agents/skills/fixture-command"
+    echo 'Exact command body from installed skill' > "$_cxf/home/.agents/skills/fixture-command/SKILL.md"
+    _out="$(_codexhook "{\"hook_event_name\":\"UserPromptSubmit\",\"session_id\":\"fixture-explicit\",\"turn_id\":\"t1\",\"prompt\":\"/fixture-command run this\",\"cwd\":\"$_cxf/repo\"}")"
+    [[ "$_out" == *'Exact command body from installed skill'* ]] \
+        || { fail "Codex prompt hook skips an explicitly requested command body"; _cx=1; }
+    _codexhook "{\"hook_event_name\":\"UserPromptSubmit\",\"session_id\":\"fixture-a\",\"turn_id\":\"t1\",\"cwd\":\"$_cxf/repo\"}" >/dev/null
+    _codexhook "{\"hook_event_name\":\"Stop\",\"session_id\":\"fixture-a\",\"cwd\":\"$_cxf/repo\"}" | grep -q '"decision"' \
+        && { fail "Codex Stop blocks on a file dirty before the turn"; _cx=1; }
+    _codexhook "{\"hook_event_name\":\"UserPromptSubmit\",\"session_id\":\"fixture-b\",\"turn_id\":\"t1\",\"cwd\":\"$_cxf/repo\"}" >/dev/null
+    echo y > "$_cxf/repo/new file.ts"
+    _codexhook "{\"hook_event_name\":\"Stop\",\"session_id\":\"fixture-b\",\"cwd\":\"$_cxf/repo\"}" | grep -q '"decision":"block"' \
+        || { fail "Codex Stop does not block an unverified edit"; _cx=1; }
+    _codexhook "{\"hook_event_name\":\"UserPromptSubmit\",\"session_id\":\"fixture-b\",\"turn_id\":\"t2\",\"cwd\":\"$_cxf/repo\"}" >/dev/null
+    _codexhook "{\"hook_event_name\":\"PostToolUse\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"bash check.sh\"},\"session_id\":\"fixture-b\",\"cwd\":\"$_cxf/repo\"}" >/dev/null
+    _codexhook "{\"hook_event_name\":\"Stop\",\"session_id\":\"fixture-b\",\"cwd\":\"$_cxf/repo\"}" | grep -q '"decision"' \
+        && { fail "Codex Stop blocks after verification on a continuation"; _cx=1; }
+    echo 'not json' | node "$REPO_DIR/hooks/craftkit-codex.js" >/dev/null 2>&1 \
+        || { fail "Codex gateway errors on malformed stdin"; _cx=1; }
+    echo '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"user-stop-hook"}]}]}}' > "$_cxf/home/.codex-hooks-before.json"
+    mkdir -p "$_cxf/home/.codex"
+    cp "$_cxf/home/.codex-hooks-before.json" "$_cxf/home/.codex/hooks.json"
+    (HOME="$_cxf/home"; source "$REPO_DIR/adapters/claude.sh"; source "$REPO_DIR/adapters/codex.sh"; install_codex_craftkit_hooks >/dev/null) \
+        || { fail "Codex hook installer failed"; _cx=1; }
+    cp "$_cxf/home/.codex/hooks.json" "$_cxf/first-hooks.json"
+    (HOME="$_cxf/home"; source "$REPO_DIR/adapters/claude.sh"; source "$REPO_DIR/adapters/codex.sh"; install_codex_craftkit_hooks >/dev/null) \
+        || { fail "Codex hook installer failed on repeat"; _cx=1; }
+    cmp -s "$_cxf/first-hooks.json" "$_cxf/home/.codex/hooks.json" \
+        || { fail "Codex hook installer is not idempotent"; _cx=1; }
+    python3 - "$_cxf/home/.codex/hooks.json" <<'PYEOF' \
+        || { fail "Codex hook registration loses events or another user's hook"; _cx=1; }
+import json, sys
+hooks = json.load(open(sys.argv[1]))['hooks']
+assert len(hooks['Stop']) == 2
+assert hooks['Stop'][0]['hooks'][0]['command'] == 'user-stop-hook'
+for event in ('SessionStart', 'UserPromptSubmit', 'PostToolUse', 'Stop'):
+    assert any('craftkit-codex.js' in h['command'] for g in hooks[event] for h in g['hooks'])
+PYEOF
+    rm -rf "$_cxf"
+    [[ $_cx -eq 0 ]] && pass
+fi
 
 # ---------------------------------------------------------------------------
 # 25. sync.sh refuses a downgrade. The state files record names only, so a sync
