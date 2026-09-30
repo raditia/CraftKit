@@ -1083,7 +1083,7 @@ fi
 # ---------------------------------------------------------------------------
 check "hook table matches hooks/"
 _ht=0
-_table="$(bash -c ". '$REPO_DIR/adapters/claude.sh' >/dev/null 2>&1; printf '%s\n' \"\${_CRAFTKIT_HOOKS[@]}\"" | cut -d'%' -f1 | sort)"
+_table="$(bash -c ". '$REPO_DIR/adapters/claude.sh' >/dev/null 2>&1; printf '%s\n' \"\${_CRAFTKIT_HOOKS[@]}\" \"\${_CRAFTKIT_DASHBOARD_HOOKS[@]}\"" | cut -d'%' -f1 | sort -u)"
 for _f in "$REPO_DIR"/hooks/*.js; do
     _b="$(basename "$_f")"
     if ! echo "$_table" | grep -qx "$_b"; then
@@ -2018,6 +2018,208 @@ for _o in parallel-review parallel-ship parallel-build; do
         || { fail "commands/$_o.md has no PROJECT CONVENTIONS: in its CONTEXT: payload, so its agents never see the project CLAUDE.md"; _oc=1; }
 done
 [[ $_oc -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 40. The agent dashboard is opt-in, and off means absent. It logs every tool call's
+#     file or command to disk, so a sync that installed it for someone who never asked,
+#     or that left it registered after they turned it off, is the failure. Behavioral:
+#     the real adapter functions run against a throwaway HOME (a full sync costs ~75s),
+#     through off, on, on again, and off, for Claude, Codex and the bin pass.
+# ---------------------------------------------------------------------------
+check "agent dashboard installs only when opted in, and leaves no trace when off"
+_db=0
+if ! command -v node >/dev/null 2>&1; then
+    echo "    skipped (node not on PATH)"
+else
+    _dbx="$(mktemp -d)"
+    mkdir -p "$_dbx/.craftkit-state" "$_dbx/.claude" "$_dbx/.codex" "$_dbx/.local/bin"
+    echo '{"hooks":{"PostToolUse":[{"hooks":[{"type":"command","command":"their-hook"}]}]}}' > "$_dbx/.codex/hooks.json"
+    _dbrun() {
+        HOME="$_dbx" CRAFTKIT_DASHBOARD_ON="$1" CRAFTKIT_DASHBOARD="$1" bash -c "
+            set -euo pipefail
+            REPO_DIR='$REPO_DIR'; STATE_DIR='$_dbx/.craftkit-state'
+            . '$REPO_DIR/adapters/claude.sh'; . '$REPO_DIR/adapters/codex.sh'
+            install_claude_craftkit_hook; install_codex_dashboard_hook
+            $(sed -n '/^sync_bin()/,/^}/p' "$REPO_DIR/sync.sh"); sync_bin" 2>&1
+    }
+    _dbstate() {
+        python3 - "$_dbx" << 'PYEOF'
+import json, os, sys
+x = sys.argv[1]
+s = json.load(open(f'{x}/.claude/settings.json'))
+c = json.load(open(f'{x}/.codex/hooks.json'))
+def events(hooks):
+    return sorted(e for e, gs in hooks.items()
+                  if any('craftkit-agent-log.js' in h.get('command', '') for g in gs for h in g.get('hooks', [])))
+print('claude', ','.join(events(s.get('hooks', {}))) or '-')
+print('statusline', 'ours' if 'craftkit-statusline.js' in (s.get('statusLine') or {}).get('command', '') else (s.get('statusLine') or {}).get('command', '-'))
+print('codex', ','.join(events(c.get('hooks', {}))) or '-')
+print('codex-codexarg', all(h['command'].endswith(' codex') for gs in c['hooks'].values() for g in gs for h in g['hooks'] if 'craftkit-agent-log' in h['command']))
+print('codex-foreign', any(h.get('command') == 'their-hook' for g in c['hooks'].get('PostToolUse', []) for h in g['hooks']))
+print('routing', any('craftkit-routing.js' in h.get('command', '') for g in s['hooks'].get('UserPromptSubmit', []) for h in g['hooks']))
+for f in ('.claude/hooks/craftkit-agent-log.js', '.claude/hooks/craftkit-statusline.js', '.codex/hooks/craftkit-agent-log.js',
+          '.craftkit/bin/dashboard.py', '.craftkit/bin/ccdash', '.craftkit/agent-tree'):
+    print(f, os.path.exists(f'{x}/{f}'))
+print('link', os.path.islink(f'{x}/.local/bin/ccdash'))
+PYEOF
+    }
+    _all_sorted="PostToolUse,SessionEnd,SubagentStart,SubagentStop"
+    _dbrun 0 >/dev/null; _off="$(_dbstate)"
+    printf '%s\n' "$_off" | grep -qx 'claude -' && printf '%s\n' "$_off" | grep -qx 'codex -' && printf '%s\n' "$_off" | grep -qx 'statusline -' \
+        || { fail "with the dashboard off, a sync still registered its hooks or status line"; _db=1; }
+    printf '%s\n' "$_off" | grep -Ev '^(routing|codex-codexarg|codex-foreign) ' | grep -q ' True$' \
+        && { fail "with the dashboard off, a sync still installed its files"; _db=1; }
+    _dbrun 1 >/dev/null
+    printf '%s' '{"hook_event_name":"PostToolUse","session_id":"s-1","agent_id":"a1","agent_type":"worker","tool_name":"Bash","tool_input":{"command":"curl -H \"Authorization: Bearer sk-live-123\"\nx"}}' \
+        | HOME="$_dbx" node "$REPO_DIR/hooks/craftkit-agent-log.js" codex
+    _on="$(_dbstate)"
+    for _want in "claude $_all_sorted" "statusline ours" "codex $_all_sorted" "codex-codexarg True" "codex-foreign True" "routing True" \
+                 ".claude/hooks/craftkit-agent-log.js True" ".claude/hooks/craftkit-statusline.js True" ".codex/hooks/craftkit-agent-log.js True" \
+                 ".craftkit/bin/dashboard.py True" ".craftkit/bin/ccdash True" ".craftkit/agent-tree True" "link True"; do
+        printf '%s\n' "$_on" | grep -qxF "$_want" || { fail "dashboard on: expected '$_want', got: $(printf '%s' "$_on" | tr '\n' ';')"; _db=1; }
+    done
+    _s1="$(cat "$_dbx/.claude/settings.json" "$_dbx/.codex/hooks.json")"
+    _rerun="$(_dbrun 1)"
+    [[ "$_s1" == "$(cat "$_dbx/.claude/settings.json" "$_dbx/.codex/hooks.json")" ]] \
+        || { fail "a second opted-in sync rewrote settings.json or hooks.json, so Codex re-asks for trust"; _db=1; }
+    printf '%s\n' "$_rerun" | grep -E '^    [+-] ' && { fail "a second opted-in sync reported work"; _db=1; }
+    _log="$_dbx/.craftkit/agent-tree/events/s-1.jsonl"
+    HOME="$_dbx" python3 -c "
+import json,os,stat,sys
+p=os.path.expanduser('~/.craftkit/agent-tree/events/s-1.jsonl')
+e=json.loads(open(p).readline())
+ok=(e['src'],e['aid'],e['type'],e['tool'])==('codex','a1','worker','Bash') and 'sk-live' not in e['what'] and '\n' not in e['what']
+mode=stat.S_IMODE(os.stat(p).st_mode); dmode=stat.S_IMODE(os.stat(os.path.dirname(p)).st_mode)
+sys.exit(0 if ok and mode==0o600 and dmode==0o700 else 1)" \
+        || { fail "agent-log hook wrote the wrong shape, kept a credential, or left the log readable by others"; _db=1; }
+    echo 'not json' | HOME="$_dbx" node "$REPO_DIR/hooks/craftkit-agent-log.js" \
+        || { fail "agent-log hook exits non-zero on bad input, which would surface as a failing hook on every tool call"; _db=1; }
+    printf '%s\n' '[1,2]' '{"sid":"s-1"}' >> "$_log"
+    HOME="$_dbx" python3 "$REPO_DIR/scripts/dashboard.py" < /dev/null | grep -q 'AGENT TREE' \
+        || { fail "dashboard without a terminal does not print one frame, or a malformed log line crashes it"; _db=1; }
+    _ev() { printf '%s' "{\"hook_event_name\":\"$1\",\"session_id\":\"s-2\",\"agent_id\":\"$2\",\"agent_type\":\"$3\"}" | HOME="$_dbx" node "$REPO_DIR/hooks/craftkit-agent-log.js"; }
+    _frame() { HOME="$_dbx" python3 "$REPO_DIR/scripts/dashboard.py" < /dev/null | sed 's/\x1b\[[0-9;]*m//g'; }
+    _bar() { printf '%s' '{"session_id":"s-2"}' | HOME="$_dbx" node "$REPO_DIR/hooks/craftkit-statusline.js"; }
+    _ev SubagentStart b1 explorer-box; _ev SubagentStart b2 worker-box
+    # A box title is "│ <type>"; the session log also names finished agents, which is intended.
+    _frame | grep -q '│ explorer-box' && _frame | grep -q '│ worker-box' && _frame | grep -q '2 subagent(s) running' \
+        || { fail "a started subagent does not appear on the dashboard"; _db=1; }
+    _bar | grep -q 'subagents \[2 running\]' || { fail "status line does not count the running subagents"; _db=1; }
+    _ev SubagentStop b1 explorer-box
+    _frame | grep -q '│ explorer-box' && { fail "a finished subagent is still shown on the dashboard"; _db=1; }
+    _frame | grep -q '│ worker-box' && _frame | grep -q '1 done' || { fail "finishing one subagent removed the others or lost the done count"; _db=1; }
+    _ev SessionEnd "" ""
+    _frame | grep -q 'no subagents running' && _bar | grep -q 'subagents \[0 running\]' \
+        || { fail "ending the session leaves subagents shown as running"; _db=1; }
+    _ev SubagentStart b3 late-box; _ev SubagentStop b3 late-box
+    printf '%s' '{"hook_event_name":"PostToolUse","session_id":"s-2","agent_id":"b3","agent_type":"late-box","tool_name":"Read"}' | HOME="$_dbx" node "$REPO_DIR/hooks/craftkit-agent-log.js"
+    _frame | grep -q '│ late-box' && { fail "a tool hook finishing after SubagentStop brought the agent back as running"; _db=1; }
+    _ev SubagentStop orphan1 ""
+    # b1 and late-box finished; the orphan stop must not make it 3.
+    _frame | grep -q '· 2 done' || { fail "a stop with no start (Claude Code's internal helpers) was counted as a finished subagent"; _db=1; }
+    _ev SubagentStart 'odd:id.x' odd-box; _ev SubagentStop 'odd:id.x' odd-box
+    _frame | grep -q '│ odd-box' && { fail "an agent id with punctuation is keyed differently by the logger and the dashboard, so it never leaves"; _db=1; }
+    _ev SubagentStart q1 quiet-box
+    python3 -c "import os,sys,time; t=time.time()-3600; os.utime(sys.argv[1],(t,t))" "$_dbx/.craftkit/agent-tree/events/s-2.agents/q1"
+    _frame | grep -q '│ quiet-box' && _frame | grep -q 'quiet' \
+        || { fail "a subagent idle for an hour (one long tool call) is not shown as quiet, or vanished"; _db=1; }
+    for _i in 1 2 3 4 5 6 7 8; do _ev SubagentStart "t$_i" "tall-$_i"; done
+    _tall="$(HOME="$_dbx" LINES=20 COLUMNS=100 python3 "$REPO_DIR/scripts/dashboard.py" < /dev/null)"
+    [[ "$(printf '%s\n' "$_tall" | wc -l | tr -d ' ')" -le 19 ]] && printf '%s' "$_tall" | grep -q 'AGENT TREE' \
+        || { fail "a frame taller than the window scrolls the header off the top"; _db=1; }
+    _ev SessionEnd "" ""
+    printf '%s' '{"hook_event_name":"PostToolUse","session_id":"m-1","cwd":"/Users/someone/secret-path/alpha-proj","tool_name":"Read"}' | HOME="$_dbx" node "$REPO_DIR/hooks/craftkit-agent-log.js"
+    python3 -c "import os,sys,time; t=time.time()+5; os.utime(sys.argv[1],(t,t))" "$_dbx/.craftkit/agent-tree/events/m-1.jsonl"
+    printf '%s' '{"hook_event_name":"SubagentStart","session_id":"m-2","cwd":"/w/beta-proj","agent_id":"m2a","agent_type":"beta-box"}' | HOME="$_dbx" node "$REPO_DIR/hooks/craftkit-agent-log.js" codex
+    python3 -c "import os,sys,time; t=time.time()+10; os.utime(sys.argv[1],(t,t))" "$_dbx/.craftkit/agent-tree/events/m-2.jsonl"
+    grep -q '"proj":"alpha-proj"' "$_dbx/.craftkit/agent-tree/events/m-1.jsonl" && ! grep -q 'secret-path' "$_dbx/.craftkit/agent-tree/events/m-1.jsonl" \
+        || { fail "the logger recorded more of the working directory than its folder name"; _db=1; }
+    _strip="$(_frame)"
+    printf '%s' "$_strip" | grep -q 'Claude alpha-proj' && printf '%s' "$_strip" | grep -q 'Codex  beta-proj' \
+        || { fail "the session strip does not list every active session with its tool and project"; _db=1; }
+    printf '%s' "$_strip" | head -1 | grep -q 'beta-proj.*following newest' \
+        || { fail "with no session chosen, the dashboard does not follow the most recently active one"; _db=1; }
+    _n="$(printf '%s\n' "$_strip" | grep 'alpha-proj' | grep -o ' [1-9] ' | head -1 | tr -d ' ')"
+    HOME="$_dbx" python3 "$REPO_DIR/scripts/dashboard.py" "$_n" < /dev/null | sed 's/\x1b\[[0-9;]*m//g' | head -1 | grep -q 'alpha-proj.*pinned' \
+        || { fail "dashboard.py <n> does not open pinned to session n"; _db=1; }
+    _cx() { printf '%s' "$1" | HOME="$_dbx" node "$REPO_DIR/hooks/craftkit-agent-log.js"; }
+    _cx '{"hook_event_name":"PostToolUse","session_id":"zz-end","cwd":"/w/gone-proj","tool_name":"Read"}'
+    _cx '{"hook_event_name":"SessionEnd","session_id":"zz-end","cwd":"/w/gone-proj"}'
+    _frame | grep -q 'gone-proj' && { fail "an ended session is still listed or followed"; _db=1; }
+    HOME="$_dbx" python3 "$REPO_DIR/scripts/dashboard.py" zz-e < /dev/null | sed 's/\x1b\[[0-9;]*m//g' | head -1 | grep -q 'gone-proj.*ended.*pinned' \
+        || { fail "a session pinned by id does not say it has ended"; _db=1; }
+    _cx '{"hook_event_name":"PostToolUse","session_id":"zz-end","cwd":"/w/gone-proj","tool_name":"Read"}'
+    [[ -e "$_dbx/.craftkit/agent-tree/events/zz-end.ended" ]] || { fail "a tool hook finishing right after SessionEnd reopened the ended session"; _db=1; }
+    python3 -c "import os,sys,time; t=time.time()-10; os.utime(sys.argv[1],(t,t))" "$_dbx/.craftkit/agent-tree/events/zz-end.ended"
+    _cx '{"hook_event_name":"PostToolUse","session_id":"zz-end","cwd":"/w/gone-proj","tool_name":"Read"}'
+    [[ -e "$_dbx/.craftkit/agent-tree/events/zz-end.ended" ]] && { fail "a resumed session stays marked ended"; _db=1; }
+    _order1="$(_frame | grep -o '[a-z-]*-proj' | tr '\n' ' ')"; _order2="$(_frame | grep -o '[a-z-]*-proj' | tr '\n' ' ')"
+    [[ "$_order1" == "$_order2" ]] || { fail "the session strip order changes between frames"; _db=1; }
+    HOME="$_dbx" python3 "$REPO_DIR/scripts/dashboard.py" --resolve 99 >/dev/null 2>&1 && { fail "--resolve accepts a number no session has, so ccdash would pin the wrong one"; _db=1; }
+    HOME="$_dbx" bash "$REPO_DIR/scripts/ccdash" abc < /dev/null >/dev/null 2>&1; [[ $? -eq 2 ]] || { fail "ccdash accepts an argument that is not a strip number"; _db=1; }
+    for _i in 1 2 3 4 5 6 7 8 9; do _cx "{\"hook_event_name\":\"SubagentStart\",\"session_id\":\"many-$_i\",\"cwd\":\"/w/m$_i\",\"agent_id\":\"k$_i\",\"agent_type\":\"kbox-$_i\"}"; done
+    HOME="$_dbx" LINES=24 COLUMNS=100 python3 "$REPO_DIR/scripts/dashboard.py" many-5 < /dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -q '│ kbox-5' \
+        || { fail "with many sessions on a small screen the strip pushes the subagent boxes off"; _db=1; }
+    _dbrun 0 >/dev/null; _back="$(_dbstate)"
+    [[ "$_back" == "$_off" ]] \
+        || { fail "turning the dashboard off left traces: $(diff <(printf '%s\n' "$_off") <(printf '%s\n' "$_back") | grep '^>' | tr '\n' ';')"; _db=1; }
+    python3 -c "import json,sys; p=sys.argv[1]; s=json.load(open(p)); s['statusLine']={'type':'command','command':'echo MINE-BADGE','padding':2}; json.dump(s,open(p,'w'))" "$_dbx/.claude/settings.json"
+    _dbrun 1 >/dev/null
+    _dbstate | grep -qx 'statusline ours' && grep -q 'MINE-BADGE' "$_dbx/.craftkit-state/statusline.json" \
+        || { fail "an opted-in sync did not wrap the user's own statusLine, or lost it"; _db=1; }
+    printf '%s' '{"session_id":"w-1","model":{"display_name":"M"}}' | HOME="$_dbx" node "$REPO_DIR/hooks/craftkit-statusline.js" | sed 's/\x1b\[[0-9;]*m//g' | grep -q '^MINE-BADGE M effort' \
+        || { fail "the wrapped status line does not show the user's own output first"; _db=1; }
+    _dbrun 0 >/dev/null
+    _dbstate | grep -qx 'statusline echo MINE-BADGE' && grep -q '"padding": 2' "$_dbx/.claude/settings.json" && [[ ! -e "$_dbx/.craftkit-state/statusline.json" ]] \
+        || { fail "turning the dashboard off did not restore the user's own statusLine exactly"; _db=1; }
+    _mode() { python3 -c 'import os,stat,sys; print(oct(stat.S_IMODE(os.stat(sys.argv[1]).st_mode))[2:])' "$1"; }
+    _sl() { python3 -c "import json,sys; p=sys.argv[1]; s=json.load(open(p)); s['statusLine']=json.loads(sys.argv[2]) if sys.argv[2] else None; s={k:v for k,v in s.items() if v is not None}; json.dump(s,open(p,'w'))" "$_dbx/.claude/settings.json" "$1"; }
+    _sl '{"type":"command","command":"echo MINE-BADGE"}'; _dbrun 1 >/dev/null
+    [[ "$(_mode "$_dbx/.craftkit-state/statusline.json")" == 600 ]] || { fail "the saved status line is readable by other users"; _db=1; }
+    python3 -c "import json,sys; p=sys.argv[1]; s=json.load(open(p)); s['statusLine']['padding']=4; json.dump(s,open(p,'w'))" "$_dbx/.claude/settings.json"
+    _dbrun 0 >/dev/null
+    grep -q '"padding": 4' "$_dbx/.claude/settings.json" && _dbstate | grep -qx 'statusline echo MINE-BADGE' && ! grep -q refreshInterval "$_dbx/.claude/settings.json" \
+        || { fail "restoring the user's status line lost an edit they made while it was wrapped, or kept our refreshInterval"; _db=1; }
+    _dbrun 1 >/dev/null; _sl ''; _dbrun 1 >/dev/null
+    printf '%s' '{"session_id":"w-2"}' | HOME="$_dbx" node "$REPO_DIR/hooks/craftkit-statusline.js" | grep -q MINE-BADGE && { fail "a status line the user removed came back from a stale save file"; _db=1; }
+    _dbrun 0 >/dev/null; [[ -e "$_dbx/.craftkit-state/statusline.json" ]] && { fail "turning off left a stale status line save file"; _db=1; }
+    _sl '{"type":"command","command":"sleep 30; echo SLOW"}'; _dbrun 1 >/dev/null
+    _t0=$(date +%s); printf '%s' '{"session_id":"w-3"}' | HOME="$_dbx" node "$REPO_DIR/hooks/craftkit-statusline.js" | grep -q 'subagents' || { fail "a hanging status line of the user's blanked ours"; _db=1; }
+    [[ $(( $(date +%s) - _t0 )) -le 5 ]] || { fail "a hanging status line of the user's stalled ours past its timeout"; _db=1; }
+    _dbrun 0 >/dev/null; _sl '{"type":"command","command":"sh -c true; node '"$_dbx"'/.claude/hooks/craftkit-statusline.js"}'; _dbrun 1 >/dev/null
+    [[ -e "$_dbx/.craftkit-state/statusline.json" ]] && { fail "a status line that already calls the dashboard line was wrapped, so it would run itself"; _db=1; }
+    _sl ''; _dbrun 0 >/dev/null
+    _dbrun 1 >/dev/null; echo '{"hooks":{"PostToolUse":{"odd":1}}}' > "$_dbx/.codex/hooks.json"; _dbrun 0 >/dev/null
+    [[ -f "$_dbx/.codex/hooks/craftkit-agent-log.js" ]] || { fail "turning off deleted the Codex hook script although hooks.json could not be updated to unregister it"; _db=1; }
+    echo '{}' > "$_dbx/.codex/hooks.json"; _dbrun 0 >/dev/null
+    echo '{"hooks":{"PostToolUse":{"not":"a list"}}}' > "$_dbx/.codex/hooks.json"
+    _dbrun 1 >/dev/null || { fail "an unexpected hooks.json shape aborts the sync"; _db=1; }
+    grep -q '"not": *"a list"' "$_dbx/.codex/hooks.json" || { fail "a sync rewrote a hooks.json shape it does not recognise"; _db=1; }
+    _dbrun 0 >/dev/null
+    mv "$_dbx/.claude/settings.json" "$_dbx/real-settings.json"; ln -s "$_dbx/real-settings.json" "$_dbx/.claude/settings.json"; chmod 600 "$_dbx/real-settings.json"
+    python3 -c "import json,sys; p=sys.argv[1]; s=json.load(open(p)); s.pop('statusLine',None); json.dump(s,open(p,'w'))" "$_dbx/real-settings.json"
+    _dbrun 1 >/dev/null
+    [[ -L "$_dbx/.claude/settings.json" && "$(python3 -c 'import os,stat,sys; print(oct(stat.S_IMODE(os.stat(sys.argv[1]).st_mode))[2:])' "$_dbx/real-settings.json")" == 600 ]] \
+        && grep -q craftkit-statusline "$_dbx/real-settings.json" \
+        || { fail "writing settings.json replaced a symlink with a file or widened a 0600 mode"; _db=1; }
+    _dbrun 0 >/dev/null
+    echo 'not json' > "$_dbx/.codex/hooks.json"
+    _dbrun 0 >/dev/null || { fail "a malformed ~/.codex/hooks.json aborts a sync with the dashboard off"; _db=1; }
+    [[ "$(cat "$_dbx/.codex/hooks.json")" == "not json" ]] || { fail "a sync rewrote a malformed hooks.json it could not parse"; _db=1; }
+    mkdir -p "$_dbx/.craftkit/agent-tree/events"
+    HOME="$_dbx" bash -c "ADAPTERS=(claude codex); $(sed -n '/^prune_orphan_staging()/,/^}/p' "$REPO_DIR/sync.sh"); prune_orphan_staging" >/dev/null
+    [[ -d "$_dbx/.craftkit/agent-tree" ]] || { fail "the orphan staging-dir prune deletes the dashboard logs on every sync"; _db=1; }
+    sed -n '/^craftkit_dashboard_resolve()/,/^}/p' "$REPO_DIR/sync.sh" > "$_dbx/resolve.sh"
+    # "-" is an unset variable: the persisted choice from the case before it must survive.
+    for _case in "1 1" "on 1" "TRUE 1" "- 1" "0 0" "off 0" "bogus 0" "- 0"; do
+        set -- $_case
+        [[ "$1" == "-" ]] && set -- "" "$2"
+        _got="$(STATE_DIR="$_dbx/r" bash -c "mkdir -p \$STATE_DIR; . '$_dbx/resolve.sh'; CRAFTKIT_DASHBOARD='$1' craftkit_dashboard_resolve 2>/dev/null; echo \$CRAFTKIT_DASHBOARD_ON")"
+        [[ "$_got" == "$2" ]] || { fail "CRAFTKIT_DASHBOARD='$1' resolved to $_got, expected $2"; _db=1; }
+    done
+    rm -rf "$_dbx"
+fi
+[[ $_db -eq 0 ]] && pass
 
 echo
 if [[ $FAILURES -eq 0 ]]; then

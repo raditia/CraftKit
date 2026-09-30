@@ -90,6 +90,84 @@ finalize_codex() {
         _remove_codex_section
     fi
     install_codex_craftkit_hooks
+    install_codex_dashboard_hook
+}
+
+# flag: CRAFTKIT_DASHBOARD (resolved in sync.sh). off: the agent-log hook is absent, and a sync removes one an earlier opted-in sync registered. remove: if the dashboard ever becomes default-on.
+install_codex_dashboard_hook() {
+    local on="${CRAFTKIT_DASHBOARD_ON:-0}" dest="$CODEX_HOOKS_DIR/craftkit-agent-log.js"
+    if [[ "$on" == 1 ]]; then
+        mkdir -p "$CODEX_HOOKS_DIR"
+        if ! diff -q "$REPO_DIR/hooks/craftkit-agent-log.js" "$dest" &>/dev/null; then
+            cp "$REPO_DIR/hooks/craftkit-agent-log.js" "$dest"
+            echo "    + hook: craftkit-agent-log"
+        fi
+    fi
+    # Unregistered before the script is deleted, so a failure here never leaves Codex
+    # calling a hook whose file is gone.
+    if [[ -f "$CODEX_HOOKS_CONFIG" || "$on" == 1 ]]; then
+        python3 - "$CODEX_HOOKS_CONFIG" "$on" "$(_resolve_node_bin)" "$dest" <<'PYEOF' || return 0
+import json, os, stat, sys
+config, on, node, script = sys.argv[1], sys.argv[2] == '1', sys.argv[3], sys.argv[4]
+EVENTS = ('SubagentStart', 'SubagentStop', 'PostToolUse', 'SessionEnd')
+try:
+    with open(config) as f:
+        data = json.load(f)
+    assert isinstance(data, dict) and isinstance(data.get('hooks', {}), dict)
+    for event in EVENTS:
+        groups = data.get('hooks', {}).get(event, [])
+        assert isinstance(groups, list) and all(isinstance(g, dict) and isinstance(g.get('hooks', []), list) for g in groups)
+except FileNotFoundError:
+    data = {}
+except (ValueError, AssertionError):
+    print('    ! ~/.codex/hooks.json has a shape this sync does not recognise, agent-log hook left as is')
+    sys.exit(3)  # non-zero, so the caller keeps the script a registration may still point at
+command = json.dumps(node) + ' ' + json.dumps(script) + ' codex'
+ours = lambda h: isinstance(h, dict) and 'craftkit-agent-log.js' in str(h.get('command', ''))
+before = json.dumps(data, sort_keys=True)
+had_hooks = 'hooks' in data
+hooks = data.setdefault('hooks', {})
+for event in EVENTS:
+    current = hooks.get(event, [])
+    if on and any(isinstance(h, dict) and h.get('command') == command for g in current for h in g.get('hooks', [])):
+        continue
+    groups = []
+    for g in current:
+        kept = [h for h in g.get('hooks', []) if not ours(h)]
+        if kept or not g.get('hooks'):
+            groups.append(dict(g, hooks=kept) if 'hooks' in g else g)
+    if on:
+        groups.append({'hooks': [{'type': 'command', 'command': command, 'timeout': 5}]})
+    if groups:
+        hooks[event] = groups
+    else:
+        hooks.pop(event, None)
+if not hooks and not had_hooks:
+    data.pop('hooks')
+if json.dumps(data, sort_keys=True) != before:
+    # Through the symlink and with the file's own mode, so a dotfiles link or a 0600 file survives.
+    real = os.path.realpath(config)
+    mode = stat.S_IMODE(os.stat(real).st_mode) if os.path.exists(real) else 0o600
+    tmp = real + '.tmp'
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+    try:
+        os.fchmod(fd, mode)
+        with os.fdopen(fd, 'w') as f:
+            json.dump(data, f, indent=2)
+            f.write('\n')
+        os.replace(tmp, real)
+    except BaseException:
+        if os.path.exists(tmp): os.remove(tmp)
+        raise
+    print('    + Codex agent-log hook registered; review and trust it with /hooks' if on
+          else '    - Codex agent-log hook unregistered')
+PYEOF
+    fi
+    if [[ "$on" != 1 && -f "$dest" ]]; then
+        rm -f "$dest"
+        echo "    - hook: craftkit-agent-log"
+    fi
+    return 0
 }
 
 # Codex requires review and trust of each changed hook definition in /hooks. Keep the

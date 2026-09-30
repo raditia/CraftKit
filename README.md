@@ -1,4 +1,4 @@
-# craftkit `v1.51.0`
+# craftkit `v1.52.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -12,6 +12,7 @@ One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**,
 - [Using the workflows](#using-the-workflows)
   - [Just say what you want](#just-say-what-you-want)
   - [Enforcement gates](#enforcement-gates-hooks-that-refuse) · the hooks that stop an unrouted edit
+  - [Agent dashboard](#agent-dashboard-opt-in) · live view of running agents, opt-in
   - [Dynamic workflows](#dynamic-workflows-default) · `/parallel-review`, `/parallel-ship`, `/parallel-build`
   - [How the classifier picks agents](#how-the-classifier-picks-agents)
   - [Sequential fallback](#sequential-fallback) · `/review`, `/ship`, `/build`
@@ -421,6 +422,36 @@ How the gates behave:
 | `CRAFTKIT_ALLOW_DOWNGRADE=1` | The sync downgrade guard |
 
 Removing a Claude hook from `_CRAFTKIT_HOOKS` uninstalls it on the next sync. The reasoning behind each behavior above, with the measurements: [design notes](docs/design-notes.md#enforcement-gates).
+
+### Agent dashboard (opt-in)
+
+A live terminal view of what your agents are doing: the main session (model, effort, context, cost), a box for each running subagent that appears when it starts and disappears when it finishes (elapsed time, tool calls, current action), and a session log. It covers Claude Code and Codex sessions, several at once: a strip at the top lists every session active in the last 30 minutes and not ended (tool, project folder name, a short session id so two sessions in one project differ, running subagents, last event), numbered in the order they started. `←`/`→` or `1`-`9` switch and pin the view, `a` goes back to following the newest, and `ccdash <n>` opens a window pinned to session `n`: the number is turned into that session's id before the window opens, so it keeps watching that session when the strip renumbers. Inside tmux a pinned view opens as a side-by-side pane; on macOS each is its own window. A session with no tool call yet, or none in 30 minutes, is not listed.
+
+```bash
+CRAFTKIT_DASHBOARD=1 bash sync.sh   # turn on; the choice persists across later syncs
+ccdash                              # open it, following the newest session; esc or q closes it
+ccdash 2                            # open pinned to session 2 (one window per session: ccdash 1, ccdash 2, ...)
+CRAFTKIT_DASHBOARD=0 bash sync.sh   # turn off; removes everything it installed
+```
+
+Installed with npm, set the same variable on the install; later upgrades keep the choice:
+
+```bash
+CRAFTKIT_DASHBOARD=1 npm install -g @raditia/craftkit   # turn on
+CRAFTKIT_DASHBOARD=0 npm install -g @raditia/craftkit   # turn off
+```
+
+Then start a new Claude session so the hooks load, and in Codex run `/hooks` once to trust the new one.
+
+It is off by default because the logger writes the first 60 characters of every tool call's file path or command to `~/.craftkit/agent-tree/events/`. Those files are private to you (`0600`), common credential shapes (auth headers, `--password x`, `token=`, `*_SECRET_*=`, `-u user:pass`, `https://user:pw@`, `sk-`/`ghp_`/`xoxb-`/`AKIA` tokens) are masked before writing (shape-based, so it narrows exposure rather than guaranteeing none), the logger deletes files older than 7 days, and turning the dashboard off deletes the directory. Off installs nothing. `CRAFTKIT_DASHBOARD` also takes `on`/`off`, `true`/`false`, `yes`/`no`; anything else is warned about and ignored.
+
+| Piece | Where | What it does |
+|-------|-------|--------------|
+| [`craftkit-agent-log.js`](hooks/craftkit-agent-log.js) | Claude and Codex, on `SubagentStart`, `SubagentStop`, `PostToolUse`, `SessionEnd` | Appends one line per event to the session's log and keeps a file per running subagent, deleted when it stops and cleared when the session ends. Fails open. Codex needs a one-time `/hooks` trust |
+| [`craftkit-statusline.js`](hooks/craftkit-statusline.js) | Claude `statusLine` | Shows model, effort, context, cost and running subagents, and saves them for the dashboard. If you already have a status line it is kept: saved to `~/.craftkit-state/statusline.json`, run first with the same input, and this is appended after it. Turning the dashboard off puts yours back exactly |
+| [`scripts/dashboard.py`](scripts/dashboard.py), [`scripts/ccdash`](scripts/ccdash) | `~/.craftkit/bin`, linked into `~/.local/bin` when that exists | The viewer and its launcher. `ccdash` opens a tmux popup inside tmux (a side pane before tmux 3.2), a separate iTerm or Terminal window when run from a chat (`! ccdash`, macOS), or full screen in a plain terminal. Without a terminal it prints one snapshot |
+
+Cost, measured on a 20,000-event log: the logger and status line each finish in under 0.1s, but they are a `node` start per tool call and per status refresh (5s) while the dashboard is on. The open dashboard idles near 0% CPU and ~20 MB, because it keeps one state per session and reads only the lines added since its last frame. A subagent quiet for 30 minutes (one long build or test run looks the same) is labelled `quiet` rather than dropped. One killed before its `SubagentStop` fires is cleared when its session ends, or hidden after a day if the session was killed too. Turning the dashboard off while a session is open makes that session report a missing hook on each tool call until it restarts.
 
 ---
 

@@ -7,6 +7,65 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.52.0 — 2026-09-30
+
+### Opt-in agent dashboard for Claude Code and Codex
+
+A live terminal view of running agents: the main session, a box per running subagent that
+appears when it starts and disappears when it finishes (elapsed time, tool calls, current
+action), and a session log. Nothing showed which
+subagents were running or what each was doing without attaching to them one by one.
+
+- `CRAFTKIT_DASHBOARD=1 bash sync.sh` turns it on; the choice persists in
+  `~/.craftkit-state/dashboard`, because the post-merge hook syncs without the caller's
+  environment. `CRAFTKIT_DASHBOARD=0` turns it off, and that sync removes every piece.
+  Off by default: the logger writes each tool call's file path or command to disk, so the
+  log is `0600` in a `0700` directory, common credential shapes are masked before writing,
+  files older than 7 days are pruned by the logger itself, and off deletes the directory.
+  Values other than 1/0 and on/off words warn and leave the setting alone.
+- `hooks/craftkit-agent-log.js` logs `SubagentStart`, `SubagentStop`, `PostToolUse` and `SessionEnd` on
+  Claude (through `_CRAFTKIT_DASHBOARD_HOOKS`, so the existing prune pass removes it when
+  off) and on Codex (its own registration, leaving other hooks alone).
+- `hooks/craftkit-statusline.js` becomes the Claude `statusLine`. An existing one is saved to
+  `~/.craftkit-state/statusline.json` and wrapped: it runs first on the same stdin (2s cap,
+  failures ignored) and the dashboard fields are appended, so the numbers reach the dashboard
+  for the many users who already have a status line. Off restores it exactly, other keys
+  (padding, refreshInterval) included.
+- `scripts/dashboard.py` and `scripts/ccdash` install to `~/.craftkit/bin` (linked into
+  `~/.local/bin`). The dashboard keeps one state per session and reads only appended bytes,
+  redraws in place without wrapping, closes on Esc, restores the terminal on SIGTERM or
+  SIGHUP, and prints one frame when it has no terminal, which is what stops `! ccdash` from
+  stacking a new frame every second, so no instance can run unseen and `ccdash` needs no
+  stop command. It opens iTerm when that is the terminal, and a tmux side pane before 3.2.
+- Running subagents are tracked as one file each under `<session>.agents/`: created only by
+  `SubagentStart` (Claude Code's internal helpers fire a bare `SubagentStop`, and a tool hook
+  can finish after the stop hook), deleted on stop, cleared on `SessionEnd`. A box idle for
+  30 minutes is labelled quiet rather than dropped, since one long tool call looks the same;
+  one whose stop and session end both never fired is hidden after a day. The status line
+  counts those files instead of re-reading the whole log.
+- Several sessions at once: a numbered strip lists every Claude and Codex session active in
+  the last 30 minutes and not ended, in start order, with a short session id. Arrows or 1-9
+  pin one by session id, `a` follows the newest (holding the current one until it has been
+  quiet 5s, so two busy sessions do not flip the view), and `ccdash <n>` resolves n to a
+  session id before opening its window, so a renumbered strip cannot retarget it. `SessionEnd`
+  leaves an `.ended` marker the strip reads without opening the log; any later event clears
+  it. The strip takes at most a quarter of the screen. The logger records the project folder
+  name only, never the path. Sessions not viewed cost a first-line read and a listing.
+- The orphan staging-dir prune in `sync.sh` now skips `~/.craftkit/agent-tree`; it had been
+  deleting the dashboard's logs on every sync while the dashboard was on.
+- Frames are fitted to the window height, dropping the oldest log lines first, because a
+  frame taller than the window scrolled the header off the top on every redraw.
+- Config writes go through symlinks and keep the file's mode, so a dotfiles link or a 0600
+  `settings.json` survives; Codex `hooks.json` shapes the sync does not recognise are left
+  untouched.
+- A malformed `settings.json` or `hooks.json` is left alone with a warning instead of
+  aborting the sync, both are written atomically, and Codex removal filters inside a hook
+  group so a user's hook sharing it survives.
+- `check.sh` check 40 runs the real adapter functions in a throwaway HOME through off, on,
+  on again (no writes, no `+`/`-` lines) and off (no trace, logs included), plus a user's
+  own `statusLine`, a malformed `hooks.json`, credential masking, file modes, malformed log
+  lines, and every `CRAFTKIT_DASHBOARD` value. Check 24 now reads the dashboard hook table.
+
 ## v1.51.0 — 2026-09-30
 
 ### Codex loads CraftKit rules and checks verification at Stop
