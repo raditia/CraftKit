@@ -427,6 +427,44 @@ Removing a Claude hook from `_CRAFTKIT_HOOKS` uninstalls it on the next sync. Th
 
 A live terminal view of what your agents are doing: the main session (model, effort, context, cost), a box for each running subagent that appears when it starts and disappears when it finishes (model, tokens used, elapsed time, tool calls, current action), a total of the tokens all its subagents used, and a session log. Model and tokens come from Claude Code's own subagent transcripts; Codex boxes show the model its events carry, and no tokens, because its transcript format is not a stable interface. It covers Claude Code and Codex sessions, several at once: a strip at the top lists every session active in the last 30 minutes and not ended (tool, project folder name, a short session id so two sessions in one project differ, running subagents, last event), numbered in the order they started. `←`/`→` or `1`-`9` switch and pin the view, `a` goes back to following the newest, and `ccdash <n>` opens a window pinned to session `n`: the number is turned into that session's id before the window opens, so it keeps watching that session when the strip renumbers. Inside tmux a pinned view opens as a side-by-side pane; on macOS each is its own window. A session with no tool call yet, or none in 30 minutes, is not listed.
 
+Example, from sample data (two sessions, the second pinned, three subagents running and one finished):
+
+```text
+CLAUDE CODE AGENT TREE  ·  agentic-skills  ·  a91c4f  ·  live  ·  pinned
+   1 ○ Codex  booking-web            b7e210  idle       live
+▸  2 ● Claude agentic-skills         a91c4f  3 running  live
+  ←/→ or 1-9 switch · a follow newest
+
+╭──────────────────────────────────────────────────────────╮
+│ Opus 5.5 · main session                                  │
+│ effort high   ctx ███░░░░░░░ 38%   $2.41                 │
+│ last: Read scripts/dashboard.py                          │
+╰──────────────────────────────────────────────────────────╯
+      │
+      ├─ 3 subagent(s) running · 1 done · subagents used 169.1k tokens
+╭────────────────────────────╮  ╭────────────────────────────╮  ╭────────────────────────────╮
+│ code-quality               │  │ adversarial                │  │ ponytail-review            │
+│ ◐ running  2m14s           │  │ ◐ running  1m58s           │  │ ◐ running  1m31s           │
+│ sonnet-5-5                 │  │ opus-5-5                   │  │ sonnet-5-5                 │
+│ 41.8k tok · 1.6k out       │  │ 98.7k tok · 2.4k out       │  │ 19.1k tok · 700 out        │
+│ 1 tool call(s)             │  │ 1 tool call(s)             │  │ 1 tool call(s)             │
+│ Read sync.sh               │  │ Read ccdash                │  │ Grep agent_usage           │
+╰────────────────────────────╯  ╰────────────────────────────╯  ╰────────────────────────────╯
+
+── session log ───────────────────────────────────────────────────────────────────────────
+22:40:02  main            Read scripts/dashboard.py
+22:40:09  code-quality    started
+22:40:14  code-quality    Read sync.sh
+22:40:21  ponytail-revi…  started
+22:40:30  ponytail-revi…  Grep agent_usage
+22:40:36  adversarial     started
+22:40:44  adversarial     Read ccdash
+22:41:03  bulk-read       started
+22:41:40  bulk-read       finished
+
+9 events  ·  esc / q to close
+```
+
 ```bash
 CRAFTKIT_DASHBOARD=1 bash sync.sh   # turn on; the choice persists across later syncs
 ccdash                              # open it, following the newest session; esc or q closes it
