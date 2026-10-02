@@ -7,6 +7,25 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.53.0 — 2026-10-02
+
+### Update notice on session start
+
+npm never tells an installed package's users that a new version exists, and craftkit has
+no CLI they run, so a release reached only the people who went looking for it.
+
+- `hooks/craftkit-update-check.js` runs on Claude Code `SessionStart`. It reads the
+  installed version from `~/.craftkit-state/version` (written by every sync), asks the npm
+  registry for the latest at most once a day, and shows a one-line notice with the update
+  command when the registry is newer. The answer is cached in
+  `~/.craftkit-state/update-check`; a failed fetch is cached too, so an offline machine
+  pays the 1.5s timeout once a day rather than every session.
+- Any failure stays silent. `CRAFTKIT_UPDATE_CHECK=off` turns it off.
+- `check.sh` check 24a runs the hook against a seeded cache: a notice for a newer
+  version, none for an equal or older one, none when switched off.
+- Only reaches installs from this version on: anyone on v1.52.0 or older needs one manual
+  update before they see notices.
+
 ## v1.52.0 — 2026-09-30
 
 ### Opt-in agent dashboard for Claude Code and Codex

@@ -1,4 +1,4 @@
-# craftkit `v1.52.0`
+# craftkit `v1.53.0`
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
@@ -389,7 +389,7 @@ Nearest ancestor wins, so `"write tests for this"` in an Android repo resolves t
 
 ### Enforcement gates: hooks that refuse
 
-Routing context is only text: an agent can read it, announce the right skill, and hand-roll the work anyway. These hooks close that gap. The four gates can stop a call; the other two only inject context.
+Routing context is only text: an agent can read it, announce the right skill, and hand-roll the work anyway. These hooks close that gap. The four gates can stop a call; the other four only inject context, rewrite a command, or notify.
 
 Codex installs [`craftkit-codex.js`](hooks/craftkit-codex.js) into `~/.codex/hooks/` and registers `SessionStart`, `UserPromptSubmit`, `PostToolUse` on Bash, and `Stop` in `~/.codex/hooks.json`. It loads applicable rule bodies and injects the installed body for an explicit `$skill` or leading `/command` request. It also prompts intent-based skill routing and blocks an edited turn that skipped the project verification command. Codex requires a one-time **`/hooks` review and trust** of the new definitions before they run. Native skill activation is not exposed as a stable hook event, so the gateway cannot prove that a skill body was followed; verification is the enforced part. `CRAFTKIT_GATE=off` disables it.
 
@@ -401,6 +401,7 @@ Codex installs [`craftkit-codex.js`](hooks/craftkit-codex.js) into `~/.codex/hoo
 | [`gate-announce-honored.js`](hooks/gate-announce-honored.js) | `Stop` | Blocks a reply that says `Running /<skill>` with no `Skill` call, or carries no routing declaration at all |
 | [`gate-read-size.js`](hooks/gate-read-size.js) | `PreToolUse` on `Read` | Refuses a whole-file read over 800 lines and points to the `bulk-read` agent or an `offset`/`limit` read. Denies rather than asks |
 | [`craftkit-platform-rules.js`](hooks/craftkit-platform-rules.js) | `SessionStart` | Loads `platform:`-scoped rules only where the cwd matches, so EVPMR laws stay out of Kotlin and Swift sessions |
+| [`craftkit-update-check.js`](hooks/craftkit-update-check.js) | `SessionStart` | Tells you when a newer craftkit is on npm. Asks the registry at most once a day (1.5s timeout, cached in `~/.craftkit-state/update-check`) and stays silent on any failure |
 | [`craftkit-read-cap.js`](hooks/craftkit-read-cap.js) | `PreToolUse` on `Bash` | Rewrites a bare `cat F` / `rtk read F` over 800 lines to `rtk read -m 800`. Leaves piped commands alone |
 
 Shared helpers (not registered as hooks): [`craftkit-transcript.js`](hooks/craftkit-transcript.js) finds the current turn for every gate, [`craftkit-platform.js`](hooks/craftkit-platform.js) detects the platform, [`craftkit-filesize.js`](hooks/craftkit-filesize.js) holds the 800-line threshold, and [`craftkit-drift.js`](hooks/craftkit-drift.js) answers "has this changed since baseline" as clean, drifted, or cannot-verify.
@@ -420,6 +421,7 @@ How the gates behave:
 | `CRAFTKIT_READ_GATE=off` | `gate-read-size.js` |
 | `CRAFTKIT_READ_CAP=off` | `craftkit-read-cap.js` |
 | `CRAFTKIT_ALLOW_DOWNGRADE=1` | The sync downgrade guard |
+| `CRAFTKIT_UPDATE_CHECK=off` | `craftkit-update-check.js` |
 
 Removing a Claude hook from `_CRAFTKIT_HOOKS` uninstalls it on the next sync. The reasoning behind each behavior above, with the measurements: [design notes](docs/design-notes.md#enforcement-gates).
 

@@ -1099,6 +1099,22 @@ for _b in $_table; do
 done
 [[ $_ht -eq 0 ]] && pass
 
+# 24a. The update check names a newer release and stays quiet otherwise. Behavioral,
+#      against a seeded fresh cache so it never touches the network: a notice that
+#      fired on an equal version would train every user to ignore it.
+# ---------------------------------------------------------------------------
+check "update check notifies only on a newer release"
+_uc=0
+_uh="$(mktemp -d)"; mkdir -p "$_uh/.craftkit-state"
+echo "1.9.0" > "$_uh/.craftkit-state/version"
+_ucrun() { printf '{"checked":%s,"latest":"%s"}' "$(($(date +%s) * 1000))" "$1" > "$_uh/.craftkit-state/update-check"; echo '{}' | HOME="$_uh" node "$REPO_DIR/hooks/craftkit-update-check.js"; }
+_ucrun "1.10.0" | grep -q 'v1.10.0 is available' || { fail "no notice for 1.10.0 over installed 1.9.0"; _uc=1; }
+[[ "$(_ucrun "1.9.0")" == "{}" ]] || { fail "notice fired for an equal version"; _uc=1; }
+[[ "$(_ucrun "1.8.9")" == "{}" ]] || { fail "notice fired for an older version"; _uc=1; }
+[[ "$(CRAFTKIT_UPDATE_CHECK=off _ucrun "1.10.0")" == "{}" ]] || { fail "CRAFTKIT_UPDATE_CHECK=off did not silence it"; _uc=1; }
+rm -rf "$_uh"
+[[ $_uc -eq 0 ]] && pass
+
 # 24b. Codex hooks load full applicable rules and block a turn that edits without
 # verification. Its native transcript is not a stable API, so exercise lifecycle payloads
 # directly, including a dirty file that predates the turn and an automatic continuation.
