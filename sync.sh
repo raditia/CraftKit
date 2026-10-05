@@ -596,19 +596,19 @@ for adapter in "${ADAPTERS[@]}"; do
     fi
 done
 
-# cross-review.sh is run by a synced command, and an installed command cannot know where
-# this repo lives, so the script gets a fixed path every tool can reach.
+# cross-review.sh and context-source.* are run by synced commands and skills, and an installed
+# file cannot know where this repo lives, so the scripts get a fixed path every tool can reach.
 # The dashboard viewer and its launcher ride along only while the dashboard is opted into.
 sync_bin() {
-    local bin="$HOME/.craftkit/bin" link="$HOME/.local/bin/ccdash" name changed=0 names="cross-review.sh"
+    local bin="$HOME/.craftkit/bin" link="$HOME/.local/bin/ccdash" name changed=0 names="cross-review.sh context-source.sh context-source.js"
     echo ""
     echo "[bin]"
     mkdir -p "$bin"
     [[ "$CRAFTKIT_DASHBOARD_ON" == 1 ]] && names="$names dashboard.py ccdash"
     for name in $names; do
         cmp -s "$REPO_DIR/scripts/$name" "$bin/$name" && continue
-        cp "$REPO_DIR/scripts/$name" "$bin/$name" || return 1
-        chmod +x "$bin/$name" || return 1
+        cp "$REPO_DIR/scripts/$name" "$bin/.$name.tmp" && chmod +x "$bin/.$name.tmp" \
+            && mv -f "$bin/.$name.tmp" "$bin/$name" || return 1
         echo "    + $name"
         changed=1
     done

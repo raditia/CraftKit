@@ -1,4 +1,4 @@
-# craftkit `v1.54.0`
+# craftkit `v1.55.0`
 
 [![npm](https://img.shields.io/npm/v/@raditia/craftkit)](https://www.npmjs.com/package/@raditia/craftkit)
 [![Content integrity](https://github.com/raditia/CraftKit/actions/workflows/check.yml/badge.svg)](https://github.com/raditia/CraftKit/actions/workflows/check.yml)
@@ -346,6 +346,7 @@ Natural language routes to the right command automatically. No slash commands re
 "poke holes in my plan" →  /grill     (also: "grill this", "stress-test my design")
 "research X for me"     →  /research  (background agent, primary sources)
 "hand this session off" →  /handoff   (also: "summarize for the next agent")
+"connect our docs repo"  →  /context-source  (also: "which docs repos are connected", "disconnect the old docs repo")
 ```
 
 Platform is not inferred. On every prompt `hooks/craftkit-routing.js` resolves it from `cwd` and injects the answer:
@@ -1285,6 +1286,7 @@ The `*-review`, `*-a11y` and `*-performance` skills are also the live source for
 | [`think`](skills/think/SKILL.md) | Systems/strategy reasoning router: cynefin, systems, feedback loops, constraints, leverage, second-order. Architecture + complex-system decisions | Architecture call with non-obvious tradeoffs, so escalate analysis to opus |
 | [`research`](skills/research/SKILL.md) | Background agent researches a question against primary sources only, writes a cited note into the repo | n/a |
 | [`handoff`](skills/handoff/SKILL.md) | Compact the session into a handoff doc for a fresh agent: state, decisions, next steps, suggested skills | n/a |
+| [`context-source`](skills/context-source/SKILL.md) | Connect, replace, disconnect or list the team docs repos on GitHub that `/interview`, `/spec` and `/plan` check asks against, with cited conflicts. Cache under `~/.craftkit`, never in the project (ADR-0003) | n/a |
 | [`eval`](skills/eval/SKILL.md) | Score a finished run into a weighted correctness %: spawns `eval-judge`, appends `docs/evals/ledger.md`, derives the success rate | Score gates a merge or release, so escalate the judge; irreversible gate, so run a fusion panel of two judges |
 | [`ponytail-review`](skills/ponytail-review/SKILL.md) | Over-engineering audit on a diff or file: what to delete/shrink | Correctness or security concerns → use `code-quality` |
 | [`ponytail-audit`](skills/ponytail-audit/SKILL.md) | Whole-repo bloat scan: ranked list of removals | n/a |
@@ -1453,7 +1455,7 @@ flowchart LR
 | L4 Errors | On demand | Failing tests, lint, TypeScript errors | n/a, always live |
 | L5 History | Session | Conversation context | n/a |
 
-Every skill that reads intent uses one resolver, `partials/planning-resolve.md` ([why](docs/design-notes.md#intent-resolution)). Test cases have one reader contract, `partials/test-cases-resolve.md` (approved rows only, never derived from the diff), and Figma/Lark sources one checker, `partials/external-sources.md` (markers, not content; `cannot-verify` when no MCP is reachable). Failing tests heal by one contract, `partials/test-heal.md`, injected into `/fe-test`, `/android-test` and `/ios-test`: each failure is classified before any edit, and an assertion changes only when an approved test case or Spec line states the new value.
+Every skill that reads intent uses one resolver, `partials/planning-resolve.md` ([why](docs/design-notes.md#intent-resolution)). Test cases have one reader contract, `partials/test-cases-resolve.md` (approved rows only, never derived from the diff), and Figma/Lark sources one checker, `partials/external-sources.md` (markers, not content; `cannot-verify` when no MCP is reachable). Connected team docs repos have one consult step, `partials/context-source.md`, injected into `/interview`, `/spec`, `/plan` and `/define`: refresh once, search under a shared read budget, cite `<source>@<sha>:<path>:<line>`, pause on any conflict, and say `context source not consulted` rather than stay silent when the helper cannot run. Failing tests heal by one contract, `partials/test-heal.md`, injected into `/fe-test`, `/android-test` and `/ios-test`: each failure is classified before any edit, and an assertion changes only when an approved test case or Spec line states the new value.
 
 ---
 
