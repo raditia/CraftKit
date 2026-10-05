@@ -1,0 +1,114 @@
+name: Sync end to end
+
+# check.sh deliberately never runs a full sync: four adapters into a fixture HOME take over
+# a minute, and the gate has to stay fast enough that people run it locally. So the other
+# half of CLAUDE.md's verification (sync prints "Sync complete.", a second run reports no
+# work) only ever ran on the author's machine. This runs it, plus the two paths a local
+# sync never exercises: installing from the npm tarball, and uninstalling a deleted file.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    # Explicit so GitHub adds -o pipefail: every sync below is piped through tee.
+    shell: bash
+
+jobs:
+  sync:
+    # Same two legs as check.yml, for the same reason: the adapters are where bash 3.2
+    # and BSD-vs-GNU differences actually execute, and check.sh only sources fragments.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            bash_bin: /bin/bash
+          - os: ubuntu-latest
+            bash_bin: bash
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      BASH_BIN: ${{ matrix.bash_bin }}
+      LC_ALL: C
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # Every sync writes here and nowhere else, so the runner's real HOME (npm cache,
+      # git config) stays untouched. One fixed path for all runs: sync bakes absolute
+      # hook paths into settings.json, so two installs only diff cleanly at the same path.
+      # Set from a step because the runner context is not available in job-level env.
+      - name: Fixture HOME
+        run: echo "FIXTURE=$RUNNER_TEMP/home" >> "$GITHUB_ENV"
+
+      - name: First sync installs cleanly
+        run: |
+          mkdir -p "$FIXTURE"
+          HOME="$FIXTURE" "$BASH_BIN" sync.sh 2>&1 | tee "$RUNNER_TEMP/sync1.log"
+          grep -qx 'Sync complete.' "$RUNNER_TEMP/sync1.log" \
+            || { echo "::error::sync.sh never printed 'Sync complete.'"; exit 1; }
+          # "!" lines are warnings sync.sh survives: an unresolved craftkitInject name,
+          # an unowned Codex skill. On a fresh HOME every one of them is a defect.
+          if grep -nE '^[[:space:]]*!' "$RUNNER_TEMP/sync1.log"; then
+            echo "::error::first sync into an empty HOME emitted warnings"; exit 1
+          fi
+
+      - name: Second sync reports no work
+        run: |
+          HOME="$FIXTURE" "$BASH_BIN" sync.sh 2>&1 | tee "$RUNNER_TEMP/sync2.log"
+          if grep -nE '^[[:space:]]*[-+!]' "$RUNNER_TEMP/sync2.log"; then
+            echo "::error::repeat sync did work; the diff-skip check is broken for the files above"; exit 1
+          fi
+
+      # Linux only: the tarball is platform-independent and macOS minutes bill at 10x.
+      # check.sh 32d compares "files" against the directories sync.sh names; this catches
+      # anything that comparison cannot see, by installing what npm actually ships and
+      # diffing it against the checkout's install. The tarball is unpacked rather than
+      # npm-installed so postinstall never runs: its ensure_tools fetches rtk and
+      # humanizer from the network and patches shell profiles.
+      - name: npm tarball installs the same tree as the checkout
+        if: runner.os == 'Linux'
+        run: |
+          pkg="$RUNNER_TEMP/pkg"
+          mkdir -p "$pkg"
+          npm pack --pack-destination "$pkg" --silent
+          tar -xzf "$pkg"/*.tgz -C "$pkg"
+          mv "$FIXTURE" "$RUNNER_TEMP/home-checkout"
+          mkdir -p "$FIXTURE"
+          HOME="$FIXTURE" "$BASH_BIN" "$pkg/package/sync.sh" 2>&1 | tee "$RUNNER_TEMP/sync-pkg.log"
+          grep -qx 'Sync complete.' "$RUNNER_TEMP/sync-pkg.log" \
+            || { echo "::error::sync from the npm tarball never printed 'Sync complete.'"; exit 1; }
+          diff -r "$RUNNER_TEMP/home-checkout" "$FIXTURE" \
+            || { echo "::error::the npm tarball installs a different tree than the checkout"; exit 1; }
+
+      # The state-file removal loop is how a deleted or renamed file leaves every tool.
+      # Names are picked from the tree, so a rename here never breaks the job; each must
+      # be unique to its kind, since twelve skills share a name with their cold agent.
+      - name: Deleting a skill and an agent uninstalls them everywhere
+        run: |
+          agents="$(ls agents | sed 's/\.md$//')"
+          skill="$(comm -23 <(ls skills) <(echo "$agents") | head -1)"
+          agent="$(comm -13 <(ls skills) <(echo "$agents") | head -1)"
+          found() {
+            find "$FIXTURE" \( -name "$skill" -o -name "$skill.md" -o -name "$skill.mdc" \
+              -o -name "$agent.md" -o -name "$agent.toml" \) -not -path '*/.craftkit-state/*'
+          }
+          [ -n "$(found)" ] || { echo "::error::$skill / $agent were never installed, so removal proves nothing"; exit 1; }
+          trimmed="$RUNNER_TEMP/trimmed"
+          mkdir -p "$trimmed"
+          git archive HEAD | tar -x -C "$trimmed"
+          rm -rf "$trimmed/skills/$skill" "$trimmed/agents/$agent.md"
+          HOME="$FIXTURE" "$BASH_BIN" "$trimmed/sync.sh" 2>&1 | tee "$RUNNER_TEMP/sync-rm.log"
+          left="$(found)"
+          if [ -n "$left" ]; then
+            echo "$left"
+            echo "::error::deleted skill '$skill' or agent '$agent' is still installed"; exit 1
+          fi
