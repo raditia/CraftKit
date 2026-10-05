@@ -7,6 +7,18 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.56.0 — 2026-10-05
+
+### Execution units: pick the smallest one that fits
+
+Agents had rules for when to spawn (parallel orchestrators, fusion panel) but none for which
+unit to use, so coupled work got split across subagents and parallel edits could share a checkout.
+
+- `using-agent-skills` gains core behavior #12: main task, subagent, custom agent, worktree, or
+  fork, each with its use. Delegation follows one flow: workstream contract, permission boundary,
+  read-only subagent or isolated worktree, main-task review, human decision.
+- The Codex runtime block carries a four-line version, since Codex loads only that section.
+
 ## v1.55.0 — 2026-10-05
 
 ### Context sources: planning checks asks against connected team docs repos

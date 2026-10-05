@@ -29,6 +29,10 @@ profile, or read its TOML and pass `developer_instructions` with the task in iso
 Cold specialists follow their brief directly without routing skills or spawning more agents.
 Pass applicable `AGENTS.md` conventions, collect every result, and report failed workers as
 coverage gaps. Do not treat a running command's session ID as successful verification.
+Use the smallest unit that fits: coupled work and integration stay in the main task; bounded
+investigation, review, or testing goes to a read-only subagent; parallel edits use separate
+worktrees. Give each delegated unit a goal, output, and done check, then review its result
+before integrating; the human decides anything hard to reverse.
 
 Keep the configured model; Codex reasoning tiers are low, medium, and high. Do not pass Claude
 family aliases. Before reporting completion, verify the latest edits using project gates and
@@ -319,6 +323,21 @@ Running /pr-message [cheapest]: generate PR message from branch diff.
 Running /fe-context [cheapest]: generate context doc from staged changes.
 ```
 One line, before the skill executes. Lets the user redirect before work begins. Read the skill's `**Model:**` line to get the right label: use `cheapest`, `everyday`, or `escalated` as the tier label. Name the tier, not a model id; the id shifts every release and the injected tier line already carries it.
+
+### 12. Use the smallest execution unit that fits
+
+| Unit | Use for |
+|------|---------|
+| Main task | Tightly coupled work and final integration, under one accountable owner |
+| Subagent | Bounded investigation, review, testing, or another independent contribution |
+| Custom agent | A specialist role reused with stable instructions or settings (`agents/*.md`) |
+| Worktree | Coding work that needs its own Git checkout, so parallel edits never collide |
+| Fork | An alternative approach explored while keeping the earlier conversation context |
+
+Delegated work follows one flow: **workstream contract → permission boundary → read-only subagent or isolated worktree → main-task review → human decision.**
+- **Contract first.** Before spawning, state the unit's goal, inputs, the output it returns, and its done check. A unit without a contract returns whatever it found.
+- **Boundary second.** Investigation and review run read-only. Edits from more than one unit happen in separate worktrees, never on a shared checkout.
+- **Main task integrates.** Delegated output is evidence, not a result: the main task reviews and verifies it before merging it in, and the human decides on anything outward-facing or hard to reverse.
 
 ---
 
