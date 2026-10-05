@@ -2,7 +2,7 @@
 name: fe-context
 description: Derive the branch's change context from git and emit it into the turn: staged, committed and pushed changes, mapped to EVPMR layers. Writes no file. Run at the start of any other fe-* skill, or once in a workflow's Phase 0 and pass the result down.
 alwaysApply: false
-craftkitInject: external-sources
+craftkitInject: external-sources, change-scope
 ---
 
 **Commands:** `rtk git diff`, `rtk git log`, `rtk git status`, `rtk ls .`
@@ -28,7 +28,7 @@ Feed the right information at the right time. This skill derives what the branch
 | 4. Errors | Failing tests, lint errors, TypeScript errors | On demand |
 | 5. History | Conversation; compact when switching major tasks | Session |
 
-**Selective include:** only include what is relevant to the diff. Hard limit: **< 600 lines / ~800 tokens**. Do not dump entire unrelated files. Summarize rather than paste full file contents.
+**Selective include:** only include what is relevant to the change scope. Hard limit: **~800 tokens**. Do not dump entire unrelated files. Summarize rather than paste full file contents.
 
 ---
 
@@ -39,7 +39,7 @@ Emit this before proceeding:
 PLAN:
 1. Find project root (nearest package.json)
 2. Detect base branch
-3. Collect: staged → committed-not-pushed → pushed-on-branch
+3. Collect: unstaged + untracked → staged → committed branch changes
 4. Analyse diff, map to hierarchy levels
 5. Surface any conflicts or ambiguities
 6. Emit the derived context into the turn, writing no file
@@ -57,20 +57,23 @@ Walk up from CWD to the nearest `package.json` directory. All paths relative to 
 
 ## Step 2: Detect base branch
 
-```bash
-git remote show origin | grep "HEAD branch"
-```
-Default to `main` if the command fails.
+Resolve a local base per `Change scope` above. Report an unavailable comparison as
+`cannot-verify`; do not silently default to a missing `main`.
 
 ---
 
 ## Step 3: Collect changes
 
-**A. Staged (uncommitted):**
+**A. Working tree (uncommitted):**
 ```bash
+rtk git status --short --branch
+rtk git diff --name-status
+rtk git diff
+rtk git ls-files --others --exclude-standard
 rtk git diff --cached --name-status
 rtk git diff --cached
 ```
+Read relevant untracked files explicitly and account for both staged and unstaged changes.
 
 **B. Committed, not yet pushed:**
 ```bash
@@ -81,8 +84,8 @@ If `@{u}` errors (no upstream), skip and note it.
 
 **C. Pushed on branch vs base:**
 ```bash
-rtk git log main...@{u} --oneline
-rtk git diff main...@{u}
+rtk git log <base>...HEAD --oneline
+rtk git diff <base>...HEAD
 ```
 
 ---
@@ -114,7 +117,7 @@ If requirements are missing or ambiguous, stop and ask; do not invent.
 workflow, derive once in Phase 0 and pass it down; a per-skill re-derivation of the same diff is
 the same content paid for twice.
 
-Keep it under ~600 lines / ~800 tokens. Summarize aggressively; never paste whole files.
+Keep it under ~800 tokens. Summarize aggressively; never paste whole files.
 
 ```markdown
 DERIVED CONTEXT
@@ -124,7 +127,7 @@ Branch: {{branch}} | Base: {{base}} | HEAD: {{short sha}}
 {{2-4 sentences: what is being built, user-facing purpose, scope}}
 
 ## Changed Files
-### A. Staged (uncommitted)
+### A. Working tree (staged, unstaged, untracked)
 | File | Change | Role |
 |------|--------|------|
 ### B. Committed, not pushed
@@ -170,7 +173,7 @@ reader trusts a snapshot nobody refreshes.
 
 - [ ] All three layers (A/B/C) represented or noted as empty
 - [ ] Conflicts in the Conflicts section, not silently resolved
-- [ ] Under ~600 lines; summarize aggressively if over
+- [ ] Under ~800 tokens; summarize aggressively if over
 - [ ] No unrelated files dumped in
 - [ ] No file written
 

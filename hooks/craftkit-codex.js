@@ -8,7 +8,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const { detectPlatform } = require('./craftkit-platform.js');
 
-const CODE = /\.(ts|tsx|js|jsx|mjs|cjs|kt|java|swift|m|mm)$/i;
+const CODE = /\.(ts|tsx|js|jsx|mjs|cjs|kt|kts|java|swift|m|mm|xml|gradle|strings|bzl|json)$/i;
 const output = value => process.stdout.write(JSON.stringify(value));
 const statePath = session => path.join(os.tmpdir(), 'craftkit-codex-' +
   crypto.createHash('sha256').update(session).digest('hex').slice(0, 24) + '.json');
@@ -19,7 +19,7 @@ const field = (body, name) => {
 };
 const strip = body => body.replace(/^---\n[\s\S]*?\n---\s*/, '');
 const save = (file, state) => {
-  try { fs.writeFileSync(file, JSON.stringify(state)); } catch (_) { /* fail open */ }
+  try { fs.writeFileSync(file, JSON.stringify(state), { mode: 0o600 }); } catch (_) { /* fail open */ }
 };
 const load = file => { try { return JSON.parse(read(file)); } catch (_) { return null; } };
 
@@ -33,25 +33,22 @@ function rules(cwd) {
     const body = read(path.join(dir, name));
     const scope = field(body, 'platform');
     if (scope && !scope.split(',').map(s => s.trim()).some(s => keys.includes(s))) return '';
-    return strip(body).trim();
+    const codex = body.match(/<!-- BEGIN CRAFTKIT-CODEX -->\s*([\s\S]*?)\s*<!-- END CRAFTKIT-CODEX -->/);
+    return codex ? codex[1] : strip(body).trim();
   }).filter(Boolean).join('\n\n---\n\n');
 }
 
 function requestedSkill(prompt) {
-  // Native Codex activation handles $name. Injecting an explicitly requested body
-  // through the hook closes the gap when an agent skips activation. Only a leading
-  // /name is treated as a command; slashes in prose and paths are not commands.
   const names = new Set();
   for (const m of String(prompt || '').matchAll(/(?:^|\s)\$([a-z][a-z0-9-]*)\b/g)) names.add(m[1]);
   const slash = String(prompt || '').match(/^\s*\/([a-z][a-z0-9-]*)\b/);
   if (slash) names.add(slash[1]);
-  const bodies = [];
+  const pointers = [];
   for (const name of [...names].slice(0, 3)) {
     const file = path.join(os.homedir(), '.agents', 'skills', name, 'SKILL.md');
-    const body = read(file);
-    if (body && body.length <= 65536) bodies.push('$' + name + '\n\n' + body);
+    if (fs.existsSync(file)) pointers.push('$' + name + ': read ' + file);
   }
-  return bodies.join('\n\n---\n\n');
+  return pointers.join('\n');
 }
 
 function snapshot(cwd) {
@@ -64,8 +61,7 @@ function snapshot(cwd) {
     for (const line of git(['status', '--porcelain', '-z', '--no-renames', '--untracked-files=all']).split('\0').filter(Boolean)) {
       const name = line.slice(3);
       try {
-        const stat = fs.statSync(path.join(root, name));
-        dirty[name] = [stat.mtimeMs, stat.size];
+        dirty[name] = crypto.createHash('sha256').update(fs.readFileSync(path.join(root, name))).digest('hex');
       } catch (_) { dirty[name] = null; }
     }
     return { root, head, dirty };
@@ -75,26 +71,79 @@ function snapshot(cwd) {
 function changed(before, after) {
   if (!before || !after || before.root !== after.root) return [];
   const names = new Set(Object.keys(before.dirty).concat(Object.keys(after.dirty)));
+  const committed = new Set();
   if (before.head !== after.head) {
     try {
       const files = execFileSync('git', ['-C', after.root, 'diff', '--name-only', before.head, after.head],
         { encoding: 'utf8', timeout: 5000 }).trim();
-      files.split('\n').filter(Boolean).forEach(n => names.add(n));
+      files.split('\n').filter(Boolean).forEach(n => committed.add(n));
     } catch (_) { /* the dirty set still works */ }
   }
-  return [...names].filter(n => JSON.stringify(before.dirty[n]) !== JSON.stringify(after.dirty[n]));
+  return [...new Set([...committed, ...[...names].filter(n => before.dirty[n] !== after.dirty[n])])];
 }
 
 function gate(cwd) {
   let dir = cwd;
   while (true) {
-    if (fs.existsSync(path.join(dir, 'check.sh'))) return { run: 'bash check.sh', patterns: [/check\.sh/], all: true };
+    if (fs.existsSync(path.join(dir, 'check.sh'))) return {
+      run: 'bash check.sh', patterns: [/^(?:(?:bash|sh) )?(?:\S*\/)?check\.sh(?: |$)/], all: true
+    };
     if (fs.existsSync(path.join(dir, 'package.json'))) return {
-      run: 'typecheck and lint', patterns: [/\b(tsc|typecheck|type-check)\b/, /\b(lint|eslint|biome|oxlint)\b/], all: false
+      run: 'typecheck and lint', patterns: [
+        /^(?:(?:pnpm|npm|yarn|npx) (?:run |exec )?)?(?:tsc|typecheck|type-check)(?: |$)/,
+        /^(?:(?:pnpm|npm|yarn|npx) (?:run |exec )?)?(?:deplint|lint|eslint|biome|oxlint)(?: |$)/
+      ], all: false
+    };
+    const entries = fs.readdirSync(dir);
+    if (entries.some(n => /^(settings|build)\.gradle(\.kts)?$/.test(n))) return {
+      run: './gradlew :<module>:lintGeneralDebug :<module>:testGeneralDebugUnitTest',
+      patterns: [/^(?:\S*\/)?gradlew .*\blint\w*/, /^(?:\S*\/)?gradlew .*\btest\w*/], all: false
+    };
+    if (entries.some(n => /\.xc(odeproj|workspace)$/.test(n) || n === 'Podfile' || n === 'Package.swift')) return {
+      run: 'the project test command and swiftlint lint', patterns: [
+        /^(?:bazelisk|bazel|swift) test(?: |$)|^xcodebuild .*\btest\b/,
+        /^swiftlint(?: lint)?(?: |$)/
+      ], all: false
     };
     const parent = path.dirname(dir);
     if (parent === dir) return null;
     dir = parent;
+  }
+}
+
+function executed(command) {
+  // Only direct foreground invocations count; quoted mentions stay arguments to echo.
+  if (/[`$()<>]|\|\||\|(?!\|)/.test(command)) return [];
+  const tokens = command.match(/"(?:\\.|[^"\\])*"|'[^']*'|&&|[;&\n]|[^\s;'"&]+/g) || [];
+  const commands = [[]];
+  for (const token of tokens) {
+    if ([';', '\n', '&'].includes(token)) return [];
+    if (token === '&&') commands.push([]);
+    else commands[commands.length - 1].push(token.replace(/^(['"])(.*)\1$/, '$2'));
+  }
+  return commands.map(args => {
+    if (args[0] === 'rtk') args.shift();
+    if (args[0]) args[0] = path.basename(args[0]);
+    return args.join(' ');
+  });
+}
+
+function exitCode(response) {
+  if (response && typeof response.exit_code === 'number') return response.exit_code;
+  if (typeof response !== 'string') return null;
+  const match = response.match(/^(?:Process exited with code|Exit code:)\s*(-?\d+)\s*$/m);
+  return match ? Number(match[1]) : null;
+}
+
+function checks(file) {
+  return read(file + '.checks').split('\n').filter(Boolean).flatMap(line => {
+    try { return [JSON.parse(line)]; } catch (_) { return []; }
+  });
+}
+
+function clear(file) {
+  for (const name of [file, file + '.checks']) {
+    try { fs.unlinkSync(name); } catch (_) {}
   }
 }
 
@@ -115,9 +164,14 @@ process.stdin.on('end', () => {
   if (!session) return output({});
   const file = statePath(session);
   let state = load(file);
+  if (state && !Number.isFinite(state.started)) {
+    state.started = Date.now();
+    delete state.commands;
+    save(file, state);
+  }
   if (event === 'UserPromptSubmit') {
     // A Stop block creates an automatic prompt. Preserve its original baseline.
-    if (!state || !state.pending) state = { baseline: snapshot(cwd), commands: [], blocks: 0, pending: false };
+    if (!state || !state.pending) state = { baseline: snapshot(cwd), started: Date.now(), blocks: 0, pending: false };
     else state.pending = false;
     state.turn = p.turn_id;
     save(file, state);
@@ -126,32 +180,49 @@ process.stdin.on('end', () => {
     return output({ hookSpecificOutput: { hookEventName: event, additionalContext:
       'CraftKit: classify this request against installed skills and workflows before work. ' +
       'For a match, activate its native $skill and follow its full SKILL.md. ' +
-      'Use build, review, or ship for their respective workflows; use their sequential forms when spawning is unavailable. ' +
+      'Use parallel-build, parallel-review, or parallel-ship for their respective workflows when native subagents are available; otherwise use the sequential twin. ' +
       'If none matches, state that briefly. After edits, run the project verification command and report its result.' +
       (platform ? '\nDetected platform: ' + platform + '.' : '') +
-      (selected ? '\n\nExplicitly requested CraftKit skill or command bodies:\n\n' + selected : '') } });
+      (selected ? '\n\nExplicitly requested CraftKit skills:\n' + selected : '') } });
   }
   if (!state) return output({});
-  if (event === 'PostToolUse') {
+  if (event === 'PreToolUse' || event === 'PostToolUse') {
     const ti = p.tool_input || {};
     if (p.tool_name === 'Bash') {
       const command = String(ti.command || ti.cmd || '');
-      if (command) state.commands.push(command);
+      const required = gate(cwd);
+      const commands = executed(command);
+      if (required && required.patterns.some(re => commands.some(c => re.test(c)))) {
+        const current = snapshot(cwd);
+        const phase = event === 'PreToolUse' ? 'start' : 'end';
+        if (phase === 'end') {
+          const start = checks(file).find(record => record.phase === 'start' &&
+            record.id === p.tool_use_id && record.at >= state.started && record.snapshot &&
+            JSON.stringify(record.snapshot) === JSON.stringify(current));
+          if (!start || exitCode(p.tool_response) !== 0) return output({});
+        }
+        if (!p.tool_use_id) return output({});
+        const record = { at: Date.now(), id: p.tool_use_id, phase, commands, snapshot: current };
+        // Each hook appends one record, so concurrent subagents cannot overwrite peers.
+        try { fs.appendFileSync(file + '.checks', JSON.stringify(record) + '\n', { mode: 0o600 }); } catch (_) {}
+      }
     }
-    save(file, state);
     return output({});
   }
   if (event !== 'Stop') return output({});
   const required = gate(cwd);
-  if (!required) { try { fs.unlinkSync(file); } catch (_) {} return output({}); }
-  const files = changed(state.baseline, snapshot(cwd))
+  if (!required) { clear(file); return output({}); }
+  const current = snapshot(cwd);
+  const files = changed(state.baseline, current)
     .filter(n => !/(^|\/)scratchpad\//.test(n))
     .filter(n => required.all || CODE.test(n));
-  if (!files.length || required.patterns.every(re => state.commands.some(c => re.test(c)))) {
-    try { fs.unlinkSync(file); } catch (_) {}
+  const verified = checks(file).filter(record => record.phase === 'end' && record.at >= state.started && record.snapshot &&
+    JSON.stringify(record.snapshot) === JSON.stringify(current));
+  if (!files.length || required.patterns.every(re => verified.some(record => record.commands.some(c => re.test(c))))) {
+    clear(file);
     return output({});
   }
-  if (state.blocks >= 2) { try { fs.unlinkSync(file); } catch (_) {} return output({}); }
+  if (state.blocks >= 2) { clear(file); return output({}); }
   state.blocks++;
   state.pending = true;
   save(file, state);

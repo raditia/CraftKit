@@ -1,7 +1,7 @@
 ---
 name: build
 description: Sequential feature build workflow, platform-routed at Step 0: context, scaffold, patterns, performance, review and tests for RN/web (EVPMR), Android (MVP) or iOS (MVVM-C). Use when building a new feature or screen without parallel validation.
-craftkitInject: planning-resolve, test-cases-resolve
+craftkitInject: planning-resolve, test-cases-resolve, change-scope
 ---
 
 **Commands:** `rtk git diff`, `rtk tsc`, `rtk jest`, `rtk lint`
@@ -27,16 +27,18 @@ Detect the platform from the project root + changed files, then dispatch:
 
 For native, Step 1 context is optional: run `/android-context` or `/ios-context` only for multi-screen branches; otherwise read a real sibling screen first.
 
+- **Node / tooling or other repositories:** use the project's architecture and verification commands. Skip EVPMR scaffolding and platform-only checklists; retain general code-quality review and the workflow's completion gates.
+
 ---
 
 ## Step 1: Context
 
 Run the `/fe-context` workflow:
-1. Detect base branch: `rtk git remote show origin | grep 'HEAD branch'`
+1. Resolve the base and collect working-tree changes per `Change scope` above
 2. Diff: `rtk git log --oneline <base>...HEAD` and `rtk git diff <base>...HEAD`
 3. Resolve the feature's intent file per `planning-resolve` and its test cases per `test-cases-resolve`; build to approved cases only, and pass the slug to every step below
 4. Run the diff reads and the source marker reads (`external-sources`) in one message, since neither waits on the other, then derive the change context into the turn: Summary, Architecture Patterns in Use, Key Changes, Test Coverage Needed, External Sources. Write no file
-5. Hard limit: ≤ 600 lines
+5. Hard limit: ~800 tokens
 
 **Gate:** the derived block covers the feature scope, and intent resolved or was explicitly absent.
 

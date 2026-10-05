@@ -147,7 +147,7 @@ bash install.sh
 **Upgrading from ≤ v1.23.0:** the next sync uninstalls the retired Copilot and Crush integrations automatically. Copilot `@` agents it wrote into your other repos may be committed there, so sync prints those paths and leaves them for you.
 
 **Contributing to craftkit itself:** see **[CONTRIBUTING.md](CONTRIBUTING.md)**. Short version:
-there is no build or test suite (the product is markdown), so `check.sh` is the gate and a second
+there is no application build (the product is instructions); behavioral fixtures run through `check.sh`, so `check.sh` is the gate and a second
 consecutive `sync.sh` must report no work.
 ```bash
 bash check.sh   # content integrity, exit 0 required before commit
@@ -231,8 +231,8 @@ Five namespaces, one source of truth:
 | `rules/` | Every session, automatically | Never, since they are always present |
 | `skills/` | On demand | Slash command or natural language |
 | `commands/` | On demand | Slash command or natural language |
-| `agents/` | Spawned by an orchestrator | `subagent_type:`, never directly (Claude only) |
-| `partials/` | Only as a splice into a skill, command or agent | Never, since it ships inside its host file (every tool for a skill or command, Claude only for an agent) |
+| `agents/` | Spawned by an orchestrator | native spawning with the named profile (Claude and Codex) |
+| `partials/` | Only as a splice into a skill, command or agent | Never, since it ships inside its host file (every tool for a skill or command, Claude and Codex for an agent) |
 
 ### At runtime: Gateway, Orchestrators, state
 
@@ -243,7 +243,7 @@ layers act inside each AI tool:
 |------|------|-------|
 | **CraftKit Gateway** | Claude uses the [routing, loader, guard, and exit hooks](#enforcement-gates-hooks-that-refuse). Codex loads applicable rule bodies at SessionStart, injects routing guidance on each prompt, and checks verification at Stop. | `hooks/`; Claude and Codex use native hooks. Cursor and Gemini get advisory text. Codex and Cursor discover skills from `~/.agents/skills/` |
 | **Orchestrators** | Run a workflow: resolve the feature once in Phase 0, pass the slug down, spawn skills and agents | `commands/*.md` |
-| **Skills and agents** | Do one job; skills reach Figma and Lark through the host's MCP client | `skills/`, `agents/` (Claude only) |
+| **Skills and agents** | Do one job; skills reach Figma and Lark through the host's MCP client | `skills/`, `agents/` (Claude and Codex) |
 
 The Gateway does not see MCP calls. Per-feature state lives in the repo, never in a tool:
 
@@ -283,7 +283,7 @@ flowchart TB
     end
     subgraph R4["WORKERS"]
         direction LR
-        S("Skills · skills/*<br/>/spec · /test-cases · /plan<br/>/fe-test · /eval") ~~~ A("Agents · agents/*.md<br/>cold reviewers<br/>Claude only") ~~~ M("MCP via the host's client<br/>Figma · Lark")
+        S("Skills · skills/*<br/>/spec · /test-cases · /plan<br/>/fe-test · /eval") ~~~ A("Agents · agents/*.md<br/>cold reviewers<br/>Claude and Codex") ~~~ M("MCP via the host's client<br/>Figma · Lark")
     end
     subgraph R5["STATE · in the repo, per feature"]
         direction LR
@@ -314,9 +314,9 @@ flowchart TB
 | Claude Code | `~/.claude/CLAUDE.md` (managed block) | `~/.claude/commands/<name>.md` → `/<name>` | `~/.claude/agents/<name>.md` |
 | Cursor | `~/.cursor/rules/*.mdc` (alwaysApply) | `~/.agents/skills/<name>/SKILL.md` (shared native skills, local only) | n/a |
 | Gemini CLI | `~/GEMINI.md` (managed block) | `~/GEMINI.md` (managed block), and also lists the shared `~/.agents/skills/` | n/a |
-| Codex CLI | `~/.codex/AGENTS.md` (short managed block); `~/.codex/hooks.json` loads applicable full rules from `~/.craftkit/codex/rules/` at session start | `~/.agents/skills/<name>/SKILL.md` (shared native skills, including workflows) | n/a |
+| Codex CLI | `~/.codex/AGENTS.md` (short managed block); `~/.codex/hooks.json` loads applicable full rules from `~/.craftkit/codex/rules/` at session start | `~/.agents/skills/<name>/SKILL.md` (shared native skills, including workflows) | `${CODEX_HOME:-~/.codex}/agents/<name>.toml` |
 
-Codex and Cursor read skills from `~/.agents/skills/`, so they share one install there. Cursor does not copy that folder to Cloud Agents, so CraftKit skills reach local Cursor sessions only. Gemini CLI reads it too, but keeps its full `~/GEMINI.md` block: as native skills, workflows would load only on demand, behind a consent prompt on every activation. CraftKit's named review agents currently install only for Claude. Codex supports custom subagents, but this adapter does not yet convert the Claude agent definitions. Codex workflows use the sequential fallback where those named agents are required.
+Codex and Cursor read skills from `~/.agents/skills/`, so they share one install there. Cursor does not copy that folder to Cloud Agents, so CraftKit skills reach local Cursor sessions only. Gemini CLI reads it too, but keeps its full `~/GEMINI.md` block: as native skills, workflows would load only on demand, behind a consent prompt on every activation. CraftKit's named specialists install for both Claude and Codex. Codex profiles carry the live injected instructions, use a read-only sandbox, and inherit the configured model with medium reasoning effort. Parallel workflows use native spawning up to the available concurrency, queue excess workers, and collect every result. Sequential fallback applies when spawning is unavailable. Unowned or symlinked Codex profiles are preserved and reported as collisions.
 
 If a skill name already belongs to another install in `~/.agents/skills/`, sync leaves that directory untouched, warns with its path, and continues installing the other skills. Remove or rename the conflicting directory if you want CraftKit's version of that skill.
 
@@ -375,11 +375,13 @@ flowchart TD
     U --> W
     C -->|"settings.gradle"| A["Android<br/>MVP"]
     C -->|"Podfile · Package.swift<br/>*.xcodeproj"| I["iOS<br/>MVVM-C"]
-    C -->|"package.json"| R["RN / web<br/>EVPMR"]
+    C -->|"package.json + React dependency"| R["RN / web<br/>EVPMR"]
+    C -->|"other package.json"| N["Node / tooling<br/>project conventions"]
     C -->|"two or more<br/>at one level"| M["mixed<br/>union both<br/>agent sets"]
     A --> INJ["inject platform into the prompt"]
     I --> INJ
     R --> INJ
+    N --> INJ
     M --> INJ
 ```
 
@@ -391,7 +393,7 @@ Nearest ancestor wins, so `"write tests for this"` in an Android repo resolves t
 
 Routing context is only text: an agent can read it, announce the right skill, and hand-roll the work anyway. These hooks close that gap. The four gates can stop a call; the other four only inject context, rewrite a command, or notify.
 
-Codex installs [`craftkit-codex.js`](hooks/craftkit-codex.js) into `~/.codex/hooks/` and registers `SessionStart`, `UserPromptSubmit`, `PostToolUse` on Bash, and `Stop` in `~/.codex/hooks.json`. It loads applicable rule bodies and injects the installed body for an explicit `$skill` or leading `/command` request. It also prompts intent-based skill routing and blocks an edited turn that skipped the project verification command. Codex requires a one-time **`/hooks` review and trust** of the new definitions before they run. Native skill activation is not exposed as a stable hook event, so the gateway cannot prove that a skill body was followed; verification is the enforced part. `CRAFTKIT_GATE=off` disables it.
+Codex installs [`craftkit-codex.js`](hooks/craftkit-codex.js) into `~/.codex/hooks/` and registers `SessionStart`, `UserPromptSubmit`, `PreToolUse` and `PostToolUse` on Bash, and `Stop` in `~/.codex/hooks.json`. It loads applicable rule bodies, using a concise Codex routing section instead of the full Claude-oriented rule. An explicit `$skill` or leading `/command` request points to the native skill file without injecting a second body. Verification requires a completed successful command against an unchanged snapshot from start to finish and the latest edited state, including committed edits; parallel hook results append without overwriting peers. Unknown or unfinished results do not count. Direct foreground commands and `&&` chains are supported; commands that mask failures with pipelines or semicolons require a separate check invocation. The gate covers `check.sh`, Node type/lint checks, Gradle lint/tests, and iOS tests/SwiftLint. Codex requires a one-time **`/hooks` review and trust** of the new definitions before they run. Native skill activation is not exposed as a stable hook event, so the gateway cannot prove that a skill body was followed; verification is the enforced part. `CRAFTKIT_GATE=off` disables it.
 
 | Hook | Event | What it does |
 |------|-------|--------------|
@@ -1301,7 +1303,7 @@ All opt-in, never auto-run from `/parallel-build`. `/spec`, `/plan` and `/adr` w
 
 ## Agents reference
 
-Cold, read-only sub-agents (`Read, Grep, Glob`) with a fixed system prompt and model. Orchestrators spawn them and pass the diff or files as the message. They sync to `~/.claude/agents/` (Claude Code only). Platform agents are picked by the detected platform; `code-quality`, `ponytail-review` and `adversarial` run on all three.
+Cold, read-only sub-agents (`Read, Grep, Glob`) with a fixed system prompt and model. Orchestrators spawn them and pass the diff or files as the message. They sync to `~/.claude/agents/` as Markdown and `${CODEX_HOME:-~/.codex}/agents/` as TOML. Codex inherits its configured model with medium reasoning effort. Platform agents are picked by the detected platform; `code-quality`, `ponytail-review` and `adversarial` run on all three.
 
 | Agent | Platform | Role | Spawned by | Model |
 |-------|----------|------|-----------|-------|
@@ -1349,7 +1351,7 @@ Why rules and rubrics ship in two sizes, and the measured savings: [design notes
 ```bash
 # create agents/<name>.md with frontmatter: name, description, tools, model, color
 git add agents/<name>.md && git commit -m "feat: add <name> agent" && git push
-# users: git pull → auto-installed to ~/.claude/agents/
+# users: git pull → Markdown in ~/.claude/agents/ and TOML in ~/.codex/agents/
 ```
 
 ### Use an agent in a command
@@ -1395,11 +1397,13 @@ type AsyncData<T> =
 
 ### How context flows between skills
 
+[`partials/change-scope.md`](partials/change-scope.md) supplies the shared collection contract: staged, unstaged, relevant untracked, and committed changes are unioned before classification. Base discovery uses local refs and reports `cannot-verify` when unavailable. No context cache is written.
+
 Context comes in two halves (ADR-0001, ADR-0002):
 
 | Half | What | Where it lives |
 |------|------|----------------|
-| **Derived** | What git knows: changed files, diff summary, patterns | Emitted into the turn by `/fe-context` (≤ 600 lines), never stored. A workflow derives it once and passes it down |
+| **Derived** | What git knows: changed files, diff summary, patterns | Emitted into the turn by `/fe-context` (~800 tokens), never stored. A workflow derives it once and passes it down |
 | **Intent** | What a human decided: spec, task plan, decisions | One file per feature at `docs/planning/<slug>.md`, with a human-owned `status:`. The active feature is found by globbing for `status: active`, so there is no index to go stale |
 
 ```mermaid
@@ -1491,7 +1495,7 @@ flowchart TD
 
 A new model release needs no edit here: `opus-5` replaces `opus-4-8` as soon as the account is entitled to it. Only a brand-new family name touches the rank list. Personal plans are capped below the frontier family on purpose ([why](docs/design-notes.md#model-routing)).
 
-Skills name a tier, never a model id. Agents spawn on the family alias (`haiku` / `sonnet` / `opus` / `fable`), which tracks the newest model in that family. `check.sh` check 17 fails the build on a versioned id from any vendor.
+Skills name a tier, never a model id. Claude agents spawn on the family alias (`haiku` / `sonnet` / `opus` / `fable`), which tracks the newest model in that family. `check.sh` check 17 fails the build on a versioned id from any vendor.
 
 | AI | Everyday | Escalate | Fusion panel |
 |----|----------|----------|-------------|
@@ -1539,12 +1543,12 @@ git add skills/my-skill && git commit -m "feat: add my-skill" && git push
 git add commands/my-command.md && git commit -m "feat: add my-command" && git push
 ```
 
-### Add an agent (cold sub-agent for Claude Code)
+### Add an agent (cold specialist for Claude and Codex)
 
 ```bash
 # create agents/my-agent.md with frontmatter: name, description, tools, model, color
 git add agents/my-agent.md && git commit -m "feat: add my-agent agent" && git push
-# users: git pull → auto-installed to ~/.claude/agents/
+# users: git pull → Markdown in ~/.claude/agents/ and TOML in ~/.codex/agents/
 ```
 
 ### Add a hook (Claude Code enforcement)

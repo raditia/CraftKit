@@ -2,7 +2,7 @@
 name: ios-context
 description: Derive an iOS branch's change context from git and emit it into the turn: an MVVM-C flavored summary of changed modules, screens, coordinators, and fetchers. Writes no file. Optional branch-scoping step that feeds /ios-review and /ship.
 alwaysApply: false
-craftkitInject: external-sources
+craftkitInject: external-sources, change-scope
 ---
 
 **Commands:** `git diff`, `git log`, `git status`, `swiftlint lint --path <file>`
@@ -27,7 +27,7 @@ Unlike the EVPMR frontend, iOS context is organized by **MVVM-C role**, not by E
 ```
 PLAN:
 1. Detect base branch
-2. Collect: staged → committed-not-pushed → pushed-on-branch
+2. Collect: unstaged + untracked → staged → committed branch changes
 3. Map each changed file to its module + screen + MVVM-C role
 4. Surface any layer/DI/navigation violations (do not fix)
 5. Emit the derived context into the turn, writing no file
@@ -39,13 +39,8 @@ PLAN:
 
 ## Step 1: Collect changes
 
-```bash
-git remote show origin | grep "HEAD branch"     # base, default main
-git diff --cached --name-status                  # staged
-git log @{u}..HEAD --oneline && git diff @{u}..HEAD   # committed, not pushed
-git log main...@{u} --oneline && git diff main...@{u} # pushed on branch
-```
-If `@{u}` errors (no upstream), skip and note it.
+Use `Change scope` above, including relevant untracked source and tests. Derive the summary
+from the complete union of files, not just committed or staged work.
 
 ---
 

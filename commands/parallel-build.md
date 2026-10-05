@@ -1,7 +1,7 @@
 ---
 name: parallel-build
 description: Dynamic parallel build workflow with platform-routed context + scaffold + implement, then classifier-selected validation agents running concurrently. Supports RN/web (EVPMR), Android (MVP), and iOS (MVVM-C).
-craftkitInject: parallel-classifier, planning-resolve, test-cases-resolve
+craftkitInject: parallel-classifier, planning-resolve, test-cases-resolve, change-scope
 ---
 
 **Commands:** `rtk git diff`, plus the platform's type/lint/test tooling (see Step 0)
@@ -26,15 +26,17 @@ Detect the platform from the project root + target files, then use its column fo
 
 For native, skip the EVPMR-specific steps. When Phase 0 context is skipped (single screen), read a real sibling screen first and use it as the convention baseline everywhere derived context is referenced below.
 
+- **Node / tooling or other repositories:** use the project's architecture and verification commands. Skip EVPMR scaffolding and platform-only checklists; retain general code-quality review and the workflow's completion gates.
+
 ---
 
 ## Phase 0: Context (sequential)
 
 Run the platform's context step from Step 0. For RN / web that is `/fe-context`:
-1. Detect base: `rtk git remote show origin | grep 'HEAD branch'`
+1. Collect the complete local change scope per the injected section above
 2. `rtk git log --oneline <base>...HEAD` + `rtk git diff <base>...HEAD`
 3. Resolve the intent file per `planning-resolve` and its test cases per `test-cases-resolve`, once, before step 2's reads (a local grep, so it costs milliseconds); pass the slug and the approved cases to every phase below
-4. Run step 2's git reads and the source marker reads (`external-sources`) in **one message**: they are independent, so the wait is the slowest of them. Then derive the context block (≤ 600 lines) into the turn: Summary, Architecture Patterns in Use, Key Changes, Test Coverage Needed, External Sources. Write no file; pass it to every phase below
+4. Run step 2's git reads and the source marker reads (`external-sources`) in **one message**: they are independent, so the wait is the slowest of them. Then derive the context block (~800 tokens) into the turn: Summary, Architecture Patterns in Use, Key Changes, Test Coverage Needed, External Sources. Write no file; pass it to every phase below
 
 **Gate:** the derived block covers the feature scope, or, for a single native screen, the sibling screen has been read.
 
@@ -96,9 +98,9 @@ Announce the detected platform and the selected agents before proceeding.
 
 ## Phase 5: Dynamic parallel validation agents
 
-Spawn **all** selected agents in **one** message: N `Agent` tool-use blocks in a single response, never in sequential waves. They are independent (cold, read-only, no shared state) and must run concurrently; splitting them across turns serializes the slow ones behind the fast ones and is a defect. Agent definitions live in `agents/`, and the harness loads their system prompt and tool restrictions automatically. Each agent is cold, so pass content as the user message. Pass full file contents, not just the diff, because agents need the full implementation context.
+Launch selected agents using **Runtime execution** above. Each specialist is isolated and read-only. Pass full file contents and the task payload explicitly, and use all available concurrency before waiting.
 
-**Do not wait by polling.** Never `grep`/`sleep`-loop over task output files (`tasks/*.output`) to detect completion. The harness wakes the main thread automatically when every spawned agent comes to rest, and re-invokes you with their results. Spin-loops keep running for minutes after the agents already finished. On wake, read the returned results and go straight to synthesis.
+**Do not wait by polling.** Never `grep`/`sleep`-loop over task output files (`tasks/*.output`) to detect completion. Use native completion notifications or the host wait tool to collect each agent result. Spin-loops keep running for minutes after the agents already finished. On wake, read the returned results and go straight to synthesis.
 
 **Write tests while they run.** The agents are read-only and the implementation is already type-clean, so the main thread starts Phase 6 authoring right after spawning, instead of idling until they return. Author the test files only; the test run waits for synthesis, because an `[ERROR]` fix can change the code under test. A fix that does touch tested behavior costs a few test edits, which is less than a full agent round of idle time.
 
@@ -116,7 +118,7 @@ CONTEXT:
 <the resolved intent file's `## Spec` when one exists, plus the Phase 0 derived Summary + Key Changes, or, for a single native screen, the sibling screen read in Phase 0>
 
 PROJECT CONVENTIONS:
-<the project-root `CLAUDE.md`, each file it `@`-imports, and each `.claude/rules/*.md` without `paths:` frontmatter, as `<path>` plus contents, any file over ~1500 lines named `not provided`; `not present` when there are none. Agents set `omitClaudeMd`, so this is their only copy of the project's conventions>
+<the applicable `AGENTS.md` files on Codex; on Claude, the project-root `CLAUDE.md`, each file it `@`-imports, and each `.claude/rules/*.md` without `paths:` frontmatter. Pass each as `<path>` plus contents, any file over ~1500 lines named `not provided`; `not present` when absent. Claude agents set `omitClaudeMd`; explicitly pass the applicable conventions to every isolated worker>
 ```
 
 `adversarial` gets one extra prefix line: `This is a newly built feature. Argue the strongest case against shipping it as-is.`

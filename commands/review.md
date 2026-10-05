@@ -1,6 +1,7 @@
 ---
 name: review
 description: Sequential code review workflow, platform-routed at Step 0: context, code-quality (5-axis), and the platform's pattern review. Use when reviewing a change before merge without parallel agents.
+craftkitInject: change-scope
 ---
 
 **Commands:** `rtk git diff`, `rtk tsc`, `rtk lint`
@@ -26,13 +27,15 @@ Detect the platform from the changed files, then dispatch:
 
 Report format (Step 4) is identical for all platforms.
 
+- **Node / tooling or other repositories:** use the project's architecture and verification commands. Skip EVPMR scaffolding and platform-only checklists; retain general code-quality review and the workflow's completion gates.
+
 ---
 
 ## Step 1: Context
 
-1. Detect base branch: `rtk git remote show origin | grep 'HEAD branch'`
-2. Run: `rtk git diff <base>...HEAD --name-only` then `rtk git diff <base>...HEAD`
-3. Apply standard context loading (`using-agent-skills`): freshness check (branch + commit), regenerate if stale or missing, read Summary + Key Changes
+1. Resolve the base and collect working-tree changes per `Change scope` above
+2. Read the complete file set and diffs collected above, including relevant untracked contents
+3. Apply standard context loading (`using-agent-skills`): derive Summary + Key Changes once into the turn from the complete change scope; write no context cache
 
 ---
 

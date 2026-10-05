@@ -337,7 +337,7 @@ sync_rules_adapter() {
 sync_agents_adapter() {
     local adapter="$1"
     local state_file="$STATE_DIR/${adapter}-agents"
-    local changed=0
+    local changed=0 skipped=0
 
     local installed_agents=()
     if [[ -f "$state_file" ]]; then
@@ -361,6 +361,11 @@ sync_agents_adapter() {
         local source_file="$AGENTS_DIR/${agent}.md"
         local dest cmp_src cmp_tmp=""
         dest="$("get_${adapter}_agent_dest" "$agent")"
+        if [[ "$adapter" == "codex" ]] && codex_agent_collision "$agent"; then
+            echo "    ! skipped unowned Codex agent: $agent ($dest)" >&2
+            skipped=1
+            continue
+        fi
         cmp_src="$source_file"
         # An adapter may transform agents on install (e.g. Claude splices craftkitInject
         # rules). If it declares effective_<adapter>_agent_source, diff against the rendered
@@ -379,7 +384,7 @@ sync_agents_adapter() {
         [[ -n "$cmp_tmp" && "$cmp_tmp" != "$source_file" ]] && rm -f "$cmp_tmp"
     done
 
-    [[ $changed -eq 0 ]] && echo "    agents: (up to date)"
+    [[ $changed -eq 0 && $skipped -eq 0 ]] && echo "    agents: (up to date)"
 
     printf '%s\n' "${current_agents[@]+"${current_agents[@]}"}" > "$state_file"
 }

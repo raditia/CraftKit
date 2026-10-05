@@ -7,12 +7,33 @@ description: Dynamic agent-selection classifier shared by the parallel-* orchest
 
 Used by `/parallel-review`, `/parallel-ship`, `/parallel-build`. Run this classification step before spawning any Phase 2 agents.
 
+### Runtime execution
+
+Use the host's native agent tools. On Claude Code, select the named `subagent_type` and put
+every selected agent's `Agent` block, plus the background test run, in **one** message, never in
+sequential waves: the agents are independent, so splitting them across turns serializes the slow
+ones behind the fast ones and is a defect. The harness wakes the main thread when all of them
+come to rest. On Codex,
+select the installed custom agent when the spawn tool supports it. Otherwise read
+`$CODEX_HOME/agents/<name>.toml` (or `~/.codex/agents/<name>.toml` when unset) and pass its `developer_instructions` plus the task
+payload explicitly to a native spawn with isolated context (`fork_turns: none` when exposed).
+Do not pass Claude model aliases to Codex. The profiles inherit the configured model and set
+reasoning effort; they run in a read-only sandbox. Generic research workers receive their own
+brief and permissions rather than a review profile.
+
+Launch independent agents without waiting for each result, up to the available concurrency.
+Queue the remainder when capacity is exhausted. Collect every result using native completion
+notifications or the wait tool, and apply Step 5 to failures. Do not launch nested `codex exec`
+processes when native spawning is available. If spawning is unavailable, use the sequential
+twin and report any omitted review axis.
+
+Start tests alongside reviewers: Claude uses Bash with `run_in_background: true` in that same message; Codex uses `exec_command` and
+collects an ongoing process with `write_stdin`. A session ID is pending work, not a pass.
+
 ### Step 1: Read the diff and actual changed files
 
-```bash
-rtk git diff <base>...HEAD --name-only   # file list
-rtk git diff <base>...HEAD               # full diff
-```
+Use the complete file set and diffs collected by `Change scope`, including unstaged and
+untracked work. Do not classify only the committed branch diff.
 
 For each changed file, read enough of its actual content to confirm what layer it belongs to. Don't rely on filename alone.
 
@@ -22,7 +43,8 @@ The routing hook already injects `Platform (detected from cwd)` each turn, so ta
 
 | Signal | Platform | Architecture |
 |--------|----------|--------------|
-| `*.tsx`/`*.ts` + `package.json` | React Native / web | EVPMR |
+| React dependency + `*.tsx`/`*.ts` | React Native / web | EVPMR |
+| Other `package.json` or tooling source | Node / tooling | project conventions; general reviewers only |
 | `*.kt`/`*.java` + Gradle | Android | MVP + Core framework |
 | `*.swift`/`*.m` + `Modules/` | iOS | MVVM-C |
 
@@ -112,4 +134,3 @@ For every selected agent that did not return findings:
 Do not retry a dead model spawn inline, because the model key won't change mid-turn. Report, and if the failing agent has a `model:` override that differs from peers (e.g. `haiku` vs `sonnet`), name that override as the likely cause.
 
 ---
-
