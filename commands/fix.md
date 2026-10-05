@@ -1,6 +1,7 @@
 ---
 name: fix
 description: Bug fix workflow: orchestrates fe-context, debug (reproduce → isolate → fix), and fe-test to verify the fix holds. Use when something is broken.
+craftkitInject: change-scope
 ---
 
 **Commands:** `rtk tsc`, `rtk lint`, `rtk grep "pattern" .`
@@ -25,12 +26,14 @@ Detect the platform from the changed/failing files. The debug loop is identical;
 - **iOS** (`*.swift`/`*.m`) → regression test via `/ios-test`; verify with `bazelisk test //Modules/<M>:<M>TestsBundle` + `swiftlint lint`. No fixed 93% coverage bar.
 - **React Native / web** → the `rtk tsc` / `rtk test` gates below apply (coverage ≥ 93%).
 
+- **Node / tooling or other repositories:** use the project's architecture and verification commands. Skip EVPMR scaffolding and platform-only checklists; retain general code-quality review and the workflow's completion gates.
+
 ---
 
 ## Step 1: Context
 
-1. Detect base branch: `rtk git remote show origin | grep 'HEAD branch'`
-2. Apply standard context loading (`using-agent-skills`): freshness check (branch + commit), regenerate if stale or missing, read Summary + Key Changes
+1. Resolve the base and collect working-tree changes per `Change scope` above
+2. Apply standard context loading (`using-agent-skills`): derive Summary + Key Changes once into the turn from the complete change scope; write no context cache
 3. Capture the exact failure: error message, stack trace, failing test output
 
 ---

@@ -76,7 +76,9 @@ _rebuild_claude_md() {
             # matches. Skipping it here is what makes that hook the single loader.
             _claude_rule_platform "$f" >/dev/null && continue
             echo ""
-            cat "$f"
+            # The CRAFTKIT-CODEX block is Codex-only runtime guidance (hooks/craftkit-codex.js
+            # extracts it); a full-body block would load it into every session here.
+            awk '/<!-- BEGIN CRAFTKIT-CODEX -->/{s=1} !s{print} /<!-- END CRAFTKIT-CODEX -->/{s=0}' "$f"
             echo ""
         done
         echo "$_CLAUDE_SECTION_END"

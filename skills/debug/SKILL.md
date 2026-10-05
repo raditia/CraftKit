@@ -20,7 +20,7 @@ alwaysApply: false
 ## Debug process
 
 1. **Reproduce:** identify exact inputs or conditions that trigger the bug
-2. **Isolate:** a built graphify graph answers this deterministically, so query it first: `graphify affected <symbol-or-file>` for blast radius, `graphify export callflow-html` for the path in. No graph in the project → spawn `cavecrew-investigator` with the symptom and ask for a `file:line` table. Either way, do not read files yourself at this step.
+2. **Isolate:** a built graphify graph answers this deterministically, so query it first: `graphify affected <symbol-or-file>` for blast radius, `graphify export callflow-html` for the path in. No graph in the project → use an available investigation agent with the symptom and ask for a `file:line` table. If no investigator or spawn tool is available, isolate with focused `rg` searches and bounded reads yourself. Do not require an uninstalled agent.
 3. **Hypothesize:** state the most likely root cause before reading more code
 4. **Verify:** confirm or disprove with code and traces:
    ```bash

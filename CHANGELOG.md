@@ -7,6 +7,37 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.54.0 — 2026-10-05
+
+### Codex-native agents and working-tree change scope
+
+Codex ran CraftKit's agents by shelling out to `codex exec`, and every review and context
+step compared only committed branch work, so unstaged and untracked edits went unreviewed.
+
+- Named agents now install for Codex as TOML profiles under `${CODEX_HOME:-~/.codex}/agents/`:
+  read-only sandbox, medium reasoning effort, the configured model. Profiles CraftKit does
+  not own are left alone.
+- `hooks/craftkit-codex.js` loads a short Codex runtime guide, taken from a `CRAFTKIT-CODEX`
+  block in `using-agent-skills`, in place of the Claude routing text.
+- New `partials/change-scope.md` is injected into every review, ship, build, fix, context and
+  eval workflow. Change scope now covers staged, unstaged and untracked files as well as the
+  committed diff, and reports `cannot-verify` when no base resolves.
+- `scripts/test-codex.py` covers the Codex hook and adapter.
+
+### Claude-side regressions found in review and fixed
+
+- Platform detection treated any `package.json` as RN/web. Codex narrowed it to roots with a
+  React dependency, which routed RN monorepos (React only in a workspace package) as plain
+  Node and dropped `fe-rules`. Detection now also reads workspace packages from
+  `workspaces`, `lerna.json` or `pnpm-workspace.yaml`.
+- The Claude and Gemini adapters strip the `CRAFTKIT-CODEX` block, so Codex-only guidance
+  no longer loads in every session there.
+- Shared commands no longer hardcode this repo's `bash check.sh` as the verification command.
+- The parallel classifier again tells Claude to launch every agent and the background test
+  run in one message.
+- `check.sh` 23b gains a monorepo fixture, a Node-without-React fixture, and an assertion that
+  the Claude block carries no Codex section.
+
 ## v1.53.0 — 2026-10-02
 
 ### Update notice on session start

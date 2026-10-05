@@ -10,6 +10,33 @@ description: Skill routing, model selection, core operating behaviors, and failu
 
 # Using Agent Skills
 
+<!-- BEGIN CRAFTKIT-CODEX -->
+## Codex runtime
+
+Classify task intent against installed skill descriptions before work. Announce the selected
+skill and read its native `SKILL.md`; Codex does not require a Claude `Skill` tool call. If no
+skill matches, state that briefly and proceed directly. User instructions take precedence.
+Use `rtk` for supported shell commands and run project verification from the project root.
+
+Build, review, and ship use `parallel-build`, `parallel-review`, and `parallel-ship` when native
+spawning is available; otherwise use `build`, `review`, and `ship`. Broken behavior uses `fix`;
+planning uses `define`; test authoring uses the platform's test skill; PR descriptions use
+`pr-message`. Use the actual project's architecture and verification commands. Generic Node
+or tooling repositories do not inherit React/EVPMR merely from a `package.json`.
+
+Use native Codex agents and respect the available concurrency. Select the installed custom
+profile, or read its TOML and pass `developer_instructions` with the task in isolated context.
+Cold specialists follow their brief directly without routing skills or spawning more agents.
+Pass applicable `AGENTS.md` conventions, collect every result, and report failed workers as
+coverage gaps. Do not treat a running command's session ID as successful verification.
+
+Keep the configured model; Codex reasoning tiers are low, medium, and high. Do not pass Claude
+family aliases. Before reporting completion, verify the latest edits using project gates and
+report actual results. Findings use `[ERROR]` (must fix), `[WARNING]` (should fix), and
+`[SUGGESTION]` (optional). For unusual routing or escalation, read the full rule referenced in
+the managed `AGENTS.md`; load only the relevant section.
+<!-- END CRAFTKIT-CODEX -->
+
 ## Always active (no invocation needed)
 
 Loaded from `rules/` automatically on every session:
@@ -25,7 +52,7 @@ Output compression (caveman) is delivered by the caveman plugin's hooks, not a s
 
 ## Skill discovery
 
-A cross-review panelist follows its assigned read-only prompt and skips skill
+A cold specialist or cross-review panelist follows its assigned read-only prompt and skips skill
 routing; the host handles synthesis and verification.
 
 **Intent-first routing is a BLOCKING REQUIREMENT.** Before generating ANY response to a user request, classify intent against available skills. This is mandatory, not advisory. Do NOT require specific trigger words; infer from meaning, not keywords. Do NOT skip this step even for simple or conversational requests.
@@ -95,7 +122,7 @@ Announce the command you actually ran (`Running /build …`), not the one you co
 
 ### Individual skills (use when task is narrower than a full workflow)
 
-**Platform first.** Classify the codebase before the task: React Native / web (EVPMR, `*.tsx`, `package.json`) → `fe-*`. Native Android (`*.kt/*.java`, Gradle, MVP) → `android-*`. Native iOS (`*.swift/*.m`, `Modules/`, MVVM-C) → `ios-*`. Native mobile does **not** use EVPMR, and takes no derived-context step for single-screen work; read a real sibling instead.
+**Platform first.** Classify the codebase before the task: React Native / web (React dependency plus `*.tsx`) → `fe-*`. Generic Node/tooling repositories use their project architecture and gates, not EVPMR. Native Android (`*.kt/*.java`, Gradle, MVP) → `android-*`. Native iOS (`*.swift/*.m`, `Modules/`, MVVM-C) → `ios-*`. Native mobile does **not** use EVPMR, and takes no derived-context step for single-screen work; read a real sibling instead.
 
 ```
 Frontend (React Native / web, EVPMR)
@@ -322,7 +349,7 @@ Use the everyday model by default. Escalate inline when you detect genuine uncer
 
 **On Claude Code the tiers arrive per turn, so never name a model id yourself.** `hooks/craftkit-routing.js` reads `~/.claude.json` every prompt and injects the resolved trio as `additionalContext` (`Model tiers (<plan> plan, ids resolved from ~/.claude.json entitlements): cheapest=… everyday=… escalate=…`). That line is authoritative wherever a skill names a tier. **Plan picks the tier window; entitlements pick the ids inside it.** Enterprise reaches the frontier family, so its window is sonnet / opus / fable, and everyday is opus. Personal caps below the frontier, so its window is haiku / sonnet / opus, and everyday is sonnet. Within the window, the id is the newest entitled version of that family from `modelAccessCache` ∪ `additionalModelOptionsCache`, which is what makes a release a no-op here: a new `opus-6` displaces `opus-5` on its own. Entitlements unreadable, or the plan unrecognized → personal window, family aliases only, said out loud in the line.
 
-**Spawn agents with the family alias** (`haiku` · `sonnet` · `opus` · `fable`), not a versioned id: the Agent tool's `model:` accepts aliases and each tracks the newest model in its family, which is why `agents/*.md` frontmatter pins `sonnet` and stays correct across releases. Concrete ids are for showing the user.
+**On Claude Code, spawn agents with the family alias** (`haiku` · `sonnet` · `opus` · `fable`), not a versioned id: the Agent tool's `model:` accepts aliases and each tracks the newest model in its family, which is why `agents/*.md` frontmatter pins `sonnet` and stays correct across releases. Codex profiles inherit the configured model and set reasoning effort. Concrete ids are for showing the user.
 
 | AI | Cheapest | Everyday | Escalate | Fusion panel |
 |---|---|---|---|---|
@@ -361,7 +388,7 @@ Independence-then-synthesis: same prompt → 2 independent runs → judge synthe
    - **Claude Code:** Agent tool, both in one message (concurrent), `model:` = the Escalate alias from the injected tier line
    - **Gemini CLI:** shell `&`-parallelism into temp files, judge call reads both
    - **Cursor:** two background agent tabs at once, both on the same escalate-tier model
-   - **Codex CLI:** two `codex exec` calls backgrounded into temp files, judge call reads both
+   - **Codex CLI:** two native subagents with isolated context, then synthesize their results; use headless subprocesses only when native spawning is unavailable and authorized
 4. Classify the deliverable, then synthesize:
    - **Artifact (code/config/script)** → run both candidates, merge by what demonstrably works, verify. The graft seam is where merges silently break, so run the merged result and fix until it passes.
    - **Research/analysis** → five sections: **Consensus** (agreement = highest confidence) · **Contradictions** (state both, adjudicate, never bury) · **Partial coverage** (depth only some engaged) · **Unique insights** (one panelist's non-obvious point, highest leverage) · **Blind spots** (what the whole panel missed; add one they didn't name).

@@ -2,7 +2,7 @@
 name: android-context
 description: Derive an Android branch's change context from git and emit it into the turn: an MVP flavored summary of changed feature modules, screens, presenters, and Dagger wiring. Writes no file. Optional branch-scoping step that feeds /android-review and /ship.
 alwaysApply: false
-craftkitInject: external-sources
+craftkitInject: external-sources, change-scope
 ---
 
 **Commands:** `git diff`, `git log`, `git status`, `./gradlew :<module>:lintGeneralDebug`
@@ -27,7 +27,7 @@ Organized by **MVP role + module split**, not EVPMR.
 ```
 PLAN:
 1. Detect base branch
-2. Collect: staged → committed-not-pushed → pushed-on-branch
+2. Collect: unstaged + untracked → staged → committed branch changes
 3. Map each changed file to its module (feature/-api/-base/-model/-navigation) + screen + MVP role
 4. Surface any layer/DI/navigation violations (do not fix)
 5. Emit the derived context into the turn, writing no file
@@ -39,13 +39,8 @@ PLAN:
 
 ## Step 1: Collect changes
 
-```bash
-git remote show origin | grep "HEAD branch"     # base, default main
-git diff --cached --name-status                  # staged
-git log @{u}..HEAD --oneline && git diff @{u}..HEAD
-git log main...@{u} --oneline && git diff main...@{u}
-```
-If `@{u}` errors (no upstream), skip and note it.
+Use `Change scope` above, including relevant untracked source and tests. Derive the summary
+from the complete union of files, not just committed or staged work.
 
 ---
 

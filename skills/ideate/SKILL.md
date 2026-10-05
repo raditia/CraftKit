@@ -26,7 +26,9 @@ Any check fails → `Ideation gate not met (<which>). Answering directly.` then 
 
 ## Phase 1: Diverge (parallel, isolated)
 
-Spawn **5 idea generators in ONE message**, parallel, never serialized. Serial execution collapses divergence into "one wider thought" and defeats the method.
+Launch **5 isolated idea generators**, using all available concurrency without waiting for one
+before launching the next. Queue excess generators when the host's capacity is lower than five.
+Keep their prompts independent; no generator receives another's output.
 
 Each generator receives, and **nothing else** (no peer output, since isolation is the point):
 - the problem statement + user context
@@ -58,10 +60,12 @@ Frame choice is judgment, so match frames to the problem. Adversary + Radical-si
 |------|------------------------|---------|
 | Claude Code | `Agent` tool, 5 blocks in one message, `subagent_type: general-purpose` | ✅ full |
 | Gemini CLI | shell `&` fan-out + `wait` (5× `gemini -p "<frame prompt>"`), then read outputs | ✅ full |
-| Codex CLI | shell `&` fan-out + `wait` (5× `codex exec "<frame prompt>"`), then read outputs | ✅ full |
+| Codex CLI | native isolated subagents, collect each with notifications or the wait tool; queue excess work at the concurrency limit | ✅ full |
 | Cursor | background agent tabs opened together | ⚠️ manual |
 
 On a manual tool, still run distinct frames; you lose isolation, not divergence.
+
+On Codex, use subprocess fan-out only when native spawning is unavailable and the user authorized it.
 
 ---
 

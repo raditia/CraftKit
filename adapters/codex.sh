@@ -5,9 +5,11 @@
 
 CODEX_SKILLS_DIR="$HOME/.agents/skills"
 CODEX_RULES_DIR="$HOME/.craftkit/codex/rules"
-CODEX_AGENTS_MD="$HOME/.codex/AGENTS.md"
-CODEX_HOOKS_DIR="$HOME/.codex/hooks"
-CODEX_HOOKS_CONFIG="$HOME/.codex/hooks.json"
+CODEX_CONFIG_DIR="${CODEX_HOME:-$HOME/.codex}"
+CODEX_AGENTS_DIR="$CODEX_CONFIG_DIR/agents"
+CODEX_AGENTS_MD="$CODEX_CONFIG_DIR/AGENTS.md"
+CODEX_HOOKS_DIR="$CODEX_CONFIG_DIR/hooks"
+CODEX_HOOKS_CONFIG="$CODEX_CONFIG_DIR/hooks.json"
 _CODEX_SECTION_START="<!-- BEGIN CRAFTKIT (managed: do not edit manually) -->"
 _CODEX_SECTION_END="<!-- END CRAFTKIT -->"
 
@@ -20,7 +22,7 @@ _rebuild_codex_agents_md() {
 # CraftKit for Codex
 
 Use the installed CraftKit skills when their descriptions match the task. Invoke one explicitly with `$skill-name` when useful. Build, review, and ship workflows are skills too. Read only relevant skills.
-For a workflow that requires a named Claude `subagent_type`, use its sequential twin: `parallel-build` to `build`, `parallel-review` to `review`, or `parallel-ship` to `ship`.
+Use native Codex subagents for parallel workflows. CraftKit agent profiles are installed in the Codex agents directory. If the spawn tool cannot select a custom profile, read its TOML and pass its developer_instructions explicitly with an isolated context. Respect available concurrency and collect every result. Use the sequential twin only when spawning is unavailable: `parallel-build` to `build`, `parallel-review` to `review`, or `parallel-ship` to `ship`.
 The Codex SessionStart hook loads the full applicable rule bodies. Follow those instructions and the activated skill or command body. The Stop hook checks project verification after edits.
 
 Working agreements:
@@ -82,10 +84,7 @@ PYEOF
 
 finalize_codex() {
     if compgen -G "$CODEX_RULES_DIR/*.md" &>/dev/null; then
-        if [[ ! -f "$CODEX_AGENTS_MD" ]] || ! grep -qF "$_CODEX_SECTION_START" "$CODEX_AGENTS_MD"; then
-            echo "    ! AGENTS.md managed section missing, rebuilding"
-            _rebuild_codex_agents_md
-        fi
+        _rebuild_codex_agents_md
     else
         _remove_codex_section
     fi
@@ -194,7 +193,7 @@ except FileNotFoundError:
     data = {}
 command = json.dumps(node) + ' ' + json.dumps(script)
 changed = False
-for event in ('SessionStart', 'UserPromptSubmit', 'PostToolUse', 'Stop'):
+for event in ('SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop'):
     groups = data.setdefault('hooks', {}).setdefault(event, [])
     found = False
     for group in groups:
@@ -209,7 +208,7 @@ for event in ('SessionStart', 'UserPromptSubmit', 'PostToolUse', 'Stop'):
         if event == 'SessionStart':
             entry['additionalContextLimit'] = 100000
         group = {'hooks': [entry]}
-        if event == 'PostToolUse':
+        if event in ('PreToolUse', 'PostToolUse'):
             group['matcher'] = 'Bash'
         groups.append(group)
         changed = True
@@ -264,3 +263,57 @@ uninstall_codex_rule() {
 get_codex_command_dest() { get_codex_dest "$1"; }
 install_codex_command() { install_codex_skill "$@"; }
 uninstall_codex_command() { uninstall_codex_skill "$1"; }
+
+get_codex_agent_dest() { echo "$CODEX_AGENTS_DIR/$1.toml"; }
+
+codex_agent_collision() {
+    local dest
+    dest="$(get_codex_agent_dest "$1")"
+    [[ -L "$CODEX_AGENTS_DIR" || -L "$dest" ]] && return 0
+    [[ -e "$dest" ]] && ! grep -qFx '# CraftKit managed agent' "$dest"
+}
+
+effective_codex_agent_source() {
+    local name="$1" source_file="$2" rendered out
+    rendered="$(mktemp)"; out="$(mktemp)"
+    craftkit_render_injected "$source_file" "$rendered"
+    python3 - "$name" "$rendered" "$out" <<'PYEOF'
+import json, re, sys
+name, source, dest = sys.argv[1:]
+with open(source) as f:
+    text = f.read()
+frontmatter, body = re.match(r'^---\n(.*?)\n---\s*(.*)', text, re.S).groups()
+description = re.search(r'^description:\s*(.+)$', frontmatter, re.M).group(1)
+instructions = ('You are a read-only CraftKit specialist. Follow your assigned task directly; '
+                'do not activate skills, route workflows, or spawn agents. Project conventions '
+                'are supplied by the parent.\n\n' + body)
+with open(dest, 'w') as f:
+    f.write('# CraftKit managed agent\n')
+    for key, value in [('name', name), ('description', description),
+                       ('sandbox_mode', 'read-only'), ('model_reasoning_effort', 'medium'),
+                       ('developer_instructions', instructions)]:
+        f.write(key + ' = ' + json.dumps(value, ensure_ascii=False) + '\n')
+PYEOF
+    rm -f "$rendered"
+    echo "$out"
+}
+
+install_codex_agent() {
+    local rendered
+    if codex_agent_collision "$1"; then
+        echo "Codex agent collision at $(get_codex_agent_dest "$1"); refusing to overwrite" >&2
+        return 1
+    fi
+    rendered="$(effective_codex_agent_source "$1" "$2")"
+    mkdir -p "$CODEX_AGENTS_DIR"
+    cp "$rendered" "$(get_codex_agent_dest "$1")"
+    rm -f "$rendered"
+}
+
+uninstall_codex_agent() {
+    local dest
+    dest="$(get_codex_agent_dest "$1")"
+    codex_agent_collision "$1" && return 0
+    [[ -f "$dest" ]] && rm -f "$dest"
+    return 0
+}

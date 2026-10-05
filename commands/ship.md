@@ -1,6 +1,7 @@
 ---
 name: ship
 description: Sequential pre-merge readiness workflow, platform-routed at Step 0: the platform's test and coverage gate, code-quality (5-axis), and its pattern review. Use when preparing a branch for PR without parallel agents.
+craftkitInject: change-scope
 ---
 
 **Commands:** `rtk jest`, `rtk tsc`, `rtk lint`, `rtk git diff`
@@ -26,13 +27,15 @@ Detect the platform from the changed files, then dispatch:
 
 The `SHIP READINESS` verdict block (Done) applies to all platforms; swap in the platform's test/lint tooling.
 
+- **Node / tooling or other repositories:** use the project's architecture and verification commands. Skip EVPMR scaffolding and platform-only checklists; retain general code-quality review and the workflow's completion gates.
+
 ---
 
 ## Step 1: Context
 
-1. Detect base branch: `rtk git remote show origin | grep 'HEAD branch'`
-2. Run: `rtk git diff <base>...HEAD --name-only`
-3. Apply standard context loading (`using-agent-skills`): freshness check (branch + commit), regenerate if stale or missing, read Summary + Key Changes
+1. Resolve the base and collect working-tree changes per `Change scope` above
+2. Read the complete file set collected above
+3. Apply standard context loading (`using-agent-skills`): derive Summary + Key Changes once into the turn from the complete change scope; write no context cache
 
 ---
 

@@ -1,6 +1,7 @@
 ---
 name: pr-message
 description: Generate a pull request message from branch commits and diff: title, summary, goal, changed files, test coverage status, and reviewer notes. Copies result to clipboard.
+craftkitInject: change-scope
 ---
 
 **Commands:** `rtk git log`, `rtk git diff`, `rtk git status`, `rtk git remote`
@@ -33,13 +34,13 @@ PLAN:
 ## Step 1: Branch context
 
 ```bash
-rtk git remote show origin | grep "HEAD branch"
+rtk git symbolic-ref --quiet --short refs/remotes/origin/HEAD
 rtk git rev-parse --abbrev-ref HEAD
 rtk git log <base>...HEAD --oneline
 rtk git diff <base>...HEAD --name-status
 ```
 
-Default base to `main` if remote detection fails.
+Resolve the base per `Change scope`; include working-tree changes and relevant untracked files. If no base resolves, report the limitation and describe the visible work without inventing a committed comparison.
 
 ---
 

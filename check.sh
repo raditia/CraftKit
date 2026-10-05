@@ -293,7 +293,8 @@ if ! command -v node >/dev/null 2>&1; then
 else
     _fx="$(mktemp -d)"
     mkdir -p "$_fx/a" "$_fx/i" "$_fx/w"
-    touch "$_fx/a/settings.gradle" "$_fx/i/Podfile" "$_fx/w/package.json"
+    touch "$_fx/a/settings.gradle" "$_fx/i/Podfile"
+    echo '{"dependencies":{"react":"*"}}' > "$_fx/w/package.json"
     _probe() { echo "{\"cwd\":\"$1\"}" | node "$HOOK" 2>/dev/null; }
     _pd=0
     _probe "$_fx/a" | grep -q "Platform (detected from cwd, authoritative): Android (MVP)" \
@@ -1039,10 +1040,14 @@ else
         fail "sandbox managed block lacks an always-on rule, so the scoped-absence check proves nothing"
         _px=1
     fi
+    # The CRAFTKIT-CODEX block is Codex's runtime guide; in Claude's full-body block it put
+    # Codex-only routing (and a "no skill" wording that contradicts the Stop hook) in every session.
+    grep -q 'Codex runtime' "$REPO_DIR/rules/using-agent-skills.md" && grep -q 'Codex runtime' "$_pf/CLAUDE.md" \
+        && { fail "Claude managed block carries the CRAFTKIT-CODEX section, so Codex-only guidance loads in every Claude session"; _px=1; }
 
     _phook() { printf '{"cwd":"%s"}' "$1" | HOME="$_pf/home" node "$REPO_DIR/hooks/craftkit-platform-rules.js" 2>/dev/null; }
     mkdir -p "$_pf/fe" "$_pf/android" "$_pf/bare"
-    echo '{}' > "$_pf/fe/package.json"
+    echo '{"dependencies":{"react":"*"}}' > "$_pf/fe/package.json"
     : > "$_pf/android/settings.gradle"
     _phook "$_pf/fe" | grep -q 'additionalContext' \
         || { fail "platform-rules hook injects nothing on a package.json project, so fe-rules never loads at all"; _px=1; }
@@ -1050,6 +1055,17 @@ else
         && { fail "platform-rules hook injects fe rules on a Gradle project, which is the bug the scoping exists to fix"; _px=1; }
     _phook "$_pf/bare" | grep -q 'additionalContext' \
         && { fail "platform-rules hook injects on a directory with no platform marker"; _px=1; }
+    # A monorepo root keeps React in a workspace package, not its own package.json, and
+    # routing it as plain Node dropped fe-rules for the whole RN monorepo.
+    mkdir -p "$_pf/mono/packages/app" "$_pf/node"
+    echo '{"name":"root"}' > "$_pf/mono/package.json"
+    echo '{"packages":["packages/*"]}' > "$_pf/mono/lerna.json"
+    echo '{"dependencies":{"react-native":"*"}}' > "$_pf/mono/packages/app/package.json"
+    echo '{"devDependencies":{"typescript":"*"}}' > "$_pf/node/package.json"
+    _phook "$_pf/mono" | grep -q 'additionalContext' \
+        || { fail "platform-rules hook treats a monorepo root with React only in a workspace package as plain Node"; _px=1; }
+    _phook "$_pf/node" | grep -q 'additionalContext' \
+        && { fail "platform-rules hook injects fe rules on a Node package with no React dependency"; _px=1; }
     echo 'not json' | node "$REPO_DIR/hooks/craftkit-platform-rules.js" >/dev/null 2>&1 \
         || { fail "platform-rules hook exits non-zero on malformed stdin, which surfaces as an error every session"; _px=1; }
 
@@ -1137,15 +1153,15 @@ else
         || { fail "Codex SessionStart does not inject rule bodies"; _cx=1; }
     [[ "$_out" == *'Layer constraints'* ]] \
         && { fail "Codex SessionStart injects FE rules into a non-FE repo"; _cx=1; }
-    echo '{}' > "$_cxf/repo/package.json"
+    echo '{"dependencies":{"react":"*"}}' > "$_cxf/repo/package.json"
     _out="$(_codexhook "{\"hook_event_name\":\"SessionStart\",\"cwd\":\"$_cxf/repo\"}")"
     [[ "$_out" == *'Layer constraints'* ]] \
         || { fail "Codex SessionStart omits platform-scoped FE rules in an FE repo"; _cx=1; }
     mkdir -p "$_cxf/home/.agents/skills/fixture-command"
     echo 'Exact command body from installed skill' > "$_cxf/home/.agents/skills/fixture-command/SKILL.md"
     _out="$(_codexhook "{\"hook_event_name\":\"UserPromptSubmit\",\"session_id\":\"fixture-explicit\",\"turn_id\":\"t1\",\"prompt\":\"/fixture-command run this\",\"cwd\":\"$_cxf/repo\"}")"
-    [[ "$_out" == *'Exact command body from installed skill'* ]] \
-        || { fail "Codex prompt hook skips an explicitly requested command body"; _cx=1; }
+    [[ "$_out" == *'fixture-command/SKILL.md'* && "$_out" != *'Exact command body'* ]] \
+        || { fail "Codex prompt hook omits the native skill pointer or duplicates its body"; _cx=1; }
     _codexhook "{\"hook_event_name\":\"UserPromptSubmit\",\"session_id\":\"fixture-a\",\"turn_id\":\"t1\",\"cwd\":\"$_cxf/repo\"}" >/dev/null
     _codexhook "{\"hook_event_name\":\"Stop\",\"session_id\":\"fixture-a\",\"cwd\":\"$_cxf/repo\"}" | grep -q '"decision"' \
         && { fail "Codex Stop blocks on a file dirty before the turn"; _cx=1; }
@@ -1154,7 +1170,8 @@ else
     _codexhook "{\"hook_event_name\":\"Stop\",\"session_id\":\"fixture-b\",\"cwd\":\"$_cxf/repo\"}" | grep -q '"decision":"block"' \
         || { fail "Codex Stop does not block an unverified edit"; _cx=1; }
     _codexhook "{\"hook_event_name\":\"UserPromptSubmit\",\"session_id\":\"fixture-b\",\"turn_id\":\"t2\",\"cwd\":\"$_cxf/repo\"}" >/dev/null
-    _codexhook "{\"hook_event_name\":\"PostToolUse\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"bash check.sh\"},\"session_id\":\"fixture-b\",\"cwd\":\"$_cxf/repo\"}" >/dev/null
+    _codexhook "{\"hook_event_name\":\"PreToolUse\",\"tool_name\":\"Bash\",\"tool_use_id\":\"verify\",\"tool_input\":{\"command\":\"bash check.sh\"},\"session_id\":\"fixture-b\",\"cwd\":\"$_cxf/repo\"}" >/dev/null
+    _codexhook "{\"hook_event_name\":\"PostToolUse\",\"tool_name\":\"Bash\",\"tool_use_id\":\"verify\",\"tool_input\":{\"command\":\"bash check.sh\"},\"tool_response\":{\"exit_code\":0},\"session_id\":\"fixture-b\",\"cwd\":\"$_cxf/repo\"}" >/dev/null
     _codexhook "{\"hook_event_name\":\"Stop\",\"session_id\":\"fixture-b\",\"cwd\":\"$_cxf/repo\"}" | grep -q '"decision"' \
         && { fail "Codex Stop blocks after verification on a continuation"; _cx=1; }
     echo 'not json' | node "$REPO_DIR/hooks/craftkit-codex.js" >/dev/null 2>&1 \
@@ -1175,11 +1192,18 @@ import json, sys
 hooks = json.load(open(sys.argv[1]))['hooks']
 assert len(hooks['Stop']) == 2
 assert hooks['Stop'][0]['hooks'][0]['command'] == 'user-stop-hook'
-for event in ('SessionStart', 'UserPromptSubmit', 'PostToolUse', 'Stop'):
+for event in ('SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop'):
     assert any('craftkit-codex.js' in h['command'] for g in hooks[event] for h in g['hooks'])
 PYEOF
     rm -rf "$_cxf"
     [[ $_cx -eq 0 ]] && pass
+fi
+
+check "Codex verification, concurrency, and native agent regressions"
+if command -v node >/dev/null 2>&1; then
+    if python3 "$REPO_DIR/scripts/test-codex.py"; then pass; else fail "Codex behavioral regressions failed"; fi
+else
+    echo "    skipped (node not on PATH)"
 fi
 
 # ---------------------------------------------------------------------------
