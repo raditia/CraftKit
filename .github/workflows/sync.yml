@@ -38,13 +38,16 @@ jobs:
     timeout-minutes: 15
     env:
       BASH_BIN: ${{ matrix.bash_bin }}
-      # Every sync writes here and nowhere else, so the runner's real HOME (npm cache,
-      # git config) stays untouched. One fixed path for all runs: sync bakes absolute
-      # hook paths into settings.json, so two installs only diff cleanly at the same path.
-      FIXTURE: ${{ runner.temp }}/home
       LC_ALL: C
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # Every sync writes here and nowhere else, so the runner's real HOME (npm cache,
+      # git config) stays untouched. One fixed path for all runs: sync bakes absolute
+      # hook paths into settings.json, so two installs only diff cleanly at the same path.
+      # Set from a step because the runner context is not available in job-level env.
+      - name: Fixture HOME
+        run: echo "FIXTURE=$RUNNER_TEMP/home" >> "$GITHUB_ENV"
 
       - name: First sync installs cleanly
         run: |
