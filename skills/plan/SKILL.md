@@ -21,6 +21,9 @@ You have a `/spec` (or an equivalently clear ask) and need implementable units. 
 1. **Read the spec** from the resolved intent file's `## Spec` section, or inline, and check its sources per `external-sources`. A drifted source means the spec may be stale: say so before planning on it. Consult the context sources (section above), then for each `kind: git` source marked `connection: active`:
    - its `seen` SHA differs from the refreshed one: list the Key decisions that cite it and ask the author to re-approve them before planning on them. Never rewrite an approved decision yourself.
    - its source is missing from the refresh output: tell the author it is no longer connected, and treat it as not consulted.
+   - its source is `cannot-verify` or `no-copy`: say its citations were not re-verified this run.
+
+   Match a source to an entry by the `github.com/<owner>/<repo>` part of `ref`, compared lowercase.
 2. **Derive tasks from acceptance criteria and approved test cases.** Each criterion becomes one or more tasks, and every approved test case is covered by at least one task. A task with no acceptance check is not a task; either give it one or drop it.
 3. **Size to verifiable units.** Each task is small enough to build + verify in one pass. If a task can't state its own done-check, split it.
 4. **Order by dependency.** A task lists what must land first. Mark tasks with no unmet dependency as parallelizable.

@@ -25,15 +25,16 @@ looked at it, so a spec could quietly contradict a decision the team had already
   new cross-source case when two repos disagree. A helper that cannot run is reported as
   `context source not consulted`, never as silence; an unconnected project is unchanged.
 - `scripts/context-source.{sh,js}` install to `~/.craftkit/bin`. URLs carrying a credential are
-  refused; symlinks and control-character filenames in a docs repo are never read and cannot
-  forge output lines; a corrupt store is refused rather than read as empty; a read-only sandbox
+  refused; symlinks and filenames carrying control, line-separator or bidi characters are never
+  read, and every path is printed as one JSON string, so a filename cannot forge output fields
+  or lines; a failed listing is reported as an error, never as "nothing found"; a corrupt store is refused rather than read as empty; a read-only sandbox
   (Codex default) falls back to the cached SHA as `cannot-verify`.
 - `partials/external-sources.md` scopes its "never write fetched content" rule to Figma and Lark
   and learns the `kind: git` source row; `partials/planning-resolve.md` documents its shape.
-- Verified headless on Claude Code and Codex against fixture repos: prompt-vs-doc and
-  cross-source conflicts each cited correctly 5/5 per host, unconnected baseline unchanged, and a
-  real github.com repo without credentials refused in about a second with no prompt. Cursor and
-  Gemini are unverified (`docs/research/context-source-hosts.md`).
+- Verified headless on Claude Code and Codex against fixture repos, with runs and pass bars in
+  `docs/research/context-source-hosts.md`: prompt-vs-doc and cross-source conflicts each cited
+  correctly 5/5 per host, unconnected baseline unchanged, and a real github.com repo without
+  credentials refused in about a second with no prompt. Cursor and Gemini are unverified.
 
 ## v1.54.0 — 2026-10-05
 

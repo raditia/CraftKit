@@ -57,7 +57,9 @@ under `sources:` with the marker read now per `external-sources`, or `seen: none
 `cannot-verify`. No pointers → omit `sources:`.
 
 **Consult the context sources** (section above). Record each cited document as a `kind: git`
-source and each resolved conflict under **Key decisions** with its citations.
+source and each resolved conflict under **Key decisions** with its citations. Never change `seen`
+on an existing `kind: git` entry: when the refreshed SHA differs, list the decisions citing it for
+the author to re-approve, as `/plan` does.
 
 Create `docs/planning/` if absent, then write `docs/planning/<slug>.md`:
 

@@ -38,7 +38,7 @@ Run from inside the project.
 4. **Report:**
 
 ```
-CONTEXT SOURCES: <project root>
+CONTEXT SOURCES (connections): <project root>
 - <source> sha <first 12 of sha=> branch <branch=>  (shared with <number of shared-with roots> projects)
 <pruned, forgot and stale lines as printed>
 Marked historical in: <planning files changed, for the author to commit>
@@ -46,4 +46,5 @@ Marked historical in: <planning files changed, for the author to commit>
 
 `no sources connected` is reported as is. `stale project=<path>` is a project whose folder is
 missing; suggest `forget-stale` only after the user confirms the folder is really gone, since an
-unmounted drive shows the same way.
+unmounted drive shows the same way. A source stuck at `cannot-verify` after its repo's default
+branch was renamed recovers with `disconnect` then `connect`.

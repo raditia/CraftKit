@@ -607,8 +607,8 @@ sync_bin() {
     [[ "$CRAFTKIT_DASHBOARD_ON" == 1 ]] && names="$names dashboard.py ccdash"
     for name in $names; do
         cmp -s "$REPO_DIR/scripts/$name" "$bin/$name" && continue
-        cp "$REPO_DIR/scripts/$name" "$bin/$name" || return 1
-        chmod +x "$bin/$name" || return 1
+        cp "$REPO_DIR/scripts/$name" "$bin/.$name.tmp" && chmod +x "$bin/.$name.tmp" \
+            && mv -f "$bin/.$name.tmp" "$bin/$name" || return 1
         echo "    + $name"
         changed=1
     done

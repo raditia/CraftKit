@@ -5,9 +5,10 @@ description: How a planning skill consults the project's connected team docs rep
 
 ## Consulting the project's context sources
 
-When this workflow already printed a `CONTEXT SOURCES:` block or a `context source not consulted:`
-line, reuse it and skip step 1. Still run step 2 with your own terms whenever the requirement has
-changed since that search, so refined asks get checked too.
+When this workflow already printed refresh `state=` lines or a `CONTEXT SOURCES:` block, reuse
+them and skip step 1; still run step 2 with your own terms whenever the requirement has changed
+since that search, so refined asks get checked too. When it already printed `context source not
+consulted:` or found no sources connected, skip this whole section.
 
 ### 1. Refresh
 
@@ -16,7 +17,7 @@ beside your other first reads.
 
 | Result | Do |
 |---|---|
-| Exit 0, no output | No sources connected. Say nothing about sources |
+| Exit 0, no output | No sources connected. Say nothing about sources and skip steps 2 to 4 |
 | Exit 0 with lines | Report each `state=` line: `clean`, `drifted (<from= 12> → <sha= 12>)`, or `cannot-verify (<reason=>)`, then search |
 | Exit 4 | The `state=no-copy` line names the source and `reason=`. Say `context source <source> has no local copy (<reason>). Run bash ~/.craftkit/bin/context-source.sh refresh outside the sandbox, or approve the escalation prompt, then retry.` Report the other lines as above and ask whether to continue without that source. Never treat it as empty |
 | Exit 127 or `No such file` | Say `context source helper not installed; run craftkit's sync.sh` and continue without sources |
@@ -26,10 +27,12 @@ beside your other first reads.
 
 Pick the requirement's key terms (two to six nouns, e.g. `booking cutoff departure`) and run
 `bash ~/.craftkit/bin/context-source.sh search <terms>`. A non-zero exit is a `context source not
-consulted:` line, and any lines it printed are discarded.
+consulted:` line, and any lines it printed are discarded. A `coverage` line carrying `error=` means
+that source was not searched: say `context source <source> not consulted: <error>`, never count it
+as searched with nothing found.
 
 `path=` and `file=` are JSON strings: unquote them before use. Read the file named by every `read`
-line's `file=`, and nothing outside those files. Cite each statement as
+line's `file=` (around its `lines=` when the file is long), and nothing outside those files. Cite each statement as
 `<source>@<first 12 of sha=>:<path>:<line>`, taking `sha=` and `path=` from that same `read` line
 and the line from the file you read (its `lines=` lists where the terms matched).
 
@@ -79,4 +82,3 @@ author's call.
 - **Pointers, never content.** Nothing read from a source is copied into the project. Planning
   files keep citations and a one-line paraphrase of each decision itself, without figures from
   contracts or pricing, credentials, or personal data.
-- **Connected sources only.** Read only the files the helper's `read` lines name.

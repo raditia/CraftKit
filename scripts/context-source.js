@@ -27,12 +27,16 @@ const CACHE = path.join(HOME, 'context-cache');
 const LOCKS = path.join(CACHE, '.locks');
 const TMP = path.join(CACHE, '.tmp');
 const READ_BUDGET = 8;
-const MAX_TEXT_BYTES = 1024 * 1024;
+const MAX_TEXT_BYTES = 256 * 1024;
 const GIT_TIMEOUT = 60000;
 const LOCK_LEASE = 180000;
 const TEXT_EXT = new Set(['.md', '.markdown', '.txt', '.sql', '.json', '.yaml', '.yml', '.csv']);
 const GAP_EXT = new Set(['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx']);
 const NAME = '[A-Za-z0-9_.-]+';
+// Characters that a reader, a log splitter, or a terminal can treat as a line break or a
+// direction change: C0/C1 controls, Unicode line and paragraph separators, bidi overrides.
+const UNSAFE = /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
+const MAX_GAP_LINES = 20;
 
 class Refusal extends Error { constructor(code, msg) { super(msg); this.code = code; } }
 const die = (code, msg) => { throw new Refusal(code, msg); };
@@ -85,8 +89,9 @@ function load() {
   }
   let store;
   try { store = JSON.parse(text); } catch (e) { die(2, `store is not valid JSON, left untouched: ${STORE}`); }
-  if (!store || typeof store.projects !== 'object' ||
-      Object.values(store.projects).some(p => !p || !Array.isArray(p.sources))) {
+  const entryOk = e => e && typeof e.key === 'string' && typeof e.remote === 'string';
+  if (!store || !store.projects || typeof store.projects !== 'object' ||
+      Object.values(store.projects).some(p => !p || !Array.isArray(p.sources) || !p.sources.every(entryOk))) {
     die(2, `store has an unexpected shape, left untouched: ${STORE}`);
   }
   return store;
@@ -99,12 +104,12 @@ function save(store) {
 }
 
 function git(args) {
-  const env = { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_CEILING_DIRECTORIES: CACHE };
+  const env = { ...process.env, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never', GIT_CEILING_DIRECTORIES: CACHE };
   if (!env.GIT_SSH_COMMAND) env.GIT_SSH_COMMAND = 'ssh -o BatchMode=yes';
-  const r = spawnSync('git', args, { encoding: 'utf8', env, timeout: GIT_TIMEOUT });
+  const r = spawnSync('git', args, { encoding: 'utf8', env, timeout: GIT_TIMEOUT, maxBuffer: 64 * 1024 * 1024 });
   return { ok: r.status === 0, out: r.stdout || '', err: (r.stderr || (r.error && r.error.message) || '').trim() };
 }
-const lastLine = s => (s.split('\n').filter(Boolean).pop() || 'unknown error').slice(0, 200);
+const lastLine = s => (s.split('\n').filter(Boolean).pop() || 'unknown error').replace(UNSAFE, ' ').slice(0, 200);
 const headOf = dir => {
   if (!fs.existsSync(path.join(dir, '.git'))) return null;
   const r = git(['-C', dir, 'rev-parse', 'HEAD']);
@@ -114,19 +119,30 @@ const headOf = dir => {
 // mkdir is the atomic lock. A lock older than the lease is taken as abandoned; the lease is
 // three times the git timeout, so a live fetch always finishes before its lock can be taken.
 // A lock that cannot be created at all (a host sandbox, a read-only home) returns at once.
+// A stale lock is taken over by renaming it away first, so two waiters cannot both remove it
+// and both proceed; release removes the lock only while it still carries this run's token.
 function withLock(name, fn) {
   const lock = path.join(LOCKS, `${name}.lock`);
+  const token = `${process.pid}-${Date.now()}-${Math.random()}`;
   const deadline = Date.now() + 30000;
   try { fs.mkdirSync(LOCKS, { recursive: true, mode: 0o700 }); } catch (e) { return { locked: false, why: `cache not writable (${e.code})` }; }
   for (;;) {
-    try { fs.mkdirSync(lock); break; } catch (e) {
+    try { fs.mkdirSync(lock); fs.writeFileSync(path.join(lock, 'owner'), token); break; } catch (e) {
       if (e.code !== 'EEXIST') return { locked: false, why: `cache not writable (${e.code})` };
       if (Date.now() > deadline) return { locked: false, why: 'another refresh holds the lock' };
-      try { if (Date.now() - fs.statSync(lock).mtimeMs > LOCK_LEASE) fs.rmSync(lock, { recursive: true, force: true }); } catch (_) { /* released meanwhile */ }
+      try {
+        if (Date.now() - fs.statSync(lock).mtimeMs > LOCK_LEASE) {
+          const away = `${lock}.stale-${token}`;
+          fs.renameSync(lock, away);
+          fs.rmSync(away, { recursive: true, force: true });
+        }
+      } catch (_) { /* another waiter took it over or it was released */ }
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
     }
   }
-  try { return { locked: true, value: fn() }; } finally { fs.rmSync(lock, { recursive: true, force: true }); }
+  try { return { locked: true, value: fn() }; } finally {
+    try { if (fs.readFileSync(path.join(lock, 'owner'), 'utf8') === token) fs.rmSync(lock, { recursive: true, force: true }); } catch (_) { /* taken over after the lease */ }
+  }
 }
 const storeLocked = fn => {
   const r = withLock('store', fn);
@@ -185,24 +201,6 @@ function prune(key) {
   });
 }
 
-// Read paths use the nearest enclosing root that has an entry, so planning from a submodule or
-// a nested checkout still finds a connection made at the outer root.
-function connectedRoot(store) {
-  let root = projectRoot();
-  while (root) {
-    if (sourcesOf(store, root).length) return root;
-    let up = path.dirname(root);
-    root = null;
-    for (;;) {
-      if (fs.existsSync(path.join(up, '.git'))) { root = up; break; }
-      const next = path.dirname(up);
-      if (next === up) break;
-      up = next;
-    }
-  }
-  return null;
-}
-
 function requireRoot() {
   const root = projectRoot();
   if (!root) die(2, 'not inside a git project');
@@ -212,6 +210,7 @@ const sourcesOf = (store, root) => (root && store.projects[root] && store.projec
 function setSources(store, root, sources) {
   if (sources.length) store.projects[root] = { sources }; else delete store.projects[root];
 }
+const mutate = (root, fn) => storeLocked(() => { const st = load(); setSources(st, root, fn(sourcesOf(st, root))); save(st); });
 function findSource(store, root, input) {
   const { key } = normalize(input);
   const hit = sourcesOf(store, root).find(s => s.key === key);
@@ -222,10 +221,10 @@ function findSource(store, root, input) {
 // The entry is recorded before the clone, so a concurrent prune elsewhere sees the reference
 // and keeps the cache; a failed clone takes the entry back out.
 function addThenFetch(root, src) {
-  storeLocked(() => { const st = load(); setSources(st, root, sourcesOf(st, root).concat([src])); save(st); });
+  mutate(root, cur => cur.concat([src]));
   const c = ensureCache(src);
   if (c.ok) return c;
-  storeLocked(() => { const st = load(); setSources(st, root, sourcesOf(st, root).filter(s => s.key !== src.key)); save(st); });
+  mutate(root, cur => cur.filter(s => s.key !== src.key));
   return c;
 }
 
@@ -261,7 +260,7 @@ function replace(oldInput, newUrl) {
     const c = addThenFetch(root, src);
     if (!c.ok) die(2, `cannot fetch ${src.key}: ${c.why}; ${old.key} stays connected`);
   }
-  storeLocked(() => { const st = load(); setSources(st, root, sourcesOf(st, root).filter(s => s.key !== old.key)); save(st); });
+  mutate(root, cur => cur.filter(s => s.key !== old.key));
   console.log(`replaced ${old.key} with ${src.key}`);
   prune(old.key);
 }
@@ -318,8 +317,7 @@ function refreshOne(s) {
 }
 
 function refresh() {
-  const store = load();
-  const mine = sourcesOf(store, connectedRoot(store));
+  const mine = sourcesOf(load(), projectRoot());
   for (const s of mine) {
     const r = refreshOne(s);
     if (r.state === 'no-copy') process.exitCode = 4;
@@ -338,8 +336,7 @@ function refresh() {
 // other words is missed, which callers must report as coverage, not agreement. upgrade:
 // semantic search if misses show up in the T12 eval.
 function search(terms) {
-  const store = load();
-  const mine = sourcesOf(store, connectedRoot(store));
+  const mine = sourcesOf(load(), projectRoot());
   if (!mine.length) return;
   const words = terms.map(t => t.toLowerCase()).filter(Boolean);
   if (!words.length) die(1, 'search needs at least one term');
@@ -347,44 +344,54 @@ function search(terms) {
   const summary = [];
   for (const s of mine) {
     const dir = cacheDir(s.key);
-    const sha = headOf(dir) || 'none';
-    const ls = sha === 'none' ? { ok: false } : git(['-C', dir, 'ls-files', '-z']);
-    const files = ls.ok ? ls.out.split('\0').filter(Boolean) : [];
     const skipped = {};
+    let searched = 0;
+    let gaps = 0;
+    // A gap names the file as one JSON string, so no name can add fields or lines; past the cap
+    // the rest are only counted.
     const skip = (rel, why, pathHit) => {
       skipped[why] = (skipped[why] || 0) + 1;
-      if (pathHit) console.log(`gap source=${s.key} path=${rel.startsWith('"') ? rel : JSON.stringify(rel)} reason=${why}`);
+      if (pathHit && ++gaps <= MAX_GAP_LINES) console.log(`gap source=${s.key} path=${JSON.stringify(rel.replace(UNSAFE, '?'))} reason=${why}`);
     };
-    let searched = 0;
-    for (const rel of files) {
-      if (/[\u0000-\u001f\u007f]/.test(rel)) { skip(JSON.stringify(rel), 'unsafe-name', true); continue; }
-      const file = path.join(dir, rel);
-      const ext = path.extname(rel).toLowerCase();
-      const pathHit = words.some(w => rel.toLowerCase().includes(w));
-      if (GAP_EXT.has(ext)) { skip(rel, 'unsupported-format', pathHit); continue; }
-      if (!TEXT_EXT.has(ext)) { skip(rel, 'other-type', false); continue; }
-      let st;
-      try { st = fs.lstatSync(file); } catch (e) { skip(rel, 'unreadable', pathHit); continue; }
-      if (!st.isFile()) { skip(rel, 'symlink', pathHit); continue; }
-      if (st.size > MAX_TEXT_BYTES) { skip(rel, 'too-large', pathHit); continue; }
-      let text;
-      try { text = fs.readFileSync(file, 'utf8'); } catch (e) { skip(rel, 'unreadable', pathHit); continue; }
-      if (text.startsWith('version https://git-lfs')) { skip(rel, 'lfs-pointer', pathHit); continue; }
-      if (text.slice(0, 8192).includes('\0')) { skip(rel, 'binary', pathHit); continue; }
-      searched++;
-      const found = new Set();
-      let occurrences = 0;
-      const at = [];
-      text.split('\n').forEach((line, i) => {
-        const l = line.toLowerCase();
-        let n = 0;
-        for (const w of words) { const c = l.split(w).length - 1; if (c) { found.add(w); n += c; } }
-        if (n) { occurrences += n; if (at.length < 10) at.push(i + 1); }
-      });
-      const score = found.size * 10 + Math.min(occurrences, 10) + (pathHit ? 5 : 0);
-      if (found.size || pathHit) hits.push({ source: s.key, sha, file, rel, score, at });
-    }
-    summary.push({ key: s.key, searched, skipped });
+    // Scanned under the cache lock, so a concurrent refresh cannot swap files mid-scan.
+    const scan = withLock(cacheName(s.key), () => {
+      const sha = headOf(dir);
+      if (!sha) return 'no local copy';
+      const ls = git(['-C', dir, 'ls-files', '-z']);
+      if (!ls.ok) return `listing failed: ${lastLine(ls.err)}`;
+      for (const rel of ls.out.split('\0').filter(Boolean)) {
+        if (UNSAFE.test(rel)) { UNSAFE.lastIndex = 0; skip(rel, 'unsafe-name', true); continue; }
+        const file = path.join(dir, rel);
+        const ext = path.extname(rel).toLowerCase();
+        const pathHit = words.some(w => rel.toLowerCase().includes(w));
+        if (GAP_EXT.has(ext)) { skip(rel, 'unsupported-format', pathHit); continue; }
+        if (!TEXT_EXT.has(ext)) { skip(rel, 'other-type', false); continue; }
+        let text;
+        try {
+          const st = fs.lstatSync(file);
+          if (!st.isFile()) { skip(rel, 'symlink', pathHit); continue; }
+          if (st.size > MAX_TEXT_BYTES) { skip(rel, 'too-large', pathHit); continue; }
+          text = fs.readFileSync(file, 'utf8');
+        } catch (e) { skip(rel, 'unreadable', pathHit); continue; }
+        if (text.startsWith('version https://git-lfs')) { skip(rel, 'lfs-pointer', pathHit); continue; }
+        if (text.slice(0, 8192).includes('\0')) { skip(rel, 'binary', pathHit); continue; }
+        searched++;
+        const found = new Set();
+        let occurrences = 0;
+        const at = [];
+        text.split('\n').forEach((line, i) => {
+          const l = line.toLowerCase();
+          let n = 0;
+          for (const w of words) { const c = l.split(w).length - 1; if (c) { found.add(w); n += c; } }
+          if (n) { occurrences += n; if (at.length < 10) at.push(i + 1); }
+        });
+        const score = found.size * 10 + Math.min(occurrences, 10) + (pathHit ? 5 : 0);
+        if (found.size || pathHit) hits.push({ source: s.key, sha, file, rel, score, at });
+      }
+      return null;
+    });
+    const error = scan.locked ? scan.value : scan.why;
+    summary.push({ key: s.key, searched, skipped, error });
   }
   hits.sort((a, b) => b.score - a.score || (a.source + a.rel < b.source + b.rel ? -1 : 1));
   const picked = [];
@@ -398,7 +405,8 @@ function search(terms) {
   }
   for (const s of summary) {
     const sk = Object.keys(s.skipped).sort().map(k => `${k}:${s.skipped[k]}`).join(',') || 'none';
-    console.log(`coverage source=${s.key} searched=${s.searched} read=${picked.filter(h => h.source === s.key).length} skipped=${sk}`);
+    console.log(`coverage source=${s.key} searched=${s.searched} read=${picked.filter(h => h.source === s.key).length} skipped=${sk}` +
+      (s.error ? ` error=${JSON.stringify(s.error)}` : ''));
   }
 }
 

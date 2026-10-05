@@ -65,3 +65,22 @@ errors exit 5, distinct from usage (1).
 - T7 must carry the `no-copy` instruction above verbatim and cite from `file=`/`sha=`.
 - T12's Codex leg runs in the default sandbox, so its pass bar is measured on the degraded path;
   its runs need a pre-populated cache.
+
+## T12 behavioral eval (2026-10-05)
+
+Headless `/spec` runs against two fixture docs repos (a team decision "bookings close 2 hours
+before departure" and a platform policy "1 hour"), served through git `insteadOf` as
+`github.com/<fixture-org>/<team-docs>` and `github.com/<fixture-org>/<platform-docs>`. Pass bars
+were fixed before running. Codex was scored on its final answer only, because its transcript
+echoes the skill text, templates included.
+
+| Case | Pass bar | Claude Code | Codex (read-only sandbox) |
+|---|---|---|---|
+| Ask contradicts the team decision | CONFLICT cites `decisions/0007-booking-cutoff.md:5` | 5/5 | 5/5 (freshness `cannot-verify`, cached SHA) |
+| The two repos contradict each other | `CONFLICT (cross-source)` citing both | 5/5 | 5/5 |
+| Unconnected project | no source output at all | 0 lines | 0 lines |
+| Resolution `A` recorded | `kind: git` source with `seen: sha:`, Key decision with citation, no doc text, outdated reminder | yes | drafted correctly; could not save (sandbox read-only for every skill) |
+| Real github.com repo that does not exist, no credential | exit 2, no prompt | refused in 1 s | n/a (helper only) |
+
+These 24 runs used the text before the pre-merge review fixes; a confirmation run of each case on
+each host after those fixes also passed (4/4). Cursor and Gemini remain unverified.

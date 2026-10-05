@@ -15,7 +15,7 @@ Two existing contracts bound where that text may live:
 
 - ADR-0002 locks in that `docs/` holds intent and decisions only, so nothing derived from
   elsewhere is cached inside a project.
-- `partials/external-sources.md:47` says "Write nothing you fetched to disk", written for Figma
+- `partials/external-sources.md` said "Write nothing you fetched to disk", written for Figma
   and Lark, where the content is reachable on demand through an MCP read and a stored copy only
   creates staleness.
 
@@ -40,7 +40,7 @@ ADR-0002's boundary holds: planning files keep pointers (`<repo>@<sha>:<path>:<l
 decisions the author approved, never doc text. This is not an exception to ADR-0002; it is the
 first stored copy that sits outside the boundary ADR-0002 draws.
 
-The absolute sentence in `partials/external-sources.md:47` is scoped, not relaxed: Figma and
+That absolute sentence in `partials/external-sources.md` is scoped, not relaxed: Figma and
 Lark content still never touches disk; `kind: git` content exists only inside the managed cache.
 A, unlike B, removes the maintenance step the author asked to remove; unlike C, it searches
 locally and survives an outage; unlike D, it keeps doc text out of code repos.
