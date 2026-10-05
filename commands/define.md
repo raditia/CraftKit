@@ -1,6 +1,7 @@
 ---
 name: define
 description: Checkpoint-gated pre-build planning pipeline that chains /interview → /spec → /test-cases → /plan (offering /ideate and plan-roaster where useful) so an underspecified feature ask becomes a reviewed spec + task plan in one invocation. Pauses for your approval between phases. Writes the feature's intent file under docs/planning/. Use before building a feature whose scope, approach, or tasks aren't yet clear.
+craftkitInject: context-source
 ---
 
 **Model:** everyday. Escalate the spec phase for hard-to-reverse features (schema, public API, payment/auth).
@@ -26,6 +27,12 @@ Platform is irrelevant to planning, since `/interview` `/spec` `/plan` are platf
 
 ---
 
+## Phase 0: Context sources (once)
+
+Run step 1 of the context sources section above (refresh) once, before Phase 1, and print its
+lines. Each phase then reuses them and runs only its own search; conflicts are raised by the phase
+whose search finds them, never here.
+
 ## Phase 1: Discover (`/interview`)
 
 Run `/interview`. Skip only if the ask is already at ~95% confidence (say so and jump to Phase 2).
@@ -47,7 +54,7 @@ Run `/spec` using the Discovery Brief (+ any `/ideate` choice) as input. Creates
 ## Phase 2.5: Test cases (`/test-cases`)
 
 Run `/test-cases` in Generate mode against the spec and its `sources:`. Skip when the feature has no
-sources and the author declines cases drawn from the spec alone.
+Figma or Lark sources and the author declines cases drawn from the spec alone.
 
 **Gate:** `docs/planning/<slug>.tests.md` written, every row cites a source or says `inferred`. The
 author approves rows in the file before `/plan`, so tasks map to approved IDs only.

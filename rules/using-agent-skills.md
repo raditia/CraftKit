@@ -157,6 +157,7 @@ Planning & docs (general, opt-in, never auto-run; write the feature's intent fil
 General utilities (any platform)
   ├── Research a question against primary sources? ──→ /research  (background agent, cited note in repo)
   ├── Score a finished run, correctness %? ──────────→ /eval  (eval-judge + weighted rubric + ledger)
+  ├── Connect / switch / remove a team docs repo? ──→ /context-source  (planning then checks asks against it)
   └── Hand this session off to a fresh agent? ───────→ /handoff  (compact state + decisions + next steps)
 
 Native Android (MVP + Core framework)          Native iOS (MVVM-C)

@@ -44,6 +44,10 @@ sources:            # optional; pointers plus a seen marker, never content (ADR-
   - kind: figma     # or lark
     ref: <file key/node id, or doc token>
     seen: <marker last reviewed; written only by /spec and /test-cases>
+  - kind: git       # a connected docs repo (context-source)
+    ref: github.com/<owner>/<repo>#<path>:<line>
+    seen: sha:<sha reviewed; written only by /spec>
+    connection: active   # historical once the source is replaced or disconnected
 ---
 
 # <feature title>

@@ -2,7 +2,7 @@
 name: spec
 description: Turn a discovery brief or clear ask into a PRD before coding: objective, users, scope, constraints, boundaries, acceptance criteria. Writes the feature's intent file under docs/planning/ so downstream skills execute with intent, not guesses. Adapted from addyosmani/agent-skills spec-driven-development (MIT).
 alwaysApply: false
-craftkitInject: planning-resolve, external-sources
+craftkitInject: planning-resolve, external-sources, context-source
 ---
 
 **Model:** everyday. Escalate when the feature is hard to reverse (schema, public API, payment/auth surface) per the karpathy hard-to-reverse gate.
@@ -56,6 +56,9 @@ derived: a branch name breaks on rename and has no answer on `main`. One or thre
 under `sources:` with the marker read now per `external-sources`, or `seen: none` when it is
 `cannot-verify`. No pointers → omit `sources:`.
 
+**Consult the context sources** (section above). Record each cited document as a `kind: git`
+source and each resolved conflict under **Key decisions** with its citations.
+
 Create `docs/planning/` if absent, then write `docs/planning/<slug>.md`:
 
 ```markdown
@@ -67,6 +70,10 @@ sources:
   - kind: {{figma|lark}}
     ref: {{pointer}}
     seen: {{marker:value, or none}}
+  - kind: git
+    ref: {{github.com/<owner>/<repo>}}#{{path}}:{{line}}
+    seen: sha:{{sha}}
+    connection: active
 ---
 
 # {{feature}}

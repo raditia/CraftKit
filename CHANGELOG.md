@@ -7,6 +7,34 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.55.0 — 2026-10-05
+
+### Context sources: planning checks asks against connected team docs repos
+
+Teams keep PRDs, specs, SQL, meeting notes and decisions in a GitHub repo, but planning never
+looked at it, so a spec could quietly contradict a decision the team had already recorded.
+
+- New `/context-source` skill connects, replaces, disconnects and lists any number of docs repos
+  per project. Connections live in `~/.craftkit/context-sources.json`, keyed by project root;
+  each repo is a craftkit-managed shallow clone under `~/.craftkit/context-cache/`, shared across
+  projects and pruned when none uses it (ADR-0003). Nothing is written into the project except
+  citations in its planning files.
+- `/interview`, `/spec`, `/plan` and `/define` inject `partials/context-source.md`: refresh once,
+  search the requirement's terms under one 8-file budget across all sources, cite
+  `<source>@<sha>:<path>:<line>`, and pause on a conflict with a fixed A/B/C prompt, including a
+  new cross-source case when two repos disagree. A helper that cannot run is reported as
+  `context source not consulted`, never as silence; an unconnected project is unchanged.
+- `scripts/context-source.{sh,js}` install to `~/.craftkit/bin`. URLs carrying a credential are
+  refused; symlinks and control-character filenames in a docs repo are never read and cannot
+  forge output lines; a corrupt store is refused rather than read as empty; a read-only sandbox
+  (Codex default) falls back to the cached SHA as `cannot-verify`.
+- `partials/external-sources.md` scopes its "never write fetched content" rule to Figma and Lark
+  and learns the `kind: git` source row; `partials/planning-resolve.md` documents its shape.
+- Verified headless on Claude Code and Codex against fixture repos: prompt-vs-doc and
+  cross-source conflicts each cited correctly 5/5 per host, unconnected baseline unchanged, and a
+  real github.com repo without credentials refused in about a second with no prompt. Cursor and
+  Gemini are unverified (`docs/research/context-source-hosts.md`).
+
 ## v1.54.0 — 2026-10-05
 
 ### Codex-native agents and working-tree change scope
