@@ -31,13 +31,13 @@ Pass applicable `AGENTS.md` conventions, collect every result, and report failed
 coverage gaps. Do not treat a running command's session ID as successful verification.
 Use the smallest unit that fits: coupled work and integration stay in the main task; bounded
 investigation, review, or testing goes to a read-only subagent; parallel edits use separate
-worktrees. Give each delegated unit a goal, output, and done check, then review its result
+worktrees. Give each delegated unit a goal, output, and verify command, then review its result
 before integrating; the human decides anything hard to reverse.
 
 Delegate multi-file, multi-step, or long-running work via `spawn_agent`; steer with
 `send_input` (`interrupt=true` to pivot), stop with `close_agent`. Codex never wakes an idle
-parent on child completion, so `wait_agent` for every result before ending the turn, then
-integrate; report "not verified" if an agent's verify result is missing or failing.
+parent, so `wait_agent` for every result before ending the turn; report "not verified" if an
+agent's verify result is missing or failing.
 
 Keep the configured model; Codex reasoning tiers are low, medium, and high. Do not pass Claude
 family aliases. Before reporting completion, verify the latest edits using project gates and

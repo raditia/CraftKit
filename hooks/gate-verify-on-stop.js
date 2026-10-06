@@ -67,10 +67,11 @@ function gitDirty(cwd, since) {
     const files = [];
     for (let i = 0; i < entries.length; i++) {
       if (!entries[i]) continue;
+      const rel = entries[i].slice(3);
       // An isolation: worktree spawn leaves its checkout untracked here; the agent's edits
       // are its own to verify. Matched repo-relative, so a session running inside a
       // worktree still gates its own files.
-      if (!entries[i].slice(3).startsWith('.claude/worktrees/')) files.push(path.join(root, entries[i].slice(3)));
+      if (!rel.startsWith('.claude/worktrees/')) files.push(path.join(root, rel));
       if (/[RC]/.test(entries[i].slice(0, 2))) i++;
     }
     return files.filter(f => {
@@ -110,8 +111,9 @@ process.stdin.on('end', () => {
   const THROWAWAY = /\/scratchpad\/|^\/tmp\/|^\/private\/tmp\/|^\/var\/folders\//;
   let touched = turn.edits.filter(f => !THROWAWAY.test(f));
   // A notification turn reports on an agent whose edits predate the turn, so its cut is
-  // the agent's spawn, falling back to the turn start when no spawn is found.
-  const since = turn.notification && Number.isFinite(turn.spawnedAt) ? turn.spawnedAt : turn.startedAt;
+  // the agent's spawn. No spawn found leaves it NaN, which counts every dirty file: the turn
+  // start would exclude all of the agent's edits.
+  const since = turn.notification ? turn.spawnedAt : turn.startedAt;
   if (wroteViaShell(turn.commands) || turn.delegated || turn.notification) {
     touched = touched.concat(gitDirty(cwd, since));
   }

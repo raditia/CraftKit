@@ -22,12 +22,14 @@ to check the result, so multi-file work now goes to background agents with a ver
   paragraph in its `CRAFTKIT-CODEX` block (`spawn_agent`, `send_input`, `close_agent`,
   `wait_agent`), which waits for every result, since Codex does not wake an idle parent.
 - New `gate-delegate.js` (`PreToolUse`, Bash included): asks on the 2nd distinct source file a
-  main turn edits, and on each further one until the turn spawns an agent.
+  main turn edits, and on each further one until the turn hands the work off (a background
+  spawn, or a profile that can edit). Unattended `claude -p` sessions skip it, since an ask
+  there is auto-denied; `CRAFTKIT_DELEGATE=off` turns it off for any other automation.
 - `gate-verify-on-stop.js`: a notification turn measures dirty files from the finished agent's
   spawn time, so a background agent's edits are verified; agent worktree dirs are ignored.
 - Cursor now strips `CRAFTKIT-CODEX`, which leaked into its rules before.
-- Sync migrates an installed hook to its new matcher; before, a changed matcher never reached
-  an existing install.
+- Sync migrates an installed hook off a matcher an earlier release registered; before, a
+  changed matcher never reached an existing install. A user-set matcher is left alone.
 - Measured: rule text alone delegated 0/5 multi-file tasks; with the gate, 2-3/5, every one
   after a gate ask. Long-running single-file work and orchestrator commands are not gated and
   stay rule-only guidance, a known gap.

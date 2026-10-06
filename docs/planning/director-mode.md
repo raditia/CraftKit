@@ -39,7 +39,7 @@ created: 2026-10-06
   - Background-edit verification is enforced in the Stop gate, with the contract as the first line: the gate collects dirty files whose mtime/ctime is at or after `turn.startedAt`, only when the turn delegated or wrote through the shell (`hooks/gate-verify-on-stop.js:74-75,109`). A background agent's edits land after the spawning turn ends and before the notification turn starts, so neither turn sees them. Measuring from the finished agent's spawn time on the notification turn closes that. Stop is the only event guaranteed to run on a reply-only turn; a PreToolUse ask would never fire there (cross-review, consensus). Corrects an earlier wrong "turn-start snapshot" description.
   - One writer in the main checkout, worktree for concurrent editors: keeps rule #12's existing "separate worktrees" law without paying a merge on every solo task.
 - **Risks & open questions:**
-  - Codex background agents and mid-run messaging are UNVERIFIED. The first task checks the Codex docs/CLI; if Codex lacks non-blocking spawn or messaging, its section degrades to "delegate, wait, integrate" and criterion 1 is Claude-only.
+  - Codex (verified by T1, `docs/research/codex-background-subagents.md`): spawn, steer and stop exist, but an idle parent is not woken on child completion, so the Codex section is "delegate, wait, integrate" and criterion 1 is Claude-only. Whether subagents survive the parent's turn end is still unverified.
   - Mid-size tasks pay a subagent round-trip and cold context; measure on one real task before tuning the threshold.
   - Known gap (measured, accepted 2026-10-06): the model delegated 0/12 times on its own initiative; long-running single-file loops (test-fix), single non-source outputs (a research .md), and orchestrator commands run in the foreground stay in the main session. Closing it needs harness-level delegation (orchestrators that launch themselves in a background agent), a separate feature.
   - A user who approves direct multi-file work is asked once per further file in that turn; `CRAFTKIT_GATE=off` is the escape.
@@ -47,14 +47,15 @@ created: 2026-10-06
   - A user-typed integration turn ("merge the worktrees") gets a false soft prompt; accepted cost, one click. Docs/planning edits never count toward the second file.
   - Finding the finished agent's spawn time from the notification (matching its tool-use id to the spawning call in the main transcript) is unproven; T4b establishes it, or falls back to the session's oldest still-running background spawn.
   - Cursor sessions lose the `CRAFTKIT-CODEX` text they carry today; it was Codex-only guidance, so this is a fix, but it is a visible Cursor change.
+- **Bar waiver (author, 2026-10-06):** T2b's original bar (>=4/5 multi-file delegations) was missed (0/5, 3/5, 2/5; 0/12 on the model's own initiative). The author chose the gate-enforced scope after run 3. The replacement bar is numeric: every turn where the gate fired ends in a background spawn (measured 4/4 in runs 2-3), and single-file delegation stays <=1/5 (measured 0/15). Not yet measured live: that the re-ask change (161c735) stops the 3rd direct source edit; in run 3 the main session still edited 2 to 3 files before handing off, and check 23e is the only evidence for the fix. Rule-only delegation stays a measured gap, not a pass criterion.
 - **Acceptance:**
-  - [ ] `CRAFTKIT-DIRECTOR` block added after rule #12 with threshold, contract, isolation, relay, integration; rule #12 itself unchanged; token-audited.
-  - [ ] Routing hook carries one director line; check.sh routing checks still pass.
+  - [x] `CRAFTKIT-DIRECTOR` block added after rule #12 with threshold, contract, isolation, relay, integration; rule #12 itself unchanged; token-audited.
+  - [x] Routing hook carries one director line; check.sh routing checks still pass.
   - [ ] `gate-delegate.js` asks on the 2nd and each further source file (incl. shell writes, parallel calls) until the turn spawns an agent; passes sidechain, notification, single-file; fixtures prove each.
   - [ ] Stop gate blocks a notification turn whose agent edited source with no verify run, and passes once verify ran; fixtures prove both.
-  - [ ] Codex section updated to verified primitives, or degradation stated.
-  - [ ] Cursor/Gemini installed output changes only by stripped foreign blocks.
-  - [ ] README hook + rule rows updated; CHANGELOG + version bump.
+  - [x] Codex section updated to verified primitives, or degradation stated.
+  - [x] Cursor/Gemini installed output changes only by stripped foreign blocks (fixture-HOME `diff -r` empty, T7, commit d90f604).
+  - [x] README hook + rule rows updated; CHANGELOG + version bump (161c735).
   - [ ] `bash check.sh` exit 0; `sync.sh` twice, second run all `(up to date)`.
 
 ## Task Plan

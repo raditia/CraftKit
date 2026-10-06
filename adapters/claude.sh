@@ -31,6 +31,12 @@ _CRAFTKIT_HOOKS=(
     "craftkit-drift.js%-%%"
     "craftkit-filesize.js%-%%"
 )
+# Matchers earlier releases registered, as script%matcher. Sync moves an installed hook off
+# one of these to its current matcher; any other installed matcher was set by the user,
+# often to narrow a gate, so it stays and sync prints a note.
+_CRAFTKIT_RETIRED_MATCHERS=(
+    "gate-delegate.js%Edit|Write|MultiEdit|NotebookEdit"
+)
 # Agent dashboard (opt-in): joins _CRAFTKIT_HOOKS only when CRAFTKIT_DASHBOARD_ON=1, so with
 # it off _claude_prune_hooks removes whatever an earlier opted-in sync installed. One script
 # per event row, because the table carries a single event per entry.
@@ -255,7 +261,7 @@ _resolve_node_bin() {
 # No field can contain a quote or backslash (script names and matchers are literals),
 # so printf is enough and a serializer would be ceremony.
 _craftkit_hook_spec_json() {
-    local node_bin h script event matcher statusmsg sep=""
+    local node_bin h script event matcher statusmsg retired sep=""
     node_bin="$(_resolve_node_bin)"
     printf '['
     for h in "${_CRAFTKIT_HOOKS[@]}"; do
@@ -264,8 +270,9 @@ _craftkit_hook_spec_json() {
         matcher="$(echo "$h" | cut -d'%' -f3)"
         statusmsg="$(echo "$h" | cut -d'%' -f4)"
         [[ "$event" == "-" ]] && continue
-        printf '%s{"script":"%s","event":"%s","matcher":"%s","status":"%s","command":"\\\"%s\\\" \\\"%s/%s\\\""}' \
-            "$sep" "$script" "$event" "$matcher" "$statusmsg" "$node_bin" "$CLAUDE_HOOKS_DIR" "$script"
+        retired="$(printf '%s\n' "${_CRAFTKIT_RETIRED_MATCHERS[@]}" | awk -F'%' -v s="$script" '$1 == s { printf "%s\"%s\"", (n++ ? "," : ""), $2 }')"
+        printf '%s{"script":"%s","event":"%s","matcher":"%s","retired":[%s],"status":"%s","command":"\\\"%s\\\" \\\"%s/%s\\\""}' \
+            "$sep" "$script" "$event" "$matcher" "$retired" "$statusmsg" "$node_bin" "$CLAUDE_HOOKS_DIR" "$script"
         sep=","
     done
     printf ']'
@@ -292,7 +299,7 @@ def interpreter(cmd):
 # the path stopped existing (dead hook, no gate, no error the user would notice),
 # or it is a version-pinned fnm path that is one `fnm uninstall` away from becoming the
 # first case. A working non-pinned command is left alone, since it may be deliberate.
-def repair(entries, script, hook_cmd, matcher):
+def repair(entries, script, hook_cmd, matcher, retired):
     for entry in entries:
         for h in entry.get('hooks', []):
             cmd = h.get('command', '')
@@ -306,7 +313,9 @@ def repair(entries, script, hook_cmd, matcher):
                 print('    %s interpreter re-pointed: %s -> %s'
                       % (script, current, interpreter(hook_cmd)))
             old = entry.get('matcher', '')
-            if old != matcher:
+            if old != matcher and old not in retired:
+                print('    %s keeps its custom matcher %s (craftkit ships %s)' % (script, old, matcher))
+            elif old != matcher:
                 entry['hooks'].remove(h)
                 if not entry['hooks']:
                     entries.remove(entry)
@@ -334,7 +343,7 @@ changed = False
 for item in spec:
     entries = settings.setdefault('hooks', {}).setdefault(item['event'], [])
     before = json.dumps(entries, sort_keys=True)
-    if not repair(entries, item['script'], item['command'], item['matcher']):
+    if not repair(entries, item['script'], item['command'], item['matcher'], item['retired']):
         hook = {'type': 'command', 'command': item['command'], 'timeout': 10}
         if item['status']:
             hook['statusMessage'] = item['status']

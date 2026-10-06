@@ -407,7 +407,7 @@ Codex installs [`craftkit-codex.js`](hooks/craftkit-codex.js) into `~/.codex/hoo
 |------|-------|--------------|
 | [`craftkit-routing.js`](hooks/craftkit-routing.js) | `UserPromptSubmit` | Injects the routing table, platform, model tiers, and any locally installed skills. Advisory |
 | [`gate-skill-first.js`](hooks/gate-skill-first.js) | `PreToolUse` on `Edit\|Write\|MultiEdit\|NotebookEdit` | Asks before a source edit in a session that never invoked a skill, naming the skills that fit the file. Once per turn |
-| [`gate-delegate.js`](hooks/gate-delegate.js) | `PreToolUse` on `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash` | Asks on the 2nd distinct source file a main-session turn edits and on every source edit after it (shell writes such as `sed -i` count; parallel calls count through its own per-turn record), telling the agent to hand the work to a background agent with a verify contract (director mode). Passes subagents, notifications, planning docs, and any turn that has spawned an agent |
+| [`gate-delegate.js`](hooks/gate-delegate.js) | `PreToolUse` on `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash` | Asks on the 2nd distinct source file a main-session turn edits and on every source edit after it (shell writes such as `sed -i` count; parallel calls count through its own per-turn record), telling the agent to hand the work to a background agent with a verify contract (director mode). Passes subagents, notifications, planning docs, unattended sessions (`claude -p`, where an ask is auto-denied), and any turn that has handed the work to an agent (a background spawn, or one whose profile can edit; a foreground `Explore` or read-only reviewer does not count). Counts only `.ts/.tsx/.js/.jsx/.mjs/.cjs/.kt/.java/.swift/.m/.mm`, so `.py` and notebooks (`.ipynb`) are not gated. `CRAFTKIT_DELEGATE=off` turns it off |
 | [`gate-verify-on-stop.js`](hooks/gate-verify-on-stop.js) | `Stop` | Blocks a turn that edited source but ran no verification command, and names the command (`check.sh` if present, else typecheck + lint). On a background-agent notification turn it counts files dirtied since that agent spawned, ignoring agent worktree dirs |
 | [`gate-announce-honored.js`](hooks/gate-announce-honored.js) | `Stop` | Blocks a reply that says `Running /<skill>` with no `Skill` call, or carries no routing declaration at all |
 | [`gate-read-size.js`](hooks/gate-read-size.js) | `PreToolUse` on `Read` | Refuses a whole-file read over 800 lines and points to the `bulk-read` agent or an `offset`/`limit` read. Denies rather than asks |
@@ -429,6 +429,7 @@ How the gates behave:
 | Escape hatch | Turns off |
 |--------------|-----------|
 | `CRAFTKIT_GATE=off` | The four edit/Stop gates and platform-rules injection |
+| `CRAFTKIT_DELEGATE=off` | `gate-delegate.js` only. Unattended `claude -p` runs already skip it; set this for any other automation that cannot answer an ask |
 | `CRAFTKIT_READ_GATE=off` | `gate-read-size.js` |
 | `CRAFTKIT_READ_CAP=off` | `craftkit-read-cap.js` |
 | `CRAFTKIT_ALLOW_DOWNGRADE=1` | The sync downgrade guard |
