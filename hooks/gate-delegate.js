@@ -1,16 +1,18 @@
 #!/usr/bin/env node
-// CraftKit PreToolUse gate: the second distinct source file edited in one main-session
-// turn asks to hand the work to a background agent (director mode, rule 12a).
+// CraftKit PreToolUse gate: from the second distinct source file edited in one main-session
+// turn, every source edit asks to hand the work to a background agent (director mode, rule
+// 12a), until the turn spawns one. Asking only once let a headless batch land the rest.
 // Rule text alone measured 0/5 delegation on multi-file tasks (director-mode plan, T2b):
 // the model read rule 12a and overruled it on task size. This is the half that can stop
 // the call. "ask", never "deny": the human keeps the override, and a declined ask (auto
 // under headless) is what forces the re-plan.
+// Cost: approving direct multi-file work interactively means one prompt per further edit.
 // Escape hatch: CRAFTKIT_GATE=off.
 
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { currentTurn, onceInTurn } = require(path.join(__dirname, 'craftkit-transcript.js'));
+const { currentTurn } = require(path.join(__dirname, 'craftkit-transcript.js'));
 
 // Same extension set as gate-skill-first and gate-verify-on-stop, so a planning doc
 // (docs/planning/*.md) is never source and never counts toward the threshold.
@@ -77,8 +79,9 @@ process.stdin.on('end', () => {
   const turn = currentTurn(payload.transcript_path);
   // An unreadable transcript is a gate that cannot see, so it must not block.
   if (!turn.readable) return pass();
-  // A subagent is the delegate already, and a background-task event is not a prompt.
-  if (turn.sidechain || turn.notification) return pass();
+  // A subagent is the delegate already, a background-task event is not a prompt, and a
+  // turn that spawned an agent has delegated.
+  if (turn.sidechain || turn.notification || turn.delegated) return pass();
 
   const session = String(payload.session_id || 'nosession');
   const recorded = turn.turnId ? seen(session, turn.turnId, mine) : [];
@@ -87,14 +90,12 @@ process.stdin.on('end', () => {
   const files = new Set(turn.edits.concat(shell).filter(counts).concat(recorded, mine));
   if (files.size < 2) return pass();
 
-  if (turn.turnId && !onceInTurn(session, turn.turnId, 'delegate')) return pass();
-
   process.stdout.write(JSON.stringify({
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
       permissionDecision: 'ask',
       permissionDecisionReason:
-        'This is the 2nd source file edited this turn (' + file + '). Director mode (rule 12a) ' +
+        'This is source file ' + files.size + ' edited this turn (' + file + '). Director mode (rule 12a) ' +
         'wants multi-file work handed to a background agent: Agent tool with run_in_background: true, ' +
         'and a contract that includes the verify command. If this is declined, re-plan the work ' +
         'as a delegation instead of continuing to edit directly.\n' +

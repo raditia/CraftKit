@@ -1204,11 +1204,12 @@ grep -q 'report "not verified"' <<<"$(_blk CODEX)" \
 [[ $_dv -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
-# 23e. The delegate gate asks on the 2nd source file of a main turn and nowhere
-#      else. Rule 12a alone delegated 0/5 multi-file tasks (T2b), so this gate is
-#      the enforcement; behavioral, because a gate that returns {} looks fine.
+# 23e. The delegate gate asks from the 2nd source file of a main turn until the
+#      turn spawns an agent, and nowhere else. Rule 12a alone delegated 0/5
+#      multi-file tasks (T2b), so this gate is the enforcement; behavioral,
+#      because a gate that returns {} looks fine.
 # ---------------------------------------------------------------------------
-check "delegate gate asks on the second source file only"
+check "delegate gate asks from the second source file until a spawn"
 if ! command -v node >/dev/null 2>&1; then
     echo "    skipped (node not on PATH)"
 else
@@ -1221,6 +1222,8 @@ edit = {"type": "assistant", "message": {"role": "assistant", "content": [
     {"type": "tool_use", "name": "Edit", "input": {"file_path": "/x/ModelFoo.ts"}}]}}
 cases = {"none": [prompt],
          "one": [prompt, edit],
+         "spawned": [prompt, edit, {"type": "assistant", "message": {"role": "assistant", "content": [
+             {"type": "tool_use", "name": "Agent", "input": {"run_in_background": True}}]}}],
          "notification": [{"type": "user", "message": {"role": "user",
                            "content": "<task-notification>\n<task-id>abc</task-id>\n"}}, edit],
          "sidechain": [dict(prompt, isSidechain=True), dict(edit, isSidechain=True)]}
@@ -1250,8 +1253,10 @@ PYEOF
     _delgate d8 /nope/missing.jsonl /x/ViewFoo.tsx | grep -q 'permissionDecision' \
         && { fail "delegate gate blocks on an unreadable transcript instead of failing open"; _de=1; }
     _delgate d9 "$_dx/one.jsonl" /x/ViewFoo.tsx >/dev/null
-    _delgate d9 "$_dx/one.jsonl" /x/PresenterFoo.ts | grep -q 'permissionDecision' \
-        && { fail "delegate gate asks twice in one turn, so a multi-file turn is a wall of prompts"; _de=1; }
+    _delgate d9 "$_dx/one.jsonl" /x/PresenterFoo.ts | grep -q '"permissionDecision":"ask"' \
+        || { fail "delegate gate lets a 3rd source file through after one ask, so a declined ask in a headless batch is ignored"; _de=1; }
+    _delgate d15 "$_dx/spawned.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "delegate gate still asks after the turn spawned an agent"; _de=1; }
     # Parallel calls in one message: the 1st call's tool_use is not in the transcript yet.
     _delgate d10 "$_dx/none.jsonl" /x/ModelFoo.ts >/dev/null
     _delgate d10 "$_dx/none.jsonl" /x/ViewFoo.tsx | grep -q '"permissionDecision":"ask"' \

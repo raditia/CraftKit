@@ -1,4 +1,4 @@
-# craftkit `v1.56.0`
+# craftkit `v1.57.0`
 
 [![npm](https://img.shields.io/npm/v/@raditia/craftkit)](https://www.npmjs.com/package/@raditia/craftkit)
 [![Content integrity](https://github.com/raditia/CraftKit/actions/workflows/check.yml/badge.svg)](https://github.com/raditia/CraftKit/actions/workflows/check.yml)
@@ -407,8 +407,8 @@ Codex installs [`craftkit-codex.js`](hooks/craftkit-codex.js) into `~/.codex/hoo
 |------|-------|--------------|
 | [`craftkit-routing.js`](hooks/craftkit-routing.js) | `UserPromptSubmit` | Injects the routing table, platform, model tiers, and any locally installed skills. Advisory |
 | [`gate-skill-first.js`](hooks/gate-skill-first.js) | `PreToolUse` on `Edit\|Write\|MultiEdit\|NotebookEdit` | Asks before a source edit in a session that never invoked a skill, naming the skills that fit the file. Once per turn |
-| [`gate-delegate.js`](hooks/gate-delegate.js) | `PreToolUse` on `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash` | Asks on the 2nd distinct source file a main-session turn edits (shell writes such as `sed -i` count; parallel calls count through its own per-turn record), telling the agent to hand the work to a background agent with a verify contract (director mode). Passes subagents, notifications and planning docs. Once per turn |
-| [`gate-verify-on-stop.js`](hooks/gate-verify-on-stop.js) | `Stop` | Blocks a turn that edited source but ran no verification command, and names the command (`check.sh` if present, else typecheck + lint) |
+| [`gate-delegate.js`](hooks/gate-delegate.js) | `PreToolUse` on `Edit\|Write\|MultiEdit\|NotebookEdit\|Bash` | Asks on the 2nd distinct source file a main-session turn edits and on every source edit after it (shell writes such as `sed -i` count; parallel calls count through its own per-turn record), telling the agent to hand the work to a background agent with a verify contract (director mode). Passes subagents, notifications, planning docs, and any turn that has spawned an agent |
+| [`gate-verify-on-stop.js`](hooks/gate-verify-on-stop.js) | `Stop` | Blocks a turn that edited source but ran no verification command, and names the command (`check.sh` if present, else typecheck + lint). On a background-agent notification turn it counts files dirtied since that agent spawned, ignoring agent worktree dirs |
 | [`gate-announce-honored.js`](hooks/gate-announce-honored.js) | `Stop` | Blocks a reply that says `Running /<skill>` with no `Skill` call, or carries no routing declaration at all |
 | [`gate-read-size.js`](hooks/gate-read-size.js) | `PreToolUse` on `Read` | Refuses a whole-file read over 800 lines and points to the `bulk-read` agent or an `offset`/`limit` read. Denies rather than asks |
 | [`craftkit-platform-rules.js`](hooks/craftkit-platform-rules.js) | `SessionStart` | Loads `platform:`-scoped rules only where the cwd matches, so EVPMR laws stay out of Kotlin and Swift sessions |
@@ -1232,7 +1232,7 @@ Loaded automatically on every session. Never invoke these; they're always presen
 | [`flag-safety`](rules/flag-safety.md) | Flag OFF stays behavior-identical: code paths, persisted state, API contracts, analytics. `flag:` marker, both states tested |
 | [`grounding`](rules/grounding.md) | Claims that drive action carry provenance: `[verified: how]`, `[from context.md @sha]`, `[UNVERIFIED]`. An `[UNVERIFIED]` claim cannot back an `[ERROR]` finding or an edit. Cold agents review handed content only; staleness reports cannot-verify, never clean |
 | [`karpathy-guidelines`](rules/karpathy-guidelines.md) | Think before coding, simplicity, surgical changes, goal-driven, read before write, tests verify intent, checkpoint after steps |
-| [`using-agent-skills`](rules/using-agent-skills.md) | Skill routing (mandatory gate: classify before every response, announce match or "No skill matched."), model selection, severity labels, parallel classifier, model for judgment only, surface conflicts |
+| [`using-agent-skills`](rules/using-agent-skills.md) | Skill routing (mandatory gate: classify before every response, announce match or "No skill matched."), model selection, severity labels, parallel classifier, model for judgment only, surface conflicts, director mode (12a: multi-file and long-running work goes to background agents, Claude Code only) |
 
 ### Frontend skills, on demand
 

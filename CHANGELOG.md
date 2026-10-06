@@ -7,6 +7,31 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.57.0 — 2026-10-06
+
+### Director mode: the main session directs, background agents build
+
+A main session that edits ten files itself burns its context on mechanics and leaves nobody
+to check the result, so multi-file work now goes to background agents with a verify contract.
+
+- `using-agent-skills` gains rule 12a (Claude Code): the main session answers and makes
+  single-file edits directly; multi-file, multi-step, long-running and orchestrator work goes to
+  background agents. Refinements go through SendMessage, pivots through TaskStop and a respawn,
+  and integration requires the agent's verify result, else it is reported "not verified". It
+  lives in a `CRAFTKIT-DIRECTOR` block that Gemini and Cursor strip. Codex gets a delegation
+  paragraph in its `CRAFTKIT-CODEX` block (`spawn_agent`, `send_input`, `close_agent`,
+  `wait_agent`), which waits for every result, since Codex does not wake an idle parent.
+- New `gate-delegate.js` (`PreToolUse`, Bash included): asks on the 2nd distinct source file a
+  main turn edits, and on each further one until the turn spawns an agent.
+- `gate-verify-on-stop.js`: a notification turn measures dirty files from the finished agent's
+  spawn time, so a background agent's edits are verified; agent worktree dirs are ignored.
+- Cursor now strips `CRAFTKIT-CODEX`, which leaked into its rules before.
+- Sync migrates an installed hook to its new matcher; before, a changed matcher never reached
+  an existing install.
+- Measured: rule text alone delegated 0/5 multi-file tasks; with the gate, 2-3/5, every one
+  after a gate ask. Long-running single-file work and orchestrator commands are not gated and
+  stay rule-only guidance, a known gap.
+
 ## v1.56.0 — 2026-10-05
 
 ### Execution units: pick the smallest one that fits

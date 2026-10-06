@@ -12,7 +12,7 @@ created: 2026-10-06
 - **Objective:** Make the main session the thinker: it routes, delegates and integrates, so any task above a size threshold runs in background subagents and the user can send a new task or a refinement while work is in flight.
 - **Users & job:** Engineers running CraftKit in Claude Code or Codex who want to keep talking to the session while it works, and steer running work without waiting for it to finish.
 - **Success:**
-  1. Observed over 5 canned multi-file and 5 single-file prompts in live Claude Code: at least 4/5 multi-file prompts end the main turn after a background spawn and answer a follow-up mid-run; at most 1/5 single-file prompts delegate.
+  1. Multi-file source work is delegated by enforcement, not by rule text: in a main turn, the 2nd and each further distinct source file (Edit/Write or a shell write) is asked until the turn spawns an agent (`check.sh` 23e). Observed in headless runs: every multi-file task the gate saw ended in a background agent, at most 1/5 single-file prompts delegate, and a follow-up is answered while the agent runs. Rule-only delegation (long-running single-file work, orchestrator commands) is guidance, measured, not a pass criterion.
   2. Observed over the same runs: every refinement sent mid-run is relayed with `SendMessage` or answered with a stop-and-respawn, and the main reply names which in one line.
   3. The new hook prompts (does not block) when the main turn edits a second distinct source file; it passes for subagent (sidechain) edits, task-notification turns, and single-file edits. Behavioral `check.sh` fixtures cover all four cases; the ask case is confirmed failing before the hook exists.
   4. Edits landed by a background agent get verified: the agent's contract carries the project's verify command and its result. On the notification turn of an agent that edited source, the Stop gate blocks until the verify command has run (`check.sh` fixture), and the live runs show "not verified" rather than "done" when it has not.
@@ -41,6 +41,8 @@ created: 2026-10-06
 - **Risks & open questions:**
   - Codex background agents and mid-run messaging are UNVERIFIED. The first task checks the Codex docs/CLI; if Codex lacks non-blocking spawn or messaging, its section degrades to "delegate, wait, integrate" and criterion 1 is Claude-only.
   - Mid-size tasks pay a subagent round-trip and cold context; measure on one real task before tuning the threshold.
+  - Known gap (measured, accepted 2026-10-06): the model delegated 0/12 times on its own initiative; long-running single-file loops (test-fix), single non-source outputs (a research .md), and orchestrator commands run in the foreground stay in the main session. Closing it needs harness-level delegation (orchestrators that launch themselves in a background agent), a separate feature.
+  - A user who approves direct multi-file work is asked once per further file in that turn; `CRAFTKIT_GATE=off` is the escape.
   - Worktree merges can conflict; the rule says the main session surfaces a conflict to the user rather than resolving it silently.
   - A user-typed integration turn ("merge the worktrees") gets a false soft prompt; accepted cost, one click. Docs/planning edits never count toward the second file.
   - Finding the finished agent's spawn time from the notification (matching its tool-use id to the spawning call in the main transcript) is unproven; T4b establishes it, or falls back to the session's oldest still-running background spawn.
@@ -48,7 +50,7 @@ created: 2026-10-06
 - **Acceptance:**
   - [ ] `CRAFTKIT-DIRECTOR` block added after rule #12 with threshold, contract, isolation, relay, integration; rule #12 itself unchanged; token-audited.
   - [ ] Routing hook carries one director line; check.sh routing checks still pass.
-  - [ ] `gate-delegate.js` prompts on 2nd source file in a main turn; passes sidechain, notification, single-file; fixtures prove each.
+  - [ ] `gate-delegate.js` asks on the 2nd and each further source file (incl. shell writes, parallel calls) until the turn spawns an agent; passes sidechain, notification, single-file; fixtures prove each.
   - [ ] Stop gate blocks a notification turn whose agent edited source with no verify run, and passes once verify ran; fixtures prove both.
   - [ ] Codex section updated to verified primitives, or degradation stated.
   - [ ] Cursor/Gemini installed output changes only by stripped foreign blocks.
