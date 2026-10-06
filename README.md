@@ -399,7 +399,7 @@ Nearest ancestor wins, so `"write tests for this"` in an Android repo resolves t
 
 ### Enforcement gates: hooks that refuse
 
-Routing context is only text: an agent can read it, announce the right skill, and hand-roll the work anyway. These hooks close that gap. The four gates can stop a call; the other four only inject context, rewrite a command, or notify.
+Routing context is only text: an agent can read it, announce the right skill, and hand-roll the work anyway. These hooks close that gap. The five gates can stop a call; the other four only inject context, rewrite a command, or notify.
 
 Codex installs [`craftkit-codex.js`](hooks/craftkit-codex.js) into `~/.codex/hooks/` and registers `SessionStart`, `UserPromptSubmit`, `PreToolUse` and `PostToolUse` on Bash, and `Stop` in `~/.codex/hooks.json`. It loads applicable rule bodies, using a concise Codex routing section instead of the full Claude-oriented rule. An explicit `$skill` or leading `/command` request points to the native skill file without injecting a second body. Verification requires a completed successful command against an unchanged snapshot from start to finish and the latest edited state, including committed edits; parallel hook results append without overwriting peers. Unknown or unfinished results do not count. Direct foreground commands and `&&` chains are supported; commands that mask failures with pipelines or semicolons require a separate check invocation. The gate covers `check.sh`, Node type/lint checks, Gradle lint/tests, and iOS tests/SwiftLint. Codex requires a one-time **`/hooks` review and trust** of the new definitions before they run. Native skill activation is not exposed as a stable hook event, so the gateway cannot prove that a skill body was followed; verification is the enforced part. `CRAFTKIT_GATE=off` disables it.
 
@@ -407,6 +407,7 @@ Codex installs [`craftkit-codex.js`](hooks/craftkit-codex.js) into `~/.codex/hoo
 |------|-------|--------------|
 | [`craftkit-routing.js`](hooks/craftkit-routing.js) | `UserPromptSubmit` | Injects the routing table, platform, model tiers, and any locally installed skills. Advisory |
 | [`gate-skill-first.js`](hooks/gate-skill-first.js) | `PreToolUse` on `Edit\|Write\|MultiEdit\|NotebookEdit` | Asks before a source edit in a session that never invoked a skill, naming the skills that fit the file. Once per turn |
+| [`gate-delegate.js`](hooks/gate-delegate.js) | `PreToolUse` on `Edit\|Write\|MultiEdit\|NotebookEdit` | Asks on the 2nd distinct source file a main-session turn edits, telling the agent to hand the work to a background agent with a verify contract (director mode). Passes subagents, notifications and planning docs. Once per turn |
 | [`gate-verify-on-stop.js`](hooks/gate-verify-on-stop.js) | `Stop` | Blocks a turn that edited source but ran no verification command, and names the command (`check.sh` if present, else typecheck + lint) |
 | [`gate-announce-honored.js`](hooks/gate-announce-honored.js) | `Stop` | Blocks a reply that says `Running /<skill>` with no `Skill` call, or carries no routing declaration at all |
 | [`gate-read-size.js`](hooks/gate-read-size.js) | `PreToolUse` on `Read` | Refuses a whole-file read over 800 lines and points to the `bulk-read` agent or an `offset`/`limit` read. Denies rather than asks |
@@ -427,7 +428,7 @@ How the gates behave:
 
 | Escape hatch | Turns off |
 |--------------|-----------|
-| `CRAFTKIT_GATE=off` | The three edit/Stop gates and platform-rules injection |
+| `CRAFTKIT_GATE=off` | The four edit/Stop gates and platform-rules injection |
 | `CRAFTKIT_READ_GATE=off` | `gate-read-size.js` |
 | `CRAFTKIT_READ_CAP=off` | `craftkit-read-cap.js` |
 | `CRAFTKIT_ALLOW_DOWNGRADE=1` | The sync downgrade guard |

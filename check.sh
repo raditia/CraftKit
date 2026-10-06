@@ -1147,6 +1147,61 @@ grep -q 'report "not verified"' <<<"$(_blk CODEX)" \
 [[ $_dv -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
+# 23e. The delegate gate asks on the 2nd source file of a main turn and nowhere
+#      else. Rule 12a alone delegated 0/5 multi-file tasks (T2b), so this gate is
+#      the enforcement; behavioral, because a gate that returns {} looks fine.
+# ---------------------------------------------------------------------------
+check "delegate gate asks on the second source file only"
+if ! command -v node >/dev/null 2>&1; then
+    echo "    skipped (node not on PATH)"
+else
+    _dx="$(mktemp -d)"
+    python3 - "$_dx" << 'PYEOF'
+import json, sys
+dx = sys.argv[1]
+prompt = {"type": "user", "message": {"role": "user", "content": "add a field"}}
+edit = {"type": "assistant", "message": {"role": "assistant", "content": [
+    {"type": "tool_use", "name": "Edit", "input": {"file_path": "/x/ModelFoo.ts"}}]}}
+cases = {"none": [prompt],
+         "one": [prompt, edit],
+         "notification": [{"type": "user", "message": {"role": "user",
+                           "content": "<task-notification>\n<task-id>abc</task-id>\n"}}, edit],
+         "sidechain": [dict(prompt, isSidechain=True), dict(edit, isSidechain=True)]}
+for name, lines in cases.items():
+    with open("%s/%s.jsonl" % (dx, name), "w") as f:
+        f.write("\n".join(json.dumps(x) for x in lines) + "\n")
+PYEOF
+    _delgate() {
+        printf '{"session_id":"%s","transcript_path":"%s","tool_input":{"file_path":"%s"}}' "$1" "$2" "$3" \
+            | TMPDIR="$_dx" node "$REPO_DIR/hooks/gate-delegate.js" 2>/dev/null
+    }
+    _de=0
+    _delgate d1 "$_dx/one.jsonl" /x/ViewFoo.tsx | grep -q '"permissionDecision":"ask"' \
+        || { fail "delegate gate lets a 2nd source file through in a main turn, so director mode is advisory again"; _de=1; }
+    _delgate d2 "$_dx/none.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "delegate gate asks on the 1st source file, so single-file work costs a prompt"; _de=1; }
+    _delgate d3 "$_dx/one.jsonl" /x/ModelFoo.ts | grep -q 'permissionDecision' \
+        && { fail "delegate gate counts a re-edit of the same file as a 2nd file"; _de=1; }
+    _delgate d4 "$_dx/sidechain.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "delegate gate asks inside a subagent, which is already the delegate"; _de=1; }
+    _delgate d5 "$_dx/notification.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "delegate gate asks on a background-task notification, which is not a prompt"; _de=1; }
+    _delgate d6 "$_dx/one.jsonl" /x/docs/planning/foo.md | grep -q 'permissionDecision' \
+        && { fail "delegate gate counts a docs/planning edit as source"; _de=1; }
+    _delgate d7 "$_dx/one.jsonl" /private/tmp/x/scratchpad/probe.ts | grep -q 'permissionDecision' \
+        && { fail "delegate gate counts a throwaway scratchpad file as source"; _de=1; }
+    _delgate d8 /nope/missing.jsonl /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "delegate gate blocks on an unreadable transcript instead of failing open"; _de=1; }
+    _delgate d9 "$_dx/one.jsonl" /x/ViewFoo.tsx >/dev/null
+    _delgate d9 "$_dx/one.jsonl" /x/PresenterFoo.ts | grep -q 'permissionDecision' \
+        && { fail "delegate gate asks twice in one turn, so a multi-file turn is a wall of prompts"; _de=1; }
+    echo 'not json' | node "$REPO_DIR/hooks/gate-delegate.js" >/dev/null 2>&1 \
+        || { fail "gate-delegate.js exits non-zero on malformed stdin"; _de=1; }
+    rm -rf "$_dx"
+    [[ $_de -eq 0 ]] && pass
+fi
+
+# ---------------------------------------------------------------------------
 # 24. The hook table and hooks/ agree in both directions, same invariant as
 #     check 13 holds for adapters. A script in hooks/ that no table entry names
 #     is never installed, and a table entry with no script installs nothing while
