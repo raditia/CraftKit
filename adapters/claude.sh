@@ -19,7 +19,7 @@ CLAUDE_MD="$HOME/.claude/CLAUDE.md"
 _CRAFTKIT_HOOKS=(
     "craftkit-routing.js%UserPromptSubmit%%CraftKit routing..."
     "gate-skill-first.js%PreToolUse%Edit|Write|MultiEdit|NotebookEdit%CraftKit skill gate..."
-    "gate-delegate.js%PreToolUse%Edit|Write|MultiEdit|NotebookEdit%CraftKit delegate gate..."
+    "gate-delegate.js%PreToolUse%Edit|Write|MultiEdit|NotebookEdit|Bash%CraftKit delegate gate..."
     "gate-verify-on-stop.js%Stop%%CraftKit verify gate..."
     "gate-announce-honored.js%Stop%%CraftKit announce gate..."
     "craftkit-platform-rules.js%SessionStart%%CraftKit platform rules..."

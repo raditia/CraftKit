@@ -1252,6 +1252,22 @@ PYEOF
     _delgate d9 "$_dx/one.jsonl" /x/ViewFoo.tsx >/dev/null
     _delgate d9 "$_dx/one.jsonl" /x/PresenterFoo.ts | grep -q 'permissionDecision' \
         && { fail "delegate gate asks twice in one turn, so a multi-file turn is a wall of prompts"; _de=1; }
+    # Parallel calls in one message: the 1st call's tool_use is not in the transcript yet.
+    _delgate d10 "$_dx/none.jsonl" /x/ModelFoo.ts >/dev/null
+    _delgate d10 "$_dx/none.jsonl" /x/ViewFoo.tsx | grep -q '"permissionDecision":"ask"' \
+        || { fail "delegate gate misses a 2nd file whose sibling call has not reached the transcript yet"; _de=1; }
+    _delbash() {
+        printf '{"session_id":"%s","transcript_path":"%s","cwd":"/x","tool_name":"Bash","tool_input":{"command":"%s"}}' "$1" "$2" "$3" \
+            | TMPDIR="$_dx" node "$REPO_DIR/hooks/gate-delegate.js" 2>/dev/null
+    }
+    _delbash d11 "$_dx/none.jsonl" "sed -i 's/a/b/' src/a.js src/b.js" | grep -q '"permissionDecision":"ask"' \
+        || { fail "delegate gate lets one sed -i across 2 source files through, so the shell bypasses it"; _de=1; }
+    _delbash d12 "$_dx/one.jsonl" "node --test test/*.test.js" | grep -q 'permissionDecision' \
+        && { fail "delegate gate asks on a Bash command that writes nothing"; _de=1; }
+    _delbash d13 "$_dx/one.jsonl" "echo hi > /private/tmp/x.js" | grep -q 'permissionDecision' \
+        && { fail "delegate gate counts a shell write to a throwaway path as source"; _de=1; }
+    _delbash d14 "$_dx/sidechain.jsonl" "sed -i 's/a/b/' src/a.js src/b.js" | grep -q 'permissionDecision' \
+        && { fail "delegate gate asks on a subagent's shell write, which is already the delegate"; _de=1; }
     echo 'not json' | node "$REPO_DIR/hooks/gate-delegate.js" >/dev/null 2>&1 \
         || { fail "gate-delegate.js exits non-zero on malformed stdin"; _de=1; }
     rm -rf "$_dx"
