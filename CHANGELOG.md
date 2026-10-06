@@ -14,6 +14,7 @@ from the README header and this file's matching `## <version>` section for the r
 A main session that edits ten files itself burns its context on mechanics and leaves nobody
 to check the result, so larger work now goes to background agents with a verify contract.
 
+- Rule 12a sets a budget: one review pass and one gate run per change, with measurement runs and extra reviews only on request.
 - `using-agent-skills` gains rule 12a (Claude Code): the main session assesses each prompt
   first. Answers, lookups, edits touching up to two files and anything done in about 2 minutes
   stay direct; long-running work, 3+ files, parallel pieces and orchestrator commands go to

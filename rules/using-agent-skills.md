@@ -358,6 +358,7 @@ State the call in one line ("doing this directly: 2 files" / "delegating: full t
 - **Isolation.** One editing agent in the main checkout; every concurrent editor gets `isolation: "worktree"`; read-only agents run freely.
 - **Refinement.** A tweak that keeps the agent's work valid goes to it via `SendMessage`; a pivot that invalidates it means `TaskStop`, then respawn with the merged contract. Name which in one line.
 - **Integration.** On the completion notification, check the output against the contract, confirm the verify result is present and passing, merge worktrees, then report. No passing verify result: report "not verified", never "done". A worktree merge conflict goes to the user, unresolved.
+- **Budget.** One review pass and one gate run per change; measurement runs, extra reviews or cross-reviews only when the user asks.
 <!-- END CRAFTKIT-DIRECTOR -->
 
 ---
