@@ -123,6 +123,37 @@ function turnIdOf(entry, text) {
   return crypto.createHash('sha1').update(text || '').digest('hex').slice(0, 16);
 }
 
+// When the agent a task-notification reports on was spawned. Its edits land after the
+// spawning turn's Stop and before this turn starts, so a cut at startedAt sees none of them.
+// Matched by the notification's tool-use id to the spawning Agent/Task call; failing that,
+// the oldest spawn no earlier notification has reported on; failing that, NaN.
+// ponytail: "still running" is "not yet notified", so a foreground spawn counts forever.
+// ceiling: the fallback window widens, failing toward the gate firing. upgrade: read
+// run_in_background off the call once the transcript shape for it is pinned.
+const TOOL_USE_ID = /<tool-use-id>\s*([^<\s]+)/;
+
+function spawnTime(earlier, text) {
+  const id = (text.match(TOOL_USE_ID) || [])[1];
+  const spawns = [], notified = new Set();
+  for (const e of earlier) {
+    if (isUserTurn(e)) {
+      const done = userText(e).match(TOOL_USE_ID);
+      if (done) notified.add(done[1]);
+    }
+    const content = e.message && e.message.content;
+    if (!Array.isArray(content)) continue;
+    for (const item of content) {
+      if (item && item.type === 'tool_use' && (item.name === 'Agent' || item.name === 'Task')) {
+        spawns.push({ id: item.id, at: Date.parse(e.timestamp) });
+      }
+    }
+  }
+  const match = spawns.find(s => id && s.id === id && Number.isFinite(s.at));
+  if (match) return match.at;
+  const running = spawns.filter(s => !notified.has(s.id) && Number.isFinite(s.at)).map(s => s.at);
+  return running.length ? Math.min.apply(null, running) : NaN;
+}
+
 // What the agent did since the user last spoke. Returns edits (file paths), commands
 // (bash command strings), skills (Skill tool invocations), slashCommand (the user
 // typed /<skill> themselves, which arms the gate just as a Skill call does), turnId
@@ -135,11 +166,13 @@ function turnIdOf(entry, text) {
 // background-task event rather than a prompt), and priorSkills (Skill calls in EARLIER
 // turns of this session, so a gate can spare a continuation of already-routed work,
 // counted across the whole file when the tail window missed the session start), and
-// startedAt (epoch ms of the prompt that opened the turn, NaN when the entry has none).
+// startedAt (epoch ms of the prompt that opened the turn, NaN when the entry has none), and
+// spawnedAt (on a notification turn, epoch ms of the reported agent's spawn, see spawnTime).
 function currentTurn(transcriptPath) {
   const out = { edits: [], commands: [], skills: [], slashCommand: false, readable: false,
                 turnId: '', sidechain: false, delegated: false, slashCommands: [],
-                assistantText: '', notification: false, priorSkills: 0, startedAt: NaN };
+                assistantText: '', notification: false, priorSkills: 0, startedAt: NaN,
+                spawnedAt: NaN };
   const tail = readTailLines(transcriptPath);
   const lines = tail.lines;
   if (!lines.length) return out;
@@ -176,6 +209,7 @@ function currentTurn(transcriptPath) {
     // Only task-notification: a system-reminder can prefix a genuine prompt in the same
     // entry, and matching it would silently disarm the gate on ordinary routable work.
     out.notification = /^\s*<task-notification\b/.test(text);
+    if (out.notification) out.spawnedAt = spawnTime(entries.slice(0, start), text);
     let sc;
     const scRe = /<command-name>\s*\/?([A-Za-z0-9:_-]+)/g;
     while ((sc = scRe.exec(text)) !== null) out.slashCommands.push(sc[1]);

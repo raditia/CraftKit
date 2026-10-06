@@ -917,6 +917,63 @@ PYEOF
             || { fail "stop gate drops a turn-edited file whose name git quotes (a space)"; _gd=1; }
         _stopgate "$_gx/delegated-chmod.jsonl" | grep -q 'Mode.ts' \
             || { fail "stop gate drops a chmod-only change, since chmod leaves mtime alone"; _gd=1; }
+        # A background agent writes after the spawning turn's Stop and before its
+        # notification turn starts, so a cut at either turn's start misses every file it
+        # wrote. The fixture dirt is dated now; the spawn sits before it, the notification
+        # after it, which is exactly that gap.
+        python3 - "$_gx" << 'PYEOF'
+import json, sys
+gx = sys.argv[1]
+
+
+def at(year, entry):
+    return dict(entry, timestamp="%s-01-01T00:00:00.000Z" % year)
+
+
+def spawned(year, tid="toolu_bg1"):
+    return [at(year, {"type": "user", "message": {"role": "user", "content": "build it"}}),
+            at(year, {"type": "assistant", "message": {"role": "assistant", "content": [
+                {"type": "tool_use", "id": tid, "name": "Agent",
+                 "input": {"prompt": "implement", "run_in_background": True}}]}})]
+
+
+def notified(year, tid="toolu_bg1", verify=False):
+    lines = [at(year, {"type": "user", "message": {"role": "user", "content":
+              "<task-notification>\n<task-id>abc</task-id>\n<tool-use-id>%s</tool-use-id>\n"
+              "<status>completed</status>\n</task-notification>" % tid}})]
+    if verify:
+        lines.append({"type": "assistant", "message": {"role": "assistant", "content": [
+            {"type": "tool_use", "name": "Bash", "input": {"command": "rtk tsc --noEmit && rtk lint ViewX.tsx"}}]}})
+    lines.append({"type": "assistant", "message": {"role": "assistant", "content": [
+        {"type": "text", "text": "The agent finished."}]}})
+    return lines
+
+
+cases = {"bg-edited": spawned(2000) + notified(2999),
+         "bg-verified": spawned(2000) + notified(2999, verify=True),
+         "bg-clean": spawned(2998) + notified(2999),
+         "bg-unmatched": spawned(2000) + notified(2999, tid="toolu_zzz")}
+for name, lines in cases.items():
+    with open("%s/%s.jsonl" % (gx, name), "w") as f:
+        f.write("\n".join(json.dumps(x) for x in lines) + "\n")
+PYEOF
+        _stopgate "$_gx/bg-edited.jsonl" | grep -q '"decision":"block"' \
+            || { fail "stop gate misses a background agent's edits on its notification turn, so delegating to the background skips verification"; _gd=1; }
+        _stopgate "$_gx/bg-verified.jsonl" | grep -q '"decision"' \
+            && { fail "stop gate blocks a notification turn that ran the verify command"; _gd=1; }
+        _stopgate "$_gx/bg-clean.jsonl" | grep -q '"decision"' \
+            && { fail "stop gate blames a background agent for files dirty before it was spawned"; _gd=1; }
+        _stopgate "$_gx/bg-unmatched.jsonl" | grep -q '"decision":"block"' \
+            || { fail "stop gate drops the oldest-running-spawn fallback when the notification's tool-use id matches no spawn"; _gd=1; }
+        # An isolation: worktree spawn creates an untracked worktree dir in the main
+        # checkout, which the delegating turn then blamed on itself. Found when the gate
+        # fired on the very turn that spawned this check's author.
+        mkdir -p "$_gx/wtproj/.claude/worktrees/agent-x" && echo '{}' > "$_gx/wtproj/package.json"
+        (cd "$_gx/wtproj" && git init -q . && git add -A && git commit -qm init >/dev/null 2>&1) || true
+        echo x > "$_gx/wtproj/.claude/worktrees/agent-x/somefile.ts"
+        printf '{"session_id":"wt%s","transcript_path":"%s","cwd":"%s"}' "$RANDOM" "$_gx/delegated.jsonl" "$_gx/wtproj" \
+            | TMPDIR="$_gx" node "$REPO_DIR/hooks/gate-verify-on-stop.js" 2>/dev/null | grep -q '"decision"' \
+            && { fail "stop gate blames a delegating turn for the agent worktree directory it spawned"; _gd=1; }
     fi
     mkdir -p "$_gx/proj/.claude/skills/zzz-fixture-skill"
     _announcegate() {
