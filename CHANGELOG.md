@@ -14,6 +14,7 @@ from the README header and this file's matching `## <version>` section for the r
 A main session that edits ten files itself burns its context on mechanics and leaves nobody
 to check the result, so larger work now goes to background agents with a verify contract.
 
+- Codex users: the PreToolUse hook's matcher changed, so Codex treats it as untrusted until you re-approve it once in `/hooks`; until then the Codex verify and delegate gates are skipped silently. Verified live on codex-cli 0.160.0: with `CRAFTKIT_DELEGATE=on` the 3rd file was handed to a subagent.
 - Rule 12a sets a budget: one review pass and one gate run per change, with measurement runs and extra reviews only on request.
 - `using-agent-skills` gains rule 12a (Claude Code): the main session assesses each prompt
   first. Answers, lookups, edits touching up to two files and anything done in about 2 minutes
