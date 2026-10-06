@@ -22,6 +22,11 @@ always-on rules, so it ran skills without grounding, verification, or the sequen
 - The block is written only once pi has created its agent dir, so users without pi get no `~/.pi`,
   and it is rewritten only on a content change, so a repeat sync stays a no-op.
 
+### Tagline: AI-gnostic
+
+- README and the npm description lead with "AI-gnostic coding workflows". The name stays
+  `craftkit`: a rename would touch on-disk markers, state dirs and hooks on every install.
+
 ## v1.56.0 — 2026-10-05
 
 ### Execution units: pick the smallest one that fits

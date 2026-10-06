@@ -5,6 +5,8 @@
 [![Release](https://img.shields.io/github/v/release/raditia/CraftKit)](https://github.com/raditia/CraftKit/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+**AI-gnostic coding workflows: write them once, run them on any AI tool or model.**
+
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, **Codex CLI**, and **pi**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
 ---
