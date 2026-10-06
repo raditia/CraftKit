@@ -714,6 +714,14 @@ announce_cases["declare-across-stop-feedback"] = [
     assistant([{"type": "text", "text": "Here is the message."}]),
 ]
 # Negative control: widening the turn must not make an undeclared turn look declared.
+# A background-task wake-up (finished subagents, a done shell) is not a prompt, so it owes no
+# declaration. The gate blocked it twice on its own author's session, burning the whole
+# budget on a turn that had nothing to route. Honesty still applies: a lie there blocks.
+_note = {"type": "user", "message": {"role": "user", "content": "<task-notification>\n<task-id>abc</task-id>\n"}}
+announce_cases["declare-notification"] = [_note,
+    assistant([{"type": "text", "text": "All five batches are in. Here is the shortlist."}])]
+announce_cases["announce-lied-notification"] = [_note,
+    assistant([{"type": "text", "text": "Running /%s [cheapest]: score them." % REAL}])]
 announce_cases["declare-silent-across-injection"] = [
     {"type": "user", "message": {"role": "user", "content": "write the PR message"}},
     injected(BODY, turnCompanion=True, sourceToolUseID="tu_1"),
@@ -966,6 +974,14 @@ PYEOF
         && { fail "announce gate blocks a turn that announced and invoked, because the skill body reset the turn"; _gd=1; }
     _announcegate "$_gx/declare-across-stop-feedback.jsonl" | grep -q '"decision"' \
         && { fail "announce gate loses a declaration to its own stop feedback, so the block repeats instead of clearing"; _gd=1; }
+    _announcegate "$_gx/declare-notification.jsonl" | grep -q '"decision"' \
+        && { fail "announce gate demands a declaration on a background-task wake-up, which has no prompt to route"; _gd=1; }
+    _announcegate "$_gx/announce-lied-notification.jsonl" | grep -q '"decision":"block"' \
+        || { fail "announce gate's notification exemption also waves through an announced-but-uninvoked skill"; _gd=1; }
+    # The transcript can lag the final reply at Stop, so the declared retry was judged by the
+    # reply before it. declare-silent's transcript, plus the reply the payload carries.
+    _announcegate "$_gx/declare-silent.jsonl" ',"last_assistant_message":"No skill matched for this request. Responding directly."' | grep -q '"decision"' \
+        && { fail "announce gate ignores last_assistant_message, so a declared reply the transcript has not flushed still blocks"; _gd=1; }
     # Negative control for check 2, mirroring s9.
     _announcegate "$_gx/declare-silent-across-injection.jsonl" | grep -q '"decision":"block"' \
         || { fail "announce gate stopped seeing an undeclared turn once an injected entry appeared, so the turn fix disarmed check 2"; _gd=1; }
