@@ -1,11 +1,11 @@
-# craftkit `v1.56.0`
+# craftkit `v1.57.0`
 
 [![npm](https://img.shields.io/npm/v/@raditia/craftkit)](https://www.npmjs.com/package/@raditia/craftkit)
 [![Content integrity](https://github.com/raditia/CraftKit/actions/workflows/check.yml/badge.svg)](https://github.com/raditia/CraftKit/actions/workflows/check.yml)
 [![Release](https://img.shields.io/github/v/release/raditia/CraftKit)](https://github.com/raditia/CraftKit/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
+One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, **Codex CLI**, and **pi**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
 ---
 
@@ -204,22 +204,23 @@ flowchart TB
         t2("Cursor")
         t3("Gemini CLI")
         t4("Codex CLI")
+        t5("pi")
     end
     subgraph S4["STAGE 4 · SESSION GATES"]
-        gates("Claude Code: routing and enforcement hooks<br/>Codex: rule loader + routing + verify-on-stop hooks<br/>Cursor/Gemini: advisory rules")
+        gates("Claude Code: routing and enforcement hooks<br/>Codex: rule loader + routing + verify-on-stop hooks<br/>Cursor/Gemini/pi: advisory rules")
     end
     subgraph S5["STAGE 5 · OUTPUT"]
         out("Verified change, shipped")
     end
     c1 & c2 & c3 & c4 & c5 --> pull
-    sync --> t1 & t2 & t3 & t4
-    t1 & t2 & t3 & t4 --> gates
+    sync --> t1 & t2 & t3 & t4 & t5
+    t1 & t2 & t3 & t4 & t5 --> gates
     gates --> out
 
     classDef n fill:#FFFFFF,stroke:#C1C4C6,color:#242628
     classDef key fill:#D1F0FF,stroke:#0A9AF2,color:#242628
     classDef ok fill:#FFFFFF,stroke:#029D24,color:#029D24
-    class c1,c2,c3,c4,c5,pull,t1,t2,t3,t4 n
+    class c1,c2,c3,c4,c5,pull,t1,t2,t3,t4,t5 n
     class sync,gates key
     class out ok
     style S1 fill:transparent,stroke:transparent
@@ -320,8 +321,9 @@ flowchart TB
 | Cursor | `~/.cursor/rules/*.mdc` (alwaysApply) | `~/.agents/skills/<name>/SKILL.md` (shared native skills, local only) | n/a |
 | Gemini CLI | `~/GEMINI.md` (managed block) | `~/GEMINI.md` (managed block), and also lists the shared `~/.agents/skills/` | n/a |
 | Codex CLI | `~/.codex/AGENTS.md` (short managed block); `~/.codex/hooks.json` loads applicable full rules from `~/.craftkit/codex/rules/` at session start | `~/.agents/skills/<name>/SKILL.md` (shared native skills, including workflows) | `${CODEX_HOME:-~/.codex}/agents/<name>.toml` |
+| pi | `${PI_CODING_AGENT_DIR:-~/.pi/agent}/AGENTS.md` (managed block: pi runtime guide + always-on rule bodies; `using-agent-skills` replaced by the guide, platform-scoped rules as pointers into `~/.craftkit/pi/rules/`). Written only once pi has created its agent dir | `~/.agents/skills/<name>/SKILL.md` (shared native skills; force one with `/skill:name`) | n/a: pi has no subagents, so workflows run the sequential twins |
 
-Codex and Cursor read skills from `~/.agents/skills/`, so they share one install there. Cursor does not copy that folder to Cloud Agents, so CraftKit skills reach local Cursor sessions only. Gemini CLI reads it too, but keeps its full `~/GEMINI.md` block: as native skills, workflows would load only on demand, behind a consent prompt on every activation. CraftKit's named specialists install for both Claude and Codex. Codex profiles carry the live injected instructions, use a read-only sandbox, and inherit the configured model with medium reasoning effort. Parallel workflows use native spawning up to the available concurrency, queue excess workers, and collect every result. Sequential fallback applies when spawning is unavailable. Unowned or symlinked Codex profiles are preserved and reported as collisions.
+Codex, Cursor and pi read skills from `~/.agents/skills/`, so they share one install there. Cursor does not copy that folder to Cloud Agents, so CraftKit skills reach local Cursor sessions only. Gemini CLI reads it too, but keeps its full `~/GEMINI.md` block: as native skills, workflows would load only on demand, behind a consent prompt on every activation. CraftKit's named specialists install for both Claude and Codex. Codex profiles carry the live injected instructions, use a read-only sandbox, and inherit the configured model with medium reasoning effort. Parallel workflows use native spawning up to the available concurrency, queue excess workers, and collect every result. Sequential fallback applies when spawning is unavailable. Unowned or symlinked Codex profiles are preserved and reported as collisions.
 
 If a skill name already belongs to another install in `~/.agents/skills/`, sync leaves that directory untouched, warns with its path, and continues installing the other skills. Remove or rename the conflicting directory if you want CraftKit's version of that skill.
 

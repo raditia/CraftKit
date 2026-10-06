@@ -66,8 +66,9 @@ source "$REPO_DIR/adapters/claude.sh"
 source "$REPO_DIR/adapters/cursor.sh"
 source "$REPO_DIR/adapters/gemini.sh"
 source "$REPO_DIR/adapters/codex.sh"
+source "$REPO_DIR/adapters/pi.sh"
 
-ADAPTERS=("claude" "cursor" "gemini" "codex")
+ADAPTERS=("claude" "cursor" "gemini" "codex" "pi")
 
 # Routing drift guard: every skill in skills/ must be named in the routing hook,
 # else the skill-first gate silently can't route it. Fail loud before syncing.
