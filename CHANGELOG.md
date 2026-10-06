@@ -12,22 +12,26 @@ from the README header and this file's matching `## <version>` section for the r
 ### Director mode: the main session directs, background agents build
 
 A main session that edits ten files itself burns its context on mechanics and leaves nobody
-to check the result, so multi-file work now goes to background agents with a verify contract.
+to check the result, so larger work now goes to background agents with a verify contract.
 
-- `using-agent-skills` gains rule 12a (Claude Code): the main session answers and makes
-  single-file edits directly; multi-file, multi-step, long-running and orchestrator work goes to
-  background agents. Refinements go through SendMessage, pivots through TaskStop and a respawn,
+- `using-agent-skills` gains rule 12a (Claude Code): the main session assesses each prompt
+  first. Answers, lookups, edits touching up to two files and anything done in about 2 minutes
+  stay direct; long-running work, 3+ files, parallel pieces and orchestrator commands go to
+  background agents, and the call is stated in one line. The user's "do it here" or "in
+  background" overrides. The agent runs the verify command in the foreground. Refinements go through SendMessage, pivots through TaskStop and a respawn,
   and integration requires the agent's verify result, else it is reported "not verified". It
   lives in a `CRAFTKIT-DIRECTOR` block that Gemini and Cursor strip. Codex gets a delegation
   paragraph in its `CRAFTKIT-CODEX` block (`spawn_agent`, `send_input`, `close_agent`,
   `wait_agent`), which waits for every result, since Codex does not wake an idle parent.
-- New `gate-delegate.js` (`PreToolUse`, Bash included): asks on the 2nd distinct source file a
+- New `gate-delegate.js` (`PreToolUse`, Bash included): asks on the 3rd distinct source file a
   main turn edits, and on each further one until the turn hands the work off (a background
   spawn, or a profile that can edit). Unattended `claude -p` sessions skip it, since an ask
   there is auto-denied; `CRAFTKIT_DELEGATE=off` turns it off for any other automation.
 - Codex gets the same gate in `craftkit-codex.js`, opt-in with `CRAFTKIT_DELEGATE=on` (`PreToolUse` now on `Bash|apply_patch|spawn_agent`): Codex rejects `ask` and cannot tell `codex exec` from an interactive run, so it can only deny; it passes once the turn spawns an agent that can edit.
 - `gate-verify-on-stop.js`: a notification turn measures dirty files from the finished agent's
-  spawn time, so a background agent's edits are verified; agent worktree dirs are ignored.
+  spawn time, so a background agent's edits are verified; agent worktree dirs are ignored. It
+  passes when the agent's own transcript shows the verify command succeeding after its last
+  write, so the main session does not re-run it, and ignores edits outside the repo root.
 - Cursor now strips `CRAFTKIT-CODEX`, which leaked into its rules before.
 - Sync migrates an installed hook off a matcher an earlier release registered; before, a
   changed matcher never reached an existing install. A user-set matcher is left alone.

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// CraftKit PreToolUse gate: from the second distinct source file edited in one main-session
+// CraftKit PreToolUse gate: from the third distinct source file edited in one main-session
 // turn, every source edit asks to hand the work to a background agent (director mode, rule
 // 12a), until the turn spawns one. Asking only once let a headless batch land the rest.
 // Rule text alone measured 0/5 delegation on multi-file tasks (director-mode plan, T2b):
@@ -32,7 +32,7 @@ const counts = f => CODE_EXT.test(f) && !THROWAWAY.test(f);
 // commit message or grep pattern is not a write; a quoted target is unquoted.
 // ponytail: perl -i, a heredoc piped to an interpreter, in-script writes, and escaped
 // quotes inside a quoted span are missed. ceiling: a shell write in those shapes reaches
-// the 2nd file unasked. upgrade: diff git state per call, as the verify gate does at Stop.
+// the 3rd file unasked. upgrade: diff git state per call, as the verify gate does at Stop.
 const QUOTED = `"[^"]*"|'[^']*'`;
 function shellWrites(command, cwd) {
   const out = [];
@@ -114,7 +114,7 @@ function gate() {
   // The current call may already be in the transcript, so dedupe rather than add one.
   const shell = [].concat.apply([], turn.commands.map(c => shellWrites(c, cwd)));
   const files = new Set(turn.edits.concat(shell).filter(counts).concat(recorded, mine));
-  if (files.size < 2) return pass();
+  if (files.size < 3) return pass();
 
   process.stdout.write(JSON.stringify({
     hookSpecificOutput: {
@@ -122,7 +122,7 @@ function gate() {
       permissionDecision: 'ask',
       permissionDecisionReason:
         'This is source file ' + files.size + ' edited this turn (' + file + '). Director mode (rule 12a) ' +
-        'wants multi-file work handed to a background agent: Agent tool with run_in_background: true, ' +
+        'wants work touching 3+ files handed to a background agent: Agent tool with run_in_background: true, ' +
         'and a contract that includes the verify command. If this is declined, re-plan the work ' +
         'as a delegation instead of continuing to edit directly.\n' +
         'Set CRAFTKIT_DELEGATE=off to disable this gate.'

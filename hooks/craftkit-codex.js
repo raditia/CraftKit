@@ -151,7 +151,7 @@ const THROWAWAY = /\/scratchpad\/|^\/tmp\/|^\/private\/tmp\/|^\/var\/folders\//;
 // Copied from gate-delegate.js, held identical by scripts/test-codex.py.
 // ponytail: perl -i, a heredoc piped to an interpreter, in-script writes, and escaped
 // quotes inside a quoted span are missed. ceiling: a shell write in those shapes reaches
-// the 2nd file unasked. upgrade: diff git state per call, as the verify gate does at Stop.
+// the 3rd file unasked. upgrade: diff git state per call, as the verify gate does at Stop.
 const QUOTED = `"[^"]*"|'[^']*'`;
 function shellWrites(command, cwd) {
   const out = [];
@@ -206,11 +206,11 @@ function delegate(p, file, cwd) {
   const retracted = new Set(rows.filter(r => r[2] === '-').map(r => r[1]));
   const live = rows.filter(r => r[2] !== '-' && !retracted.has(r[1])).map(r => r[2]);
   const files = new Set(live);
-  if (files.has('spawn_agent') || files.size < 2) return null;
+  if (files.has('spawn_agent') || files.size < 3) return null;
   append(['-']);
   return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason:
-    'This is source file ' + files.size + ' edited this turn (' + mine[0] + '). Director mode wants multi-file ' +
-    'work delegated: spawn_agent with a contract that includes the verify command, then wait_agent and ' +
+    'This is source file ' + files.size + ' edited this turn (' + mine[0] + '). Director mode wants work ' +
+    'touching 3+ files delegated: spawn_agent with a contract that includes the verify command, then wait_agent and ' +
     'integrate its result. Re-plan the work as a delegation instead of editing directly. ' +
     'Unset CRAFTKIT_DELEGATE or set it to off to disable this gate.' } };
 }

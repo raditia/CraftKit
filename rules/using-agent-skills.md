@@ -346,15 +346,15 @@ Delegated work follows one flow: **workstream contract â†’ permission boundary â
 <!-- BEGIN CRAFTKIT-DIRECTOR -->
 ### 12a. Director mode (Claude Code)
 
-Supersedes rule 12's "Main task" row: the main session thinks, routes, delegates and integrates, and keeps the chat unblocked.
+Supersedes rule 12's "Main task" row: the main session thinks, routes, delegates and integrates, and keeps the chat unblocked. Assess each prompt before choosing: delegating quick work is slower (agent cold start plus its verify run).
 
 | Main works directly | Background agent (Agent tool, `run_in_background: true`) |
 |---|---|
-| Conversational answer, lookup in a known file or symbol, edit confined to one file | Anything multi-file, multi-step, or long-running (builds, test suites, research), and every orchestrator command |
+| Answers, lookups, an edit touching up to two files, or anything expected to finish in about 2 minutes | Long-running work (builds, test suites, research), 3+ files, independent pieces worth running in parallel, every orchestrator command, or the user said they want to keep working |
 
-After spawning, end the turn with a one-line status so the user can keep talking.
+State the call in one line ("doing this directly: 2 files" / "delegating: full test suite, ~5 min"). The user's explicit "do it here" or "in background" overrides. After spawning, end the turn with a one-line status so the user can keep talking.
 
-- **Contract.** Rule 12's four fields plus the project's verify command; the agent reports that command's actual result. Agents do not reliably inherit CLAUDE.md, so the contract always carries it.
+- **Contract.** Rule 12's four fields plus the project's verify command; the agent runs it in the foreground and reports that command's actual result only after it finishes. Agents do not reliably inherit CLAUDE.md, so the contract always carries it.
 - **Isolation.** One editing agent in the main checkout; every concurrent editor gets `isolation: "worktree"`; read-only agents run freely.
 - **Refinement.** A tweak that keeps the agent's work valid goes to it via `SendMessage`; a pivot that invalidates it means `TaskStop`, then respawn with the merged contract. Name which in one line.
 - **Integration.** On the completion notification, check the output against the contract, confirm the verify result is present and passing, merge worktrees, then report. No passing verify result: report "not verified", never "done". A worktree merge conflict goes to the user, unresolved.

@@ -616,7 +616,7 @@ if ! command -v node >/dev/null 2>&1; then
     echo "    skipped (node not on PATH)"
 else
     _gx="$(mktemp -d)"
-    mkdir -p "$_gx/proj" && echo '{}' > "$_gx/proj/package.json"
+    mkdir -p "$_gx/proj" "$_gx/plain" && echo '{}' > "$_gx/proj/package.json" && echo '{}' > "$_gx/plain/package.json"
     python3 - "$_gx" << 'PYEOF'
 import json, sys
 gx = sys.argv[1]
@@ -747,7 +747,7 @@ PYEOF
             | TMPDIR="$_gx" node "$REPO_DIR/hooks/gate-skill-first.js" 2>/dev/null
     }
     _stopgate() {
-        printf '{"session_id":"%s","transcript_path":"%s","cwd":"%s"%s}' "${3:-v$RANDOM}" "$1" "$_gx/proj" "${2:-}" \
+        printf '{"session_id":"%s","transcript_path":"%s","cwd":"%s"%s}' "${3:-v$RANDOM}" "$1" "${4:-$_gx/proj}" "${2:-}" \
             | TMPDIR="$_gx" node "$REPO_DIR/hooks/gate-verify-on-stop.js" 2>/dev/null
     }
     _gd=0
@@ -902,6 +902,10 @@ PYEOF
         # fired on a PR body drafted in the session scratchpad until it excluded them.
         _stopgate "$_gx/scratch.jsonl" | grep -q '"decision"' \
             && { fail "stop gate demands verification for a scratchpad-only turn, firing on throwaway files"; _gd=1; }
+        # An edit outside the repo root (a memory note under ~/.claude) is not this
+        # project's to verify. Found when a memory write demanded check.sh.
+        _stopgate "$_gx/bare.jsonl" | grep -q '"decision"' \
+            && { fail "stop gate demands verification for an edit outside the repo root"; _gd=1; }
         # Delegating the edits hides them the same way the shell does: a subagent's writes
         # land in ITS transcript, so the parent's turn shows no edits at all.
         _stopgate "$_gx/delegated.jsonl" | grep -q '"decision":"block"' \
@@ -957,7 +961,37 @@ cases = {"bg-edited": spawned(2000) + notified(2999),
 for name, lines in cases.items():
     with open("%s/%s.jsonl" % (gx, name), "w") as f:
         f.write("\n".join(json.dumps(x) for x in lines) + "\n")
+
+# The reported agent's own transcript, at <session>/subagents/agent-<task-id>.jsonl.
+EDIT = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "e1", "name": "Edit", "input": {"file_path": "ViewX.tsx"}}]}}
+
+
+def verify(error=False):
+    return [{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "v1", "name": "Bash",
+             "input": {"command": "rtk tsc --noEmit && rtk lint ViewX.tsx"}}]}},
+            {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "v1",
+             "is_error": error, "content": "ok"}]}}]
+
+
+import os
+for name, steps in {"bg-agent-verified": [EDIT] + verify(),
+                    "bg-agent-early": verify() + [EDIT],
+                    "bg-agent-failed": [EDIT] + verify(error=True)}.items():
+    with open("%s/%s.jsonl" % (gx, name), "w") as f:
+        f.write("\n".join(json.dumps(x) for x in spawned(2000) + notified(2999)) + "\n")
+    os.makedirs("%s/%s/subagents" % (gx, name))
+    with open("%s/%s/subagents/agent-abc.jsonl" % (gx, name), "w") as f:
+        f.write("\n".join(json.dumps(x) for x in steps) + "\n")
 PYEOF
+        # The agent's own verify run counts when it came after its last write and passed,
+        # so the main session need not re-run the gate; anything less still blocks.
+        _stopgate "$_gx/bg-agent-verified.jsonl" | grep -q '"decision"' \
+            && { fail "stop gate blocks a notification turn whose agent ran the verify command after its last edit"; _gd=1; }
+        _stopgate "$_gx/bg-agent-early.jsonl" | grep -q '"decision":"block"' \
+            || { fail "stop gate trusts an agent verify run that preceded the agent's last edit"; _gd=1; }
+        _stopgate "$_gx/bg-agent-failed.jsonl" | grep -q '"decision":"block"' \
+            || { fail "stop gate trusts an agent verify run that failed"; _gd=1; }
         _stopgate "$_gx/bg-edited.jsonl" | grep -q '"decision":"block"' \
             || { fail "stop gate misses a background agent's edits on its notification turn, so delegating to the background skips verification"; _gd=1; }
         _stopgate "$_gx/bg-verified.jsonl" | grep -q '"decision"' \
@@ -1033,10 +1067,11 @@ PYEOF
     _announcegate "$_gx/declare-silent-across-injection.jsonl" | grep -q '"decision":"block"' \
         || { fail "announce gate stopped seeing an undeclared turn once an injected entry appeared, so the turn fix disarmed check 2"; _gd=1; }
 
-    _stopgate "$_gx/repeat-edits.jsonl" | grep -q 'edited 1 file' \
+    # $_gx/plain is no repo, so the /x/ fixture paths count; proj is a repo by now.
+    _stopgate "$_gx/repeat-edits.jsonl" "" "" "$_gx/plain" | grep -q 'edited 1 file' \
         || { fail "stop gate counts repeat edits to one file as several files, inflating the reason line"; _gd=1; }
     # A blocked party cannot find the escape hatch in a file comment nobody reads mid-turn.
-    _stopgate "$_gx/bare.jsonl" | grep -q 'CRAFTKIT_GATE=off' \
+    _stopgate "$_gx/bare.jsonl" "" "" "$_gx/plain" | grep -q 'CRAFTKIT_GATE=off' \
         || { fail "stop gate refusal never names its own escape hatch, unlike the skill gate"; _gd=1; }
 
     for _g in gate-skill-first.js gate-verify-on-stop.js gate-announce-honored.js; do
@@ -1209,12 +1244,12 @@ grep -q 'report "not verified"' <<<"$(_blk CODEX)" \
 [[ $_dv -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
-# 23e. The delegate gate asks from the 2nd source file of a main turn until the
+# 23e. The delegate gate asks from the 3rd source file of a main turn until the
 #      turn spawns an agent, and nowhere else. Rule 12a alone delegated 0/5
 #      multi-file tasks (T2b), so this gate is the enforcement; behavioral,
 #      because a gate that returns {} looks fine.
 # ---------------------------------------------------------------------------
-check "delegate gate asks from the second source file until a spawn"
+check "delegate gate asks from the third source file until a spawn"
 if ! command -v node >/dev/null 2>&1; then
     echo "    skipped (node not on PATH)"
 else
@@ -1225,19 +1260,22 @@ dx = sys.argv[1]
 prompt = {"type": "user", "message": {"role": "user", "content": "add a field"}}
 edit = {"type": "assistant", "message": {"role": "assistant", "content": [
     {"type": "tool_use", "name": "Edit", "input": {"file_path": "/x/ModelFoo.ts"}}]}}
+edit2 = {"type": "assistant", "message": {"role": "assistant", "content": [
+    {"type": "tool_use", "name": "Edit", "input": {"file_path": "/x/HelperFoo.ts"}}]}}
 cases = {"none": [prompt],
          "one": [prompt, edit],
-         "spawned": [prompt, edit, {"type": "assistant", "message": {"role": "assistant", "content": [
+         "two": [prompt, edit, edit2],
+         "spawned": [prompt, edit, edit2, {"type": "assistant", "message": {"role": "assistant", "content": [
              {"type": "tool_use", "name": "Agent", "input": {"run_in_background": True}}]}}],
          "notification": [{"type": "user", "message": {"role": "user",
-                           "content": "<task-notification>\n<task-id>abc</task-id>\n"}}, edit],
-         "explore-fg": [prompt, edit, {"type": "assistant", "message": {"role": "assistant", "content": [
+                           "content": "<task-notification>\n<task-id>abc</task-id>\n"}}, edit, edit2],
+         "explore-fg": [prompt, edit, edit2, {"type": "assistant", "message": {"role": "assistant", "content": [
              {"type": "tool_use", "name": "Agent", "input": {"subagent_type": "Explore"}}]}}],
-         "reviewer-fg": [prompt, edit, {"type": "assistant", "message": {"role": "assistant", "content": [
+         "reviewer-fg": [prompt, edit, edit2, {"type": "assistant", "message": {"role": "assistant", "content": [
              {"type": "tool_use", "name": "Task", "input": {"subagent_type": "code-quality"}}]}}],
-         "builder-fg": [prompt, edit, {"type": "assistant", "message": {"role": "assistant", "content": [
+         "builder-fg": [prompt, edit, edit2, {"type": "assistant", "message": {"role": "assistant", "content": [
              {"type": "tool_use", "name": "Agent", "input": {"subagent_type": "general-purpose"}}]}}],
-         "explore-bg": [prompt, edit, {"type": "assistant", "message": {"role": "assistant", "content": [
+         "explore-bg": [prompt, edit, edit2, {"type": "assistant", "message": {"role": "assistant", "content": [
              {"type": "tool_use", "name": "Agent", "input": {"subagent_type": "Explore", "run_in_background": True}}]}}],
          "sidechain": [dict(prompt, isSidechain=True), dict(edit, isSidechain=True)]}
 for name, lines in cases.items():
@@ -1251,42 +1289,45 @@ PYEOF
     # The caller's own switches must not leak in: under claude -p this check runs unattended.
     _delenv() { env -u CRAFTKIT_GATE -u CRAFTKIT_DELEGATE -u CLAUDE_CODE_SESSION_ATTENDED TMPDIR="$_dx" "$@"; }
     _de=0
-    _delgate d1 "$_dx/one.jsonl" /x/ViewFoo.tsx | grep -q '"permissionDecision":"ask"' \
-        || { fail "delegate gate lets a 2nd source file through in a main turn, so director mode is advisory again"; _de=1; }
+    _delgate d1 "$_dx/two.jsonl" /x/ViewFoo.tsx | grep -q '"permissionDecision":"ask"' \
+        || { fail "delegate gate lets a 3rd source file through in a main turn, so director mode is advisory again"; _de=1; }
+    _delgate d1b "$_dx/one.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "delegate gate asks on the 2nd source file, so two-file work costs a prompt"; _de=1; }
     _delgate d2 "$_dx/none.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
         && { fail "delegate gate asks on the 1st source file, so single-file work costs a prompt"; _de=1; }
-    _delgate d3 "$_dx/one.jsonl" /x/ModelFoo.ts | grep -q 'permissionDecision' \
-        && { fail "delegate gate counts a re-edit of the same file as a 2nd file"; _de=1; }
+    _delgate d3 "$_dx/two.jsonl" /x/ModelFoo.ts | grep -q 'permissionDecision' \
+        && { fail "delegate gate counts a re-edit of the same file as a 3rd file"; _de=1; }
     _delgate d4 "$_dx/sidechain.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
         && { fail "delegate gate asks inside a subagent, which is already the delegate"; _de=1; }
     _delgate d5 "$_dx/notification.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
         && { fail "delegate gate asks on a background-task notification, which is not a prompt"; _de=1; }
-    _delgate d6 "$_dx/one.jsonl" /x/docs/planning/foo.md | grep -q 'permissionDecision' \
+    _delgate d6 "$_dx/two.jsonl" /x/docs/planning/foo.md | grep -q 'permissionDecision' \
         && { fail "delegate gate counts a docs/planning edit as source"; _de=1; }
-    _delgate d7 "$_dx/one.jsonl" /private/tmp/x/scratchpad/probe.ts | grep -q 'permissionDecision' \
+    _delgate d7 "$_dx/two.jsonl" /private/tmp/x/scratchpad/probe.ts | grep -q 'permissionDecision' \
         && { fail "delegate gate counts a throwaway scratchpad file as source"; _de=1; }
     _delgate d8 /nope/missing.jsonl /x/ViewFoo.tsx | grep -q 'permissionDecision' \
         && { fail "delegate gate blocks on an unreadable transcript instead of failing open"; _de=1; }
-    _delgate d9 "$_dx/one.jsonl" /x/ViewFoo.tsx >/dev/null
-    _delgate d9 "$_dx/one.jsonl" /x/PresenterFoo.ts | grep -q '"permissionDecision":"ask"' \
+    _delgate d9 "$_dx/two.jsonl" /x/ViewFoo.tsx >/dev/null
+    _delgate d9 "$_dx/two.jsonl" /x/PresenterFoo.ts | grep -q '"permissionDecision":"ask"' \
         || { fail "delegate gate lets a 3rd source file through after one ask, so a declined ask in a headless batch is ignored"; _de=1; }
     _delgate d15 "$_dx/spawned.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
         && { fail "delegate gate still asks after the turn spawned an agent"; _de=1; }
     # Parallel calls in one message: the 1st call's tool_use is not in the transcript yet.
     _delgate d10 "$_dx/none.jsonl" /x/ModelFoo.ts >/dev/null
+    _delgate d10 "$_dx/none.jsonl" /x/HelperFoo.ts >/dev/null
     _delgate d10 "$_dx/none.jsonl" /x/ViewFoo.tsx | grep -q '"permissionDecision":"ask"' \
-        || { fail "delegate gate misses a 2nd file whose sibling call has not reached the transcript yet"; _de=1; }
+        || { fail "delegate gate misses a 3rd file whose sibling call has not reached the transcript yet"; _de=1; }
     _delbash() {
         printf '{"session_id":"%s","transcript_path":"%s","cwd":"/x","tool_name":"Bash","tool_input":{"command":"%s"}}' "$1" "$2" "$3" \
             | _delenv node "$REPO_DIR/hooks/gate-delegate.js" 2>/dev/null
     }
-    _delbash d11 "$_dx/none.jsonl" "sed -i 's/a/b/' src/a.js src/b.js" | grep -q '"permissionDecision":"ask"' \
-        || { fail "delegate gate lets one sed -i across 2 source files through, so the shell bypasses it"; _de=1; }
-    _delbash d12 "$_dx/one.jsonl" "node --test test/*.test.js" | grep -q 'permissionDecision' \
+    _delbash d11 "$_dx/none.jsonl" "sed -i 's/a/b/' src/a.js src/b.js src/c.js" | grep -q '"permissionDecision":"ask"' \
+        || { fail "delegate gate lets one sed -i across 3 source files through, so the shell bypasses it"; _de=1; }
+    _delbash d12 "$_dx/two.jsonl" "node --test test/*.test.js" | grep -q 'permissionDecision' \
         && { fail "delegate gate asks on a Bash command that writes nothing"; _de=1; }
-    _delbash d13 "$_dx/one.jsonl" "echo hi > /private/tmp/x.js" | grep -q 'permissionDecision' \
+    _delbash d13 "$_dx/two.jsonl" "echo hi > /private/tmp/x.js" | grep -q 'permissionDecision' \
         && { fail "delegate gate counts a shell write to a throwaway path as source"; _de=1; }
-    _delbash d14 "$_dx/sidechain.jsonl" "sed -i 's/a/b/' src/a.js src/b.js" | grep -q 'permissionDecision' \
+    _delbash d14 "$_dx/sidechain.jsonl" "sed -i 's/a/b/' src/a.js src/b.js src/c.js" | grep -q 'permissionDecision' \
         && { fail "delegate gate asks on a subagent's shell write, which is already the delegate"; _de=1; }
     # Only a spawn that takes the work disarms the gate: a foreground read-only lookup
     # (Explore, or a Read/Grep/Glob reviewer) leaves the edits with the main session.
@@ -1298,23 +1339,23 @@ PYEOF
         && { fail "delegate gate still asks after a foreground spawn of an agent that can edit"; _de=1; }
     _delgate d19 "$_dx/explore-bg.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
         && { fail "delegate gate still asks after a background spawn"; _de=1; }
-    # Quoted text is not a redirect: a phantom target made a commit message a 2nd file.
-    _delbash d20 "$_dx/one.jsonl" 'git commit -m \"x > y.js\"' | grep -q 'permissionDecision' \
+    # Quoted text is not a redirect: a phantom target made a commit message a 3rd file.
+    _delbash d20 "$_dx/two.jsonl" 'git commit -m \"x > y.js\"' | grep -q 'permissionDecision' \
         && { fail "delegate gate reads a > inside a quoted commit message as a write"; _de=1; }
-    _delbash d21 "$_dx/one.jsonl" 'git commit -m \"fix x > y.js now\"' | grep -q 'permissionDecision' \
+    _delbash d21 "$_dx/two.jsonl" 'git commit -m \"fix x > y.js now\"' | grep -q 'permissionDecision' \
         && { fail "delegate gate reads a > mid-way through a quoted commit message as a write"; _de=1; }
-    _delbash d22 "$_dx/one.jsonl" 'grep \"a>b.js\" f' | grep -q 'permissionDecision' \
+    _delbash d22 "$_dx/two.jsonl" 'grep \"a>b.js\" f' | grep -q 'permissionDecision' \
         && { fail "delegate gate reads a > inside a quoted grep pattern as a write"; _de=1; }
-    _delbash d23 "$_dx/one.jsonl" 'echo hi > \"src/a.js\"' | grep -q '/x/src/a.js' \
+    _delbash d23 "$_dx/two.jsonl" 'echo hi > \"src/a.js\"' | grep -q '/x/src/a.js' \
         || { fail "delegate gate misses a quoted redirect target, so quoting a path bypasses it"; _de=1; }
-    # Headless: an ask is auto-denied under claude -p, so an unattended job that edits two
+    # Headless: an ask is auto-denied under claude -p, so an unattended job that edits three
     # files would fail outright. CLAUDE_CODE_SESSION_ATTENDED=0 observed under claude -p
     # (2.1.291); interactive sessions carry 1.
-    _delgate d24 "$_dx/one.jsonl" /x/ViewFoo.tsx 'CRAFTKIT_DELEGATE=off' | grep -q 'permissionDecision' \
+    _delgate d24 "$_dx/two.jsonl" /x/ViewFoo.tsx 'CRAFTKIT_DELEGATE=off' | grep -q 'permissionDecision' \
         && { fail "CRAFTKIT_DELEGATE=off does not turn the delegate gate off"; _de=1; }
-    _delgate d25 "$_dx/one.jsonl" /x/ViewFoo.tsx 'CLAUDE_CODE_SESSION_ATTENDED=0' | grep -q 'permissionDecision' \
+    _delgate d25 "$_dx/two.jsonl" /x/ViewFoo.tsx 'CLAUDE_CODE_SESSION_ATTENDED=0' | grep -q 'permissionDecision' \
         && { fail "delegate gate asks in an unattended session, where the ask is auto-denied"; _de=1; }
-    _delgate d26 "$_dx/one.jsonl" /x/ViewFoo.tsx 'CLAUDE_CODE_SESSION_ATTENDED=1' | grep -q '"permissionDecision":"ask"' \
+    _delgate d26 "$_dx/two.jsonl" /x/ViewFoo.tsx 'CLAUDE_CODE_SESSION_ATTENDED=1' | grep -q '"permissionDecision":"ask"' \
         || { fail "delegate gate stops asking in an attended session"; _de=1; }
     # Concurrent calls in one message: each must record itself before reading, or two
     # hooks that read first both see an empty log and both pass.
