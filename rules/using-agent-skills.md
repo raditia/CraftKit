@@ -343,7 +343,6 @@ Delegated work follows one flow: **workstream contract â†’ permission boundary â
 - **Contract first.** Before spawning, state the unit's goal, inputs, the output it returns, and its done check. A unit without a contract returns whatever it found.
 - **Boundary second.** Investigation and review run read-only. Edits from more than one unit happen in separate worktrees, never on a shared checkout.
 - **Main task integrates.** Delegated output is evidence, not a result: the main task reviews and verifies it before merging it in, and the human decides on anything outward-facing or hard to reverse.
-
 <!-- BEGIN CRAFTKIT-DIRECTOR -->
 ### 12a. Director mode (Claude Code)
 

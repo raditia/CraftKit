@@ -1127,6 +1127,26 @@ rm -rf "$_tf"
 [[ $_tb -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
+# 23d. Delegated edits stay verified. A background agent's edits land between
+#      turns, so the contract carrying the verify command and the "not verified"
+#      report are the only things that keep "done" honest. Short phrases, so a
+#      reword passes and a deletion fails.
+# ---------------------------------------------------------------------------
+check "director and Codex blocks keep the verify contract"
+_dv=0
+_blk() { sed -n "/<!-- BEGIN CRAFTKIT-$1 -->/,/<!-- END CRAFTKIT-$1 -->/p" "$_rule"; }
+_dir="$(_blk DIRECTOR)"
+grep -q "project's verify command" <<<"$_dir" \
+    || { fail "CRAFTKIT-DIRECTOR contract no longer carries the project's verify command"; _dv=1; }
+grep -q "actual result" <<<"$_dir" \
+    || { fail "CRAFTKIT-DIRECTOR contract no longer asks the agent for the verify command's actual result"; _dv=1; }
+grep -q 'report "not verified"' <<<"$_dir" \
+    || { fail "CRAFTKIT-DIRECTOR integration no longer reports \"not verified\" on a missing or failing verify"; _dv=1; }
+grep -q 'report "not verified"' <<<"$(_blk CODEX)" \
+    || { fail "CRAFTKIT-CODEX block no longer reports \"not verified\" on a missing or failing verify"; _dv=1; }
+[[ $_dv -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
 # 24. The hook table and hooks/ agree in both directions, same invariant as
 #     check 13 holds for adapters. A script in hooks/ that no table entry names
 #     is never installed, and a table entry with no script installs nothing while
