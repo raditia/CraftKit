@@ -34,6 +34,11 @@ investigation, review, or testing goes to a read-only subagent; parallel edits u
 worktrees. Give each delegated unit a goal, output, and done check, then review its result
 before integrating; the human decides anything hard to reverse.
 
+Delegate multi-file, multi-step, or long-running work via `spawn_agent`; steer with
+`send_input` (`interrupt=true` to pivot), stop with `close_agent`. Codex never wakes an idle
+parent on child completion, so `wait_agent` for every result before ending the turn, then
+integrate; report "not verified" if an agent's verify result is missing or failing.
+
 Keep the configured model; Codex reasoning tiers are low, medium, and high. Do not pass Claude
 family aliases. Before reporting completion, verify the latest edits using project gates and
 report actual results. Findings use `[ERROR]` (must fix), `[WARNING]` (should fix), and
