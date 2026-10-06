@@ -36,6 +36,7 @@
     "type": "git",
     "url": "git+https://github.com/raditia/CraftKit.git"
   },
+  "homepage": "https://raditia.github.io/CraftKit/",
   "publishConfig": {
     "access": "public"
   }

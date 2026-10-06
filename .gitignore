@@ -3,3 +3,6 @@
 .agents/
 skills/caveman*/
 skills/cavecrew/
+site/node_modules/
+site/dist/
+site/dist-ssr/

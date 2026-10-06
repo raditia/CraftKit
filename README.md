@@ -7,6 +7,8 @@
 
 One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
 
+Site: [raditia.github.io/CraftKit](https://raditia.github.io/CraftKit/)
+
 ---
 
 ## Table of contents

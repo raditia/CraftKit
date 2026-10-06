@@ -489,9 +489,10 @@ fi
 # ---------------------------------------------------------------------------
 check "prose carries no em-dash"
 _emdash="$(printf '\xe2\x80\x94')"
-_em="$(grep -rn "$_emdash" \
+_em="$(grep -rnI "$_emdash" \
     "$REPO_DIR"/rules "$REPO_DIR"/skills "$REPO_DIR"/commands "$REPO_DIR"/agents \
     "$REPO_DIR"/adapters "$REPO_DIR"/hooks "$REPO_DIR"/docs \
+    "$REPO_DIR"/site/src "$REPO_DIR"/site/index.html "$REPO_DIR"/site/README.md \
     "$REPO_DIR"/README.md "$REPO_DIR"/CLAUDE.md "$REPO_DIR"/CONTRIBUTING.md \
     "$REPO_DIR"/LICENSE "$REPO_DIR"/check.sh "$REPO_DIR"/sync.sh "$REPO_DIR"/install.sh \
     "$REPO_DIR"/.github/workflows/release.yml 2>/dev/null \
@@ -2462,6 +2463,54 @@ for _f in "$_ccp" "$SKILLS_DIR/context-source/SKILL.md" "$REPO_DIR/scripts/conte
     [[ -z "$_hit" ]] || { fail "${_f#$REPO_DIR/} names a concrete GitHub repo (use <owner>/<repo>): $_hit"; _cc=1; }
 done
 [[ $_cc -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 41. The site still describes this repo. site/ derives what it can from package.json at
+#     build time; what it cannot derive it names through readme()/repoFile() helpers, a
+#     command field, and a TOOLS list, so each is resolved here: a README heading reworded,
+#     a file moved, a command renamed, or an adapter added fails the PR instead of leaving
+#     the published page linking nowhere. A hardcoded GitHub URL would bypass all of that.
+# ---------------------------------------------------------------------------
+check "site references resolve against the repo"
+_site_out="$(python3 - "$REPO_DIR" <<'PY' 2>&1
+import glob, io, os, re, sys
+root = sys.argv[1]
+def slug(h):
+    s = re.sub(r'[^\w\s-]', '', h.strip().lower())
+    return s.replace(' ', '-')
+readme = io.open(os.path.join(root, "README.md"), encoding="utf-8").read()
+heads = {slug(m.group(1)) for m in re.finditer(r'^#{1,6}\s+(.*)$', readme, re.M)}
+srcs = sorted(glob.glob(os.path.join(root, "site/src/*.js*")))
+if not srcs:
+    print("site/src has no sources")
+for f in srcs:
+    rel = os.path.relpath(f, root)
+    txt = io.open(f, encoding="utf-8").read()
+    for a in re.findall(r"readme\('([^']+)'\)", txt):
+        if a not in heads:
+            print("%s: readme('%s') matches no README heading" % (rel, a))
+    for p in re.findall(r"repoFile\('([^']+)'\)", txt):
+        if not os.path.exists(os.path.join(root, p)):
+            print("%s: repoFile('%s') does not exist" % (rel, p))
+    for c in re.findall(r"command:\s*'/([^']+)'", txt):
+        if not (os.path.exists(os.path.join(root, "commands", c + ".md")) or os.path.exists(os.path.join(root, "skills", c, "SKILL.md"))):
+            print("%s: command /%s is neither a command nor a skill" % (rel, c))
+    if "github.com" in txt:
+        print("%s: hardcoded github.com URL, use readme()/repoFile() or REPO" % rel)
+repo_js = io.open(os.path.join(root, "site/src/repo.js"), encoding="utf-8").read()
+tools = re.findall(r"'([^']+)'", re.search(r"TOOLS = \[([^\]]*)\]", repo_js).group(1))
+sync = io.open(os.path.join(root, "sync.sh"), encoding="utf-8").read()
+adapters = re.findall(r'"([^"]+)"', re.search(r'^ADAPTERS=\(([^)]*)\)', sync, re.M).group(1))
+if sorted(t.split()[0].lower() for t in tools) != sorted(adapters):
+    print("site/src/repo.js TOOLS %s does not match sync.sh ADAPTERS %s (and sync-engine.png draws the tools)" % (tools, adapters))
+PY
+)"
+if [[ -n "$_site_out" ]]; then
+    fail "the site references something the repo no longer has:"
+    echo "$_site_out" | sed 's/^/      /'
+else
+    pass
+fi
 
 echo
 if [[ $FAILURES -eq 0 ]]; then
