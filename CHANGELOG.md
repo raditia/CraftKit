@@ -7,6 +7,26 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.57.0 — 2026-10-06
+
+### pi adapter: craftkit rules reach pi
+
+pi (pi.dev) already loaded craftkit skills from the shared `~/.agents/skills`, but none of the
+always-on rules, so it ran skills without grounding, verification, or the sequential-twin routing.
+
+- New `adapters/pi.sh` writes a managed `CRAFTKIT` block into `${PI_CODING_AGENT_DIR:-~/.pi/agent}/AGENTS.md`:
+  a short pi runtime guide plus the always-on rule bodies inline, since pi has no hook to load them
+  on demand. `using-agent-skills` (Claude-shaped) is replaced by the guide; platform-scoped rules stay as pointers.
+- Rules only: skills keep arriving through the Codex adapter's shared install, and pi has no
+  subagents, so `parallel-*` routes to `build`, `review`, `ship`.
+- The block is written only once pi has created its agent dir, so users without pi get no `~/.pi`,
+  and it is rewritten only on a content change, so a repeat sync stays a no-op.
+
+### Tagline: AI-gnostic
+
+- README and the npm description lead with "AI-gnostic coding workflows". The name stays
+  `craftkit`: a rename would touch on-disk markers, state dirs and hooks on every install.
+
 ## v1.56.0 — 2026-10-05
 
 ### Execution units: pick the smallest one that fits

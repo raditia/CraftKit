@@ -1,7 +1,7 @@
 {
   "name": "@raditia/craftkit",
-  "version": "1.56.0",
-  "description": "AI coding skills that auto-sync across Claude Code, Cursor, Gemini CLI, and Codex CLI",
+  "version": "1.57.0",
+  "description": "AI-gnostic coding workflows: one set of skills and rules that auto-syncs across Claude Code, Cursor, Gemini CLI, Codex CLI, and pi",
   "scripts": {
     "postinstall": "bash scripts/postinstall.sh"
   },
