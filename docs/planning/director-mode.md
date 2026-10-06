@@ -74,6 +74,8 @@ created: 2026-10-06
 
 **T2b result (2026-10-06, headless `claude -p`, toy Node repo):** multi-file delegate 0/5, single-file delegate 0/5; follow-up mid-run and refinement relay unmeasured (no agent ever ran); M3 reported real test output. Rule 12a and the hook line reached the model (probe quoted both); it overruled them on task size ("touches 4 small files... so I'll do it directly"). Bar missed, so T4's hook carries the enforcement: on the 2nd source file the ask reason tells the model to hand the work to a background agent, and a declined ask (auto-denied headless) forces the re-plan. Re-measure T2b with T4 installed before T8. Confounds: headless has no waiting user; tasks took 10 to 75 s.
 
+**T2b runs 2-3 (2026-10-06, delegate gate installed, real repo path):** run 2 multi-file 3/5, run 3 2/5 (n=5, within noise); single-file 0/5 both. First-turn delegations 0/12 in run 3: every background spawn followed a delegate-gate ask. Proven live: follow-up answered mid-run 2/2, refinement relayed via SendMessage (X2), Stop gate on notification turns 4/4, parallel-batch race fixed. Misses are what the gate cannot see: a long test-fix loop on 2 files (M3), a single .md research output (M4), an orchestrator command run foreground (M5). Also found: once-per-turn ask lets later edits in the same batch land; `perl -pi` passes (marked ceiling); Stop gate demands `rtk tsc`/`rtk lint` in plain JS repos (pre-existing).
+
 **Parallelizable now:** T1, T2
 **Critical path:** T2 → T3 → T2b → T4 → T8 → T9
 **Cross-review:** 2026-10-06, claude + codex, 1 error 2 warnings 2 suggestions folded: rule #12 kept with an added director block, Cursor strips foreign blocks, notification verify moved to the Stop gate, mechanism corrected.
