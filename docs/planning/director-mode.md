@@ -72,6 +72,8 @@ created: 2026-10-06
 | T8 | README rule/hook rows, CHANGELOG section, version bump in `package.json` + README header | `bash check.sh` version and README checks pass | T4, T4b, T5, T6 | none | direct edit |
 | T9 | Final gate: `check.sh`, `sync.sh` twice, re-run T2b's prompts with hooks installed | `bash check.sh` exit 0; second `sync.sh` all `(up to date)`; T2b bar still met | T7, T8 | none | /parallel-ship |
 
+**T2b result (2026-10-06, headless `claude -p`, toy Node repo):** multi-file delegate 0/5, single-file delegate 0/5; follow-up mid-run and refinement relay unmeasured (no agent ever ran); M3 reported real test output. Rule 12a and the hook line reached the model (probe quoted both); it overruled them on task size ("touches 4 small files... so I'll do it directly"). Bar missed, so T4's hook carries the enforcement: on the 2nd source file the ask reason tells the model to hand the work to a background agent, and a declined ask (auto-denied headless) forces the re-plan. Re-measure T2b with T4 installed before T8. Confounds: headless has no waiting user; tasks took 10 to 75 s.
+
 **Parallelizable now:** T1, T2
 **Critical path:** T2 → T3 → T2b → T4 → T8 → T9
 **Cross-review:** 2026-10-06, claude + codex, 1 error 2 warnings 2 suggestions folded: rule #12 kept with an added director block, Cursor strips foreign blocks, notification verify moved to the Stop gate, mechanism corrected.
