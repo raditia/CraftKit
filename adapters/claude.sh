@@ -292,7 +292,7 @@ def interpreter(cmd):
 # the path stopped existing (dead hook, no gate, no error the user would notice),
 # or it is a version-pinned fnm path that is one `fnm uninstall` away from becoming the
 # first case. A working non-pinned command is left alone, since it may be deliberate.
-def repair(entries, script, hook_cmd):
+def repair(entries, script, hook_cmd, matcher):
     for entry in entries:
         for h in entry.get('hooks', []):
             cmd = h.get('command', '')
@@ -305,32 +305,40 @@ def repair(entries, script, hook_cmd):
                 h['command'] = hook_cmd
                 print('    %s interpreter re-pointed: %s -> %s'
                       % (script, current, interpreter(hook_cmd)))
+            old = entry.get('matcher', '')
+            if old != matcher:
+                entry['hooks'].remove(h)
+                if not entry['hooks']:
+                    entries.remove(entry)
+                matcher_entry(entries, matcher)['hooks'].append(h)
+                print('    %s matcher migrated: %s -> %s' % (script, old, matcher))
             return True
     return False
+
+
+# A matcher belongs to the entry, not the hook, so an entry with the wrong matcher
+# cannot be reused: sharing one would silently widen or narrow which tools the gate sees.
+def matcher_entry(entries, matcher):
+    for entry in entries:
+        if entry.get('matcher', '') == matcher:
+            entry.setdefault('hooks', [])
+            return entry
+    entry = {'hooks': []}
+    if matcher:
+        entry['matcher'] = matcher
+    entries.append(entry)
+    return entry
 
 
 changed = False
 for item in spec:
     entries = settings.setdefault('hooks', {}).setdefault(item['event'], [])
     before = json.dumps(entries, sort_keys=True)
-    if not repair(entries, item['script'], item['command']):
+    if not repair(entries, item['script'], item['command'], item['matcher']):
         hook = {'type': 'command', 'command': item['command'], 'timeout': 10}
         if item['status']:
             hook['statusMessage'] = item['status']
-        # A matcher belongs to the entry, not the hook, so an entry with the wrong
-        # matcher cannot be reused: sharing one would silently widen or narrow which
-        # tools the gate sees.
-        target = None
-        for entry in entries:
-            if entry.get('matcher', '') == item['matcher']:
-                target = entry
-                break
-        if target is None:
-            target = {'hooks': []}
-            if item['matcher']:
-                target['matcher'] = item['matcher']
-            entries.append(target)
-        target.setdefault('hooks', []).append(hook)
+        matcher_entry(entries, item['matcher'])['hooks'].append(hook)
     if json.dumps(entries, sort_keys=True) != before:
         changed = True
 

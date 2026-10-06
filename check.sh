@@ -1549,6 +1549,40 @@ grep -q 'STATE_DIR/claude-hooks' "$REPO_DIR/adapters/claude.sh" \
 [[ $_ph -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
+# 28b. A hook whose matcher changed in _CRAFTKIT_HOOKS moves to the new matcher.
+#     The wiring pass found an installed hook by script name and stopped there,
+#     so widening gate-delegate.js to cover Bash left every existing install on
+#     the old matcher forever. Behavioral, on a fixture settings file: the gate
+#     moves, a user hook sharing its old entry stays, and a rerun is a no-op.
+# ---------------------------------------------------------------------------
+check "a hook's matcher change migrates installed registrations"
+_mm=0
+_mmx="$(mktemp -d)"
+_mmspec="$(. "$REPO_DIR/adapters/claude.sh" >/dev/null 2>&1; printf '%s\n' "${_CRAFTKIT_HOOKS[@]}" | grep '^gate-delegate.js%' | cut -d'%' -f3)"
+cat > "$_mmx/settings.json" <<'JSON'
+{"hooks":{"PreToolUse":[{"matcher":"Edit|Write|MultiEdit|NotebookEdit","hooks":[
+  {"type":"command","command":"user-edit-hook"},
+  {"type":"command","command":"node /x/gate-delegate.js","timeout":10}]}]}}
+JSON
+_mmwire() { ( HOME="$_mmx/home"; . "$REPO_DIR/adapters/claude.sh" >/dev/null 2>&1; CLAUDE_SETTINGS="$_mmx/settings.json"; _craftkit_hook_wire_settings >/dev/null ); }
+_mmwire || { fail "wiring failed on the fixture"; _mm=1; }
+cp "$_mmx/settings.json" "$_mmx/first.json"
+_mmwire
+cmp -s "$_mmx/first.json" "$_mmx/settings.json" \
+    || { fail "a second wiring pass rewrote settings.json, so sync never settles"; _mm=1; }
+python3 - "$_mmx/settings.json" "$_mmspec" <<'PYEOF' \
+    || { fail "gate-delegate.js still sits under its old matcher, or the user hook beside it moved"; _mm=1; }
+import json, sys
+pre = json.load(open(sys.argv[1]))['hooks']['PreToolUse']
+where = [e.get('matcher', '') for e in pre for h in e['hooks'] if 'gate-delegate.js' in h['command']]
+assert where == [sys.argv[2]], where
+user = [e.get('matcher', '') for e in pre for h in e['hooks'] if h['command'] == 'user-edit-hook']
+assert user == ['Edit|Write|MultiEdit|NotebookEdit'], user
+PYEOF
+rm -rf "$_mmx"
+[[ $_mm -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
 # 29. Drift detector distinguishes clean, drifted and cannot-verify. The third
 #     is the point: a context doc records a baseline commit, and this repo
 #     squash-merges, so that commit leaves reachable history as soon as its
