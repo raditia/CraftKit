@@ -141,8 +141,82 @@ function checks(file) {
   });
 }
 
+// Director mode port of hooks/gate-delegate.js, opt-in (CRAFTKIT_DELEGATE=on). Codex
+// 0.160.0 rejects permissionDecision "ask" as unsupported, so this can only deny, and no
+// hook payload field tells `codex exec` from an interactive session (permission_mode only
+// mirrors the approval policy), so a default-on deny could stall automation.
+// The Claude gate's source set, narrower than the verify gate's CODE, which also counts config.
+const DELEGATE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|kt|java|swift|m|mm)$/i;
+const THROWAWAY = /\/scratchpad\/|^\/tmp\/|^\/private\/tmp\/|^\/var\/folders\//;
+// Copied from gate-delegate.js, held identical by scripts/test-codex.py.
+// ponytail: perl -i, a heredoc piped to an interpreter, in-script writes, and escaped
+// quotes inside a quoted span are missed. ceiling: a shell write in those shapes reaches
+// the 2nd file unasked. upgrade: diff git state per call, as the verify gate does at Stop.
+const QUOTED = `"[^"]*"|'[^']*'`;
+function shellWrites(command, cwd) {
+  const out = [];
+  let m;
+  const redirect = new RegExp(QUOTED + `|(?<![0-9&<>])>>?\\s*(?!\\/dev\\/|&)(${QUOTED}|[^\\s;&|<>"']+)`, 'g');
+  while ((m = redirect.exec(command)) !== null) if (m[1]) out.push(m[1].replace(/^(["'])(.*)\1$/, '$2'));
+  const operands = new RegExp(QUOTED + `|\\b(?:sed\\s+-i\\b|tee\\b)((?:${QUOTED}|[^;&|"'])*)`, 'g');
+  while ((m = operands.exec(command)) !== null) if (m[1]) out.push.apply(out, m[1].split(/[\s'"]+/));
+  return out.filter(t => DELEGATE_EXT.test(t)).map(t => path.resolve(cwd, t));
+}
+
+// A CraftKit profile installed read-only by adapters/codex.sh cannot take the edits.
+function readOnlyProfile(type) {
+  if (!/^[A-Za-z0-9_-]+$/.test(type)) return false;
+  const body = read(path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'agents', type + '.toml'));
+  return body.startsWith('# CraftKit managed agent\n') && /^sandbox_mode = "read-only"$/m.test(body);
+}
+
+function patchFiles(text, cwd) {
+  const files = [];
+  for (const m of text.matchAll(/^\*\*\* (Add File|Update File|Delete File|Move to): (.+)$/gm)) {
+    // A rename's Update header names the old path; the file that results is its Move to.
+    if (m[1] === 'Move to') files.pop();
+    files.push(path.resolve(cwd, m[2].trim()));
+  }
+  return files;
+}
+
+function delegate(p, file, cwd) {
+  if (process.env.CRAFTKIT_DELEGATE !== 'on' || p.agent_id || !p.turn_id) return null;
+  const ti = p.tool_input || {};
+  const text = String(ti.command || ti.cmd || '');
+  const log = file + '.delegate';
+  const id = String(p.tool_use_id || crypto.randomUUID());
+  const append = lines => {
+    try { fs.appendFileSync(log, lines.map(l => p.turn_id + '\t' + id + '\t' + l + '\n').join(''), { mode: 0o600 }); }
+    catch (_) {}
+  };
+  if (/spawn_agent$/.test(String(p.tool_name))) {
+    if (!readOnlyProfile(String(ti.agent_type || '').trim())) append(['spawn_agent']);
+    return null;
+  }
+  // apply_patch sends the raw patch as `command`; a shell `apply_patch <<EOF` carries the same headers.
+  const patch = p.tool_name === 'apply_patch' || text.includes('*** Begin Patch');
+  const mine = (patch ? patchFiles(text, cwd) : []).concat(p.tool_name === 'Bash' ? shellWrites(text, cwd) : [])
+    .filter(f => DELEGATE_EXT.test(f) && !THROWAWAY.test(f));
+  if (!mine.length) return null;
+  // Appended before reading, so of two parallel calls the later reader sees both; a denied
+  // call then retracts its own lines, so a refused file never counts against a later edit.
+  append(mine);
+  const rows = read(log).split('\n').map(l => l.split('\t')).filter(r => r[0] === String(p.turn_id) && r.length === 3);
+  const retracted = new Set(rows.filter(r => r[2] === '-').map(r => r[1]));
+  const live = rows.filter(r => r[2] !== '-' && !retracted.has(r[1])).map(r => r[2]);
+  const files = new Set(live);
+  if (files.has('spawn_agent') || files.size < 2) return null;
+  append(['-']);
+  return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason:
+    'This is source file ' + files.size + ' edited this turn (' + mine[0] + '). Director mode wants multi-file ' +
+    'work delegated: spawn_agent with a contract that includes the verify command, then wait_agent and ' +
+    'integrate its result. Re-plan the work as a delegation instead of editing directly. ' +
+    'Unset CRAFTKIT_DELEGATE or set it to off to disable this gate.' } };
+}
+
 function clear(file) {
-  for (const name of [file, file + '.checks']) {
+  for (const name of [file, file + '.checks', file + '.delegate']) {
     try { fs.unlinkSync(name); } catch (_) {}
   }
 }
@@ -163,6 +237,11 @@ process.stdin.on('end', () => {
   const session = String(p.session_id || '');
   if (!session) return output({});
   const file = statePath(session);
+  if (event === 'PreToolUse') {
+    let denied = null;
+    try { denied = delegate(p, file, cwd); } catch (_) { /* fail open */ }
+    if (denied) return output(denied);
+  }
   let state = load(file);
   if (state && !Number.isFinite(state.started)) {
     state.started = Date.now();
@@ -170,6 +249,7 @@ process.stdin.on('end', () => {
     save(file, state);
   }
   if (event === 'UserPromptSubmit') {
+    try { fs.unlinkSync(file + '.delegate'); } catch (_) {}
     // A Stop block creates an automatic prompt. Preserve its original baseline.
     if (!state || !state.pending) state = { baseline: snapshot(cwd), started: Date.now(), blocks: 0, pending: false };
     else state.pending = false;

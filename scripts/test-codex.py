@@ -37,7 +37,7 @@ class CodexGatewayTests(unittest.TestCase):
         self.git('-c', 'user.name=Probe', '-c', 'user.email=probe@example.test', 'commit', '-qm', 'fixture')
 
     def hook(self, event, **fields):
-        payload = dict(hook_event_name=event, session_id=self.session, cwd=str(self.repo), **fields)
+        payload = dict(dict(hook_event_name=event, session_id=self.session, cwd=str(self.repo)), **fields)
         result = subprocess.run(['node', str(REPO / 'hooks/craftkit-codex.js')],
                                 env=self.env, input=json.dumps(payload), text=True,
                                 capture_output=True, check=True)
@@ -244,6 +244,99 @@ class CodexGatewayTests(unittest.TestCase):
         self.assertIn('User guidance', content)
         self.assertNotIn('old guide', content)
         self.assertIn('parallel', content)
+
+    def patch(self, *files, turn='main-turn', body=None, **fields):
+        # Absolute, because the fixture repo sits under the temp dir the gate ignores as throwaway.
+        if body is None:
+            body = ''.join('*** Update File: /fixture/' + f + '\n@@\n-old\n+new\n' for f in files)
+        self.env.setdefault('CRAFTKIT_DELEGATE', 'on')
+        return self.hook('PreToolUse', tool_name='apply_patch', turn_id=turn, tool_use_id=uuid.uuid4().hex,
+                         tool_input={'command': '*** Begin Patch\n' + body + '*** End Patch\n'}, **fields)
+
+    def test_delegate_gate_is_opt_in_for_codex(self):
+        self.env['CRAFTKIT_DELEGATE'] = ''
+        self.assertEqual(self.patch('a.js'), {})
+        self.assertEqual(self.patch('b.js'), {})
+        self.env['CRAFTKIT_DELEGATE'] = 'on'
+        self.env['CRAFTKIT_GATE'] = 'off'
+        self.assertEqual(self.patch('c.js'), {})
+
+    def test_delegate_rename_counts_the_destination_once(self):
+        self.assertEqual(self.patch(body='*** Update File: /fixture/a.ts\n*** Move to: /fixture/b.ts\n@@\n-x\n+y\n'), {})
+        self.assertEqual(self.patch('b.ts'), {})
+
+    def test_delegate_denied_edit_does_not_lock_the_first_file(self):
+        self.patch('a.js')
+        self.denied(self.patch('b.ts'))
+        self.assertEqual(self.patch('a.js'), {})
+
+    def test_delegate_read_only_spawn_does_not_disarm(self):
+        agents = self.home / '.codex/agents'
+        agents.mkdir(parents=True)
+        (agents / 'fe-review.toml').write_text('# CraftKit managed agent\nname = "fe-review"\nsandbox_mode = "read-only"\n')
+        self.patch('a.js')
+        self.hook('PreToolUse', tool_name='spawn_agent', turn_id='main-turn', tool_use_id='ro',
+                  tool_input={'agent_type': 'fe-review', 'message': 'review a.js'})
+        self.denied(self.patch('b.js'))
+        self.hook('PreToolUse', tool_name='spawn_agent', turn_id='main-turn', tool_use_id='rw',
+                  tool_input={'message': 'edit b.js; verify: bash check.sh'})
+        self.assertEqual(self.patch('b.js'), {})
+
+    def test_delegate_record_clears_on_new_prompt(self):
+        self.patch('a.js')
+        record = Path(tempfile.gettempdir()) / ('craftkit-codex-' +
+                      hashlib.sha256(self.session.encode()).hexdigest()[:24] + '.json.delegate')
+        self.assertTrue(record.exists())
+        self.start()
+        self.assertFalse(record.exists())
+
+    def test_delegate_patch_headers_only_parse_in_a_patch(self):
+        self.patch('a.js')
+        self.assertEqual(self.hook('PreToolUse', tool_name='Bash', turn_id='main-turn', tool_use_id='h',
+                                   tool_input={'command': 'cat <<EOF\n*** Update File: /fixture/b.js\nEOF'}), {})
+
+    def test_delegate_relative_paths_and_deletes_count(self):
+        self.assertEqual(self.patch(body='*** Add File: src/a.js\n+x\n', cwd='/fixture/repo'), {})
+        self.assertEqual(self.patch(body='*** Update File: src/a.js\n@@\n-x\n+y\n', cwd='/fixture/repo'), {})
+        self.denied(self.patch(body='*** Delete File: src/b.js\n', cwd='/fixture/repo'))
+
+    def denied(self, result):
+        out = result.get('hookSpecificOutput', {})
+        self.assertEqual(out.get('permissionDecision'), 'deny')
+        self.assertIn('spawn_agent', out.get('permissionDecisionReason', ''))
+
+    def test_delegate_gate_denies_second_source_file(self):
+        self.assertEqual(self.patch('app.js'), {})
+        self.assertEqual(self.patch('app.js'), {})
+        self.assertEqual(self.patch('docs/plan.md'), {})
+        self.denied(self.patch('src/b.ts'))
+        self.denied(self.patch('src/c.kt'))
+        self.assertEqual(self.patch('src/b.ts', turn='next-turn'), {})
+
+    def test_delegate_gate_counts_one_patch_and_shell_writes(self):
+        self.denied(self.patch('a.js', 'b.js'))
+        self.assertEqual(self.patch('a.js', turn='t2'), {})
+        self.denied(self.hook('PreToolUse', tool_name='Bash', turn_id='t2', tool_use_id='s',
+                              tool_input={'command': "sed -i '' 's/a/b/' /fixture/src/b.swift"}))
+        self.assertEqual(self.hook('PreToolUse', tool_name='Bash', turn_id='t2', tool_use_id='r',
+                                   tool_input={'command': 'node /fixture/src/b.js > out.log'}), {})
+
+    def test_delegate_gate_passes_after_spawn_subagents_and_off(self):
+        self.patch('a.js')
+        self.hook('PreToolUse', tool_name='spawn_agent', turn_id='main-turn', tool_use_id='sp',
+                  tool_input={'message': 'edit b.js; verify: bash check.sh'})
+        self.assertEqual(self.patch('b.js'), {})
+        self.patch('a.js', turn='t2', agent_id='child', agent_type='worker')
+        self.assertEqual(self.patch('b.js', turn='t2', agent_id='child', agent_type='worker'), {})
+        self.env['CRAFTKIT_DELEGATE'] = 'off'
+        self.assertEqual(self.patch('a.js', turn='t3'), {})
+        self.assertEqual(self.patch('b.js', turn='t3'), {})
+
+    def test_delegate_shell_parsing_matches_claude_gate(self):
+        import re
+        grab = lambda f: re.search(r'^const QUOTED = .*?^}\n', (REPO / 'hooks' / f).read_text(),
+                                   re.M | re.S).group().replace('DELEGATE_EXT', 'CODE_EXT')
+        self.assertEqual(grab('craftkit-codex.js'), grab('gate-delegate.js'))
 
     def test_agent_profiles_render_live_rules_without_claude_models(self):
         import re

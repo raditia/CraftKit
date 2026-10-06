@@ -1412,7 +1412,7 @@ else
         && { fail "Codex Stop blocks after verification on a continuation"; _cx=1; }
     echo 'not json' | node "$REPO_DIR/hooks/craftkit-codex.js" >/dev/null 2>&1 \
         || { fail "Codex gateway errors on malformed stdin"; _cx=1; }
-    echo '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"user-stop-hook"}]}]}}' > "$_cxf/home/.codex-hooks-before.json"
+    echo '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"user-stop-hook"}]}],"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"user-pre-hook"},{"type":"command","command":"node old/craftkit-codex.js"}]}],"PostToolUse":[{"matcher":"Bash|exec_command","hooks":[{"type":"command","command":"node old/craftkit-codex.js"}]}]}}' > "$_cxf/home/.codex-hooks-before.json"
     mkdir -p "$_cxf/home/.codex"
     cp "$_cxf/home/.codex-hooks-before.json" "$_cxf/home/.codex/hooks.json"
     (HOME="$_cxf/home"; source "$REPO_DIR/adapters/claude.sh"; source "$REPO_DIR/adapters/codex.sh"; install_codex_craftkit_hooks >/dev/null) \
@@ -1430,7 +1430,18 @@ assert len(hooks['Stop']) == 2
 assert hooks['Stop'][0]['hooks'][0]['command'] == 'user-stop-hook'
 for event in ('SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop'):
     assert any('craftkit-codex.js' in h['command'] for g in hooks[event] for h in g['hooks'])
+# The delegate gate needs patches and spawns: the legacy Bash matcher is migrated by moving
+# our hook out of a group it shared, and a matcher the user narrowed is left alone.
+pre = hooks['PreToolUse']
+assert [(g['matcher'], [h['command'] for h in g['hooks']]) for g in pre][0] == ('Bash', ['user-pre-hook'])
+assert pre[1]['matcher'] == 'Bash|apply_patch|spawn_agent' and 'craftkit-codex.js' in pre[1]['hooks'][0]['command']
+assert len(pre) == 2
+assert hooks['PostToolUse'][0]['matcher'] == 'Bash|exec_command'
 PYEOF
+    echo '[]' > "$_cxf/home/.codex/hooks.json"
+    (HOME="$_cxf/home"; source "$REPO_DIR/adapters/claude.sh"; source "$REPO_DIR/adapters/codex.sh"; install_codex_craftkit_hooks >/dev/null 2>&1)
+    [[ "$(cat "$_cxf/home/.codex/hooks.json")" == '[]' ]] \
+        || { fail "Codex hook installer rewrote a hooks.json shape it does not recognise"; _cx=1; }
     rm -rf "$_cxf"
     [[ $_cx -eq 0 ]] && pass
 fi

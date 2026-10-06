@@ -25,6 +25,7 @@ to check the result, so multi-file work now goes to background agents with a ver
   main turn edits, and on each further one until the turn hands the work off (a background
   spawn, or a profile that can edit). Unattended `claude -p` sessions skip it, since an ask
   there is auto-denied; `CRAFTKIT_DELEGATE=off` turns it off for any other automation.
+- Codex gets the same gate in `craftkit-codex.js`, opt-in with `CRAFTKIT_DELEGATE=on` (`PreToolUse` now on `Bash|apply_patch|spawn_agent`): Codex rejects `ask` and cannot tell `codex exec` from an interactive run, so it can only deny; it passes once the turn spawns an agent that can edit.
 - `gate-verify-on-stop.js`: a notification turn measures dirty files from the finished agent's
   spawn time, so a background agent's edits are verified; agent worktree dirs are ignored.
 - Cursor now strips `CRAFTKIT-CODEX`, which leaked into its rules before.
