@@ -339,6 +339,23 @@ Delegated work follows one flow: **workstream contract â†’ permission boundary â
 - **Boundary second.** Investigation and review run read-only. Edits from more than one unit happen in separate worktrees, never on a shared checkout.
 - **Main task integrates.** Delegated output is evidence, not a result: the main task reviews and verifies it before merging it in, and the human decides on anything outward-facing or hard to reverse.
 
+<!-- BEGIN CRAFTKIT-DIRECTOR -->
+### 12a. Director mode (Claude Code)
+
+Supersedes rule 12's "Main task" row: the main session thinks, routes, delegates and integrates, and keeps the chat unblocked.
+
+| Main works directly | Background agent (Agent tool, `run_in_background: true`) |
+|---|---|
+| Conversational answer, lookup in a known file or symbol, edit confined to one file | Anything multi-file, multi-step, or long-running (builds, test suites, research), and every orchestrator command |
+
+After spawning, end the turn with a one-line status so the user can keep talking.
+
+- **Contract.** Rule 12's four fields plus the project's verify command; the agent reports that command's actual result. Agents do not reliably inherit CLAUDE.md, so the contract always carries it.
+- **Isolation.** One editing agent in the main checkout; every concurrent editor gets `isolation: "worktree"`; read-only agents run freely.
+- **Refinement.** A tweak that keeps the agent's work valid goes to it via `SendMessage`; a pivot that invalidates it means `TaskStop`, then respawn with the merged contract. Name which in one line.
+- **Integration.** On the completion notification, check the output against the contract, confirm the verify result is present and passing, merge worktrees, then report. No passing verify result: report "not verified", never "done". A worktree merge conflict goes to the user, unresolved.
+<!-- END CRAFTKIT-DIRECTOR -->
+
 ---
 
 ## Skill authoring rules

@@ -1093,6 +1093,40 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# 23c. Tool-scoped marker blocks reach only their tool. CRAFTKIT-DIRECTOR carries
+#      Claude Code primitives (run_in_background, SendMessage, TaskStop) and
+#      CRAFTKIT-CODEX carries Codex's runtime guide; Cursor once copied rules
+#      verbatim and loaded the Codex guide in every session. Behavioral, from each
+#      adapter's own installer into a sandbox, so it never reads the real $HOME.
+# ---------------------------------------------------------------------------
+check "tool-scoped rule blocks reach only their tool"
+_tb=0
+_tf="$(mktemp -d)"
+_rule="$REPO_DIR/rules/using-agent-skills.md"
+grep -q '<!-- BEGIN CRAFTKIT-DIRECTOR -->' "$_rule" \
+    || { fail "rules/using-agent-skills.md has no CRAFTKIT-DIRECTOR block, so director mode never loads"; _tb=1; }
+( . "$REPO_DIR/adapters/claude.sh" >/dev/null 2>&1
+  CLAUDE_RULES_DIR="$_tf/claude-rules"; CLAUDE_MD="$_tf/CLAUDE.md"; CLAUDE_COMMANDS_DIR="$_tf/cmds"
+  install_claude_rule using-agent-skills "$_rule" >/dev/null 2>&1 )
+( . "$REPO_DIR/adapters/gemini.sh" >/dev/null 2>&1
+  GEMINI_SKILLS_DIR="$_tf/gemini"; GEMINI_MD="$_tf/GEMINI.md"
+  install_gemini_rule using-agent-skills "$_rule" >/dev/null 2>&1 )
+( . "$REPO_DIR/adapters/cursor.sh" >/dev/null 2>&1
+  CURSOR_RULES_DIR="$_tf/cursor"
+  install_cursor_rule using-agent-skills "$_rule" >/dev/null 2>&1 )
+grep -q 'CRAFTKIT-DIRECTOR' "$_tf/CLAUDE.md" 2>/dev/null \
+    || { fail "Claude managed block lacks the CRAFTKIT-DIRECTOR block, so the main session never delegates"; _tb=1; }
+for _out in "$_tf/GEMINI.md" "$_tf/cursor/using-agent-skills.mdc"; do
+    if [[ ! -s "$_out" ]]; then
+        fail "sandbox render produced no $(basename "$_out"), so the absence check proves nothing"; _tb=1
+    elif grep -qE 'CRAFTKIT-(DIRECTOR|CODEX)' "$_out"; then
+        fail "$(basename "$_out") carries a CRAFTKIT-DIRECTOR or CRAFTKIT-CODEX block meant for another tool"; _tb=1
+    fi
+done
+rm -rf "$_tf"
+[[ $_tb -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
 # 24. The hook table and hooks/ agree in both directions, same invariant as
 #     check 13 holds for adapters. A script in hooks/ that no table entry names
 #     is never installed, and a table entry with no script installs nothing while
