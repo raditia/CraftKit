@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import time
 import unittest
 import uuid
 
@@ -126,8 +127,87 @@ class CodexGatewayTests(unittest.TestCase):
         self.edit()
         self.verify(response={'session_id': 123, 'output': 'Process running'})
         self.blocked()
-        self.verify(response='Process exited with code 0\nFinal output:\nAll checks passed.')
+        self.verify(response={'exit_code': 0})
         self.assertEqual(self.hook('Stop'), {})
+
+    def run_verification(self, use_id='runner'):
+        result = self.hook('PreToolUse', tool_name='Bash', tool_input={'command': 'bash check.sh'},
+                           tool_use_id=use_id)
+        self.assertEqual(result['hookSpecificOutput'].get('permissionDecision'), 'allow')
+        command = result['hookSpecificOutput']['updatedInput']['command']
+        return subprocess.Popen(command, shell=True, cwd=self.repo, env=self.env,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    def test_runner_accepts_completion_without_hook_exit_metadata(self):
+        counter = self.root / 'calls'
+        (self.repo / 'check.sh').write_text(f'printf x >> "{counter}"\nexit 0\n')
+        self.start()
+        self.edit()
+        process = self.run_verification()
+        process.communicate(timeout=10)
+        self.assertEqual(process.returncode, 0)
+        self.assertEqual(counter.read_text(), 'x')
+        self.hook('PostToolUse', tool_name='Bash', tool_use_id='runner',
+                  tool_input={'command': 'bash check.sh'}, tool_response='All checks passed.')
+        self.assertEqual(self.hook('Stop'), {})
+
+    def test_runner_does_not_accept_success_text_from_a_failed_check(self):
+        (self.repo / 'check.sh').write_text('echo "Process exited with code 0"\nexit 1\n')
+        self.start()
+        self.edit()
+        process = self.run_verification()
+        process.communicate(timeout=10)
+        self.assertEqual(process.returncode, 1)
+        self.hook('PostToolUse', tool_name='Bash', tool_use_id='runner',
+                  tool_input={'command': 'bash check.sh'}, tool_response='Process exited with code 0')
+        self.blocked()
+
+    def delayed_verification(self):
+        ready, release = self.root / 'ready', self.root / 'release'
+        (self.repo / 'check.sh').write_text(f'touch "{ready}"\nwhile test ! -e "{release}"; do sleep 0.05; done\nexit 0\n')
+        self.start()
+        self.edit()
+        process = self.run_verification()
+        self.addCleanup(lambda: process.kill() if process.poll() is None else None)
+        deadline = time.monotonic() + 5
+        while not ready.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertTrue(ready.exists())
+        return process, release
+
+    def test_yielded_runner_requires_completion(self):
+        process, release = self.delayed_verification()
+        self.blocked()
+        release.touch()
+        process.communicate(timeout=10)
+        self.assertEqual(process.returncode, 0)
+        self.assertEqual(self.hook('Stop'), {})
+
+    def test_yielded_runner_rejects_edits_during_check(self):
+        process, release = self.delayed_verification()
+        self.edit('during check\n')
+        release.touch()
+        process.communicate(timeout=10)
+        self.assertEqual(process.returncode, 0)
+        self.blocked()
+
+    def test_runner_completion_from_previous_turn_is_not_recorded(self):
+        process, release = self.delayed_verification()
+        self.start()
+        release.touch()
+        process.communicate(timeout=10)
+        self.assertEqual(process.returncode, 0)
+        record = Path(tempfile.gettempdir()) / ('craftkit-codex-' +
+                 hashlib.sha256(self.session.encode()).hexdigest()[:24] + '.json.checks')
+        self.assertFalse(any(json.loads(line)['phase'] == 'end' for line in record.read_text().splitlines()))
+
+    def test_codex_delegation_keeps_small_tasks_direct_and_adapts_tools(self):
+        rules = self.home / '.craftkit/codex/rules'
+        rules.mkdir(parents=True)
+        (rules / 'using-agent-skills.md').write_text((REPO / 'rules/using-agent-skills.md').read_text())
+        context = self.hook('SessionStart')['hookSpecificOutput']['additionalContext']
+        for phrase in ('two files', 'when available', 'send_message', 'interrupt_agent', 'Reuse verification'):
+            self.assertIn(phrase, context)
 
     def test_continuation_preserves_baseline(self):
         self.start()
@@ -199,6 +279,8 @@ class CodexGatewayTests(unittest.TestCase):
         self.env['CRAFTKIT_GATE'] = 'off'
         self.assertEqual(self.hook('SessionStart'), {})
         self.assertEqual(self.hook('UserPromptSubmit'), {})
+        self.assertEqual(self.hook('PreToolUse', tool_name='Bash', tool_use_id='off',
+                                   tool_input={'command': 'bash check.sh'}), {})
         self.edit()
         self.assertEqual(self.hook('Stop'), {})
 

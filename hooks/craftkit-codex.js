@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { execFileSync, spawn } = require('child_process');
 const { detectPlatform } = require('./craftkit-platform.js');
 
 const CODE = /\.(ts|tsx|js|jsx|mjs|cjs|kt|kts|java|swift|m|mm|xml|gradle|strings|bzl|json)$/i;
@@ -130,14 +130,40 @@ function executed(command) {
 
 function exitCode(response) {
   if (response && typeof response.exit_code === 'number') return response.exit_code;
-  if (typeof response !== 'string') return null;
-  const match = response.match(/^(?:Process exited with code|Exit code:)\s*(-?\d+)\s*$/m);
-  return match ? Number(match[1]) : null;
+  return null;
 }
 
 function checks(file) {
   return read(file + '.checks').split('\n').filter(Boolean).flatMap(line => {
     try { return [JSON.parse(line)]; } catch (_) { return []; }
+  });
+}
+
+// Codex 0.160 sends only stdout to PostToolUse, so verification observes the exit here.
+function runVerification() {
+  const [file, id, token] = process.argv.slice(3);
+  const state = load(file);
+  const start = state && checks(file).find(r => r.phase === 'start' && r.id === id && r.token === token &&
+    r.at >= state.started && r.snapshot);
+  if (!start) return process.exit(1);
+  const before = snapshot(start.cwd);
+  const child = spawn(process.env.SHELL || '/bin/sh', ['-c', start.command], {
+    cwd: start.cwd, stdio: 'inherit'
+  });
+  child.on('error', () => process.exit(1));
+  child.on('close', code => {
+    const current = snapshot(start.cwd);
+    const latest = load(file);
+    if (code === 0 && latest && start.at >= latest.started && before &&
+        JSON.stringify(start.snapshot) === JSON.stringify(before) &&
+        JSON.stringify(before) === JSON.stringify(current)) {
+      try {
+        fs.appendFileSync(file + '.checks', JSON.stringify({
+          at: Date.now(), id, phase: 'end', commands: start.commands, snapshot: current
+        }) + '\n', { mode: 0o600 });
+      } catch (_) {}
+    }
+    process.exit(code === null ? 1 : code);
   });
 }
 
@@ -222,6 +248,8 @@ function clear(file) {
 }
 
 let input = '';
+if (process.argv[2] === '--verify') runVerification();
+else {
 process.stdin.on('data', c => { input += c; });
 process.stdin.on('end', () => {
   let p;
@@ -283,8 +311,15 @@ process.stdin.on('end', () => {
         }
         if (!p.tool_use_id) return output({});
         const record = { at: Date.now(), id: p.tool_use_id, phase, commands, snapshot: current };
+        if (phase === 'start') Object.assign(record, { command, cwd, token: crypto.randomUUID() });
         // Each hook appends one record, so concurrent subagents cannot overwrite peers.
         try { fs.appendFileSync(file + '.checks', JSON.stringify(record) + '\n', { mode: 0o600 }); } catch (_) {}
+        if (phase === 'start' && current) {
+          const quote = s => "'" + String(s).replace(/'/g, "'\\''") + "'";
+          return output({ hookSpecificOutput: { hookEventName: event, permissionDecision: 'allow', updatedInput: {
+            command: [process.execPath, __filename, '--verify', file, p.tool_use_id, record.token].map(quote).join(' ')
+          } } });
+        }
       }
     }
     return output({});
@@ -311,3 +346,4 @@ process.stdin.on('end', () => {
     'Run ' + required.run + ', then report the actual result. If it cannot run, explain why the change is unverified. ' +
     'Set CRAFTKIT_GATE=off to disable this gate.' });
 });
+}

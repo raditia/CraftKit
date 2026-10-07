@@ -34,10 +34,10 @@ investigation, review, or testing goes to a read-only subagent; parallel edits u
 worktrees. Give each delegated unit a goal, output, and verify command, then review its result
 before integrating; the human decides anything hard to reverse.
 
-Delegate multi-file, multi-step, or long-running work via `spawn_agent`; steer with
-`send_input` (`interrupt=true` to pivot), stop with `close_agent`. Codex never wakes an idle
-parent, so `wait_agent` for every result before ending the turn; report "not verified" if an
-agent's verify result is missing or failing.
+Keep quick, coupled work (up to two files, about 2 minutes) direct; delegate when useful.
+Steer via `send_message`/`followup_task` and `interrupt_agent`, or `send_input`/`close_agent`
+when available. Collect results with `wait_agent` before replying. Reuse verification for
+an unchanged tree; report "not verified" if it is missing or failing.
 
 Keep the configured model; Codex reasoning tiers are low, medium, and high. Do not pass Claude
 family aliases. Before reporting completion, verify the latest edits using project gates and

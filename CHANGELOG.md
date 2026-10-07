@@ -23,8 +23,13 @@ to check the result, so larger work now goes to background agents with a verify 
   background" overrides. The agent runs the verify command in the foreground. Refinements go through SendMessage, pivots through TaskStop and a respawn,
   and integration requires the agent's verify result, else it is reported "not verified". It
   lives in a `CRAFTKIT-DIRECTOR` block that Gemini and Cursor strip. Codex gets a delegation
-  paragraph in its `CRAFTKIT-CODEX` block (`spawn_agent`, `send_input`, `close_agent`,
-  `wait_agent`), which waits for every result, since Codex does not wake an idle parent.
+  paragraph in its `CRAFTKIT-CODEX` block: quick, coupled work of up to two files stays direct,
+  steering uses the available v1 or v2 agent tools, and every delegated result is collected
+  before replying. Passing verification is reused when the final tree is unchanged.
+- Codex verification runs through a PreToolUse command rewrite that observes the actual
+  process exit and matching start/finish snapshots. Codex 0.160 sends raw stdout to
+  PostToolUse without exit metadata, so yielded checks previously triggered repeated
+  verification requests even after success; stdout claims cannot grant verification credit.
 - New `gate-delegate.js` (`PreToolUse`, Bash included): asks on the 3rd distinct source file a
   main turn edits, and on each further one until the turn hands the work off (a background
   spawn, or a profile that can edit). Unattended `claude -p` sessions skip it, since an ask
