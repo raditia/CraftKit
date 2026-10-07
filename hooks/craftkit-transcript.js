@@ -123,23 +123,61 @@ function turnIdOf(entry, text) {
   return crypto.createHash('sha1').update(text || '').digest('hex').slice(0, 16);
 }
 
+// When the agent a task-notification reports on was spawned. Its edits land after the
+// spawning turn's Stop and before this turn starts, so a cut at startedAt sees none of them.
+// Matched by the notification's tool-use id to the spawning Agent/Task call; failing that,
+// the oldest spawn no earlier notification has reported on; failing that, NaN, which the
+// verify gate reads as no cut at all (every dirty file counts), never as the turn start.
+// ponytail: "still running" is "not yet notified", so a foreground spawn counts forever.
+// ceiling: the fallback window widens, failing toward the gate firing. upgrade: read
+// run_in_background off the call once the transcript shape for it is pinned.
+const TOOL_USE_ID = /<tool-use-id>\s*([^<\s]+)/;
+
+function spawnTime(earlier, text) {
+  const id = (text.match(TOOL_USE_ID) || [])[1];
+  const spawns = [], notified = new Set();
+  for (const e of earlier) {
+    if (isUserTurn(e)) {
+      const done = userText(e).match(TOOL_USE_ID);
+      if (done) notified.add(done[1]);
+    }
+    const content = e.message && e.message.content;
+    if (!Array.isArray(content)) continue;
+    for (const item of content) {
+      if (item && item.type === 'tool_use' && (item.name === 'Agent' || item.name === 'Task') &&
+          Number.isFinite(Date.parse(e.timestamp))) {
+        spawns.push({ id: item.id, at: Date.parse(e.timestamp) });
+      }
+    }
+  }
+  const match = spawns.find(s => id && s.id === id);
+  if (match) return match.at;
+  const running = spawns.filter(s => !notified.has(s.id)).map(s => s.at);
+  return running.length ? Math.min.apply(null, running) : NaN;
+}
+
 // What the agent did since the user last spoke. Returns edits (file paths), commands
 // (bash command strings), skills (Skill tool invocations), slashCommand (the user
 // typed /<skill> themselves, which arms the gate just as a Skill call does), turnId
 // (stable identity of this turn), sidechain (this transcript belongs to a subagent, which
 // gets its own file under <session>/subagents/), delegated (the turn spawned an agent,
-// so files may have been written where this transcript cannot see them), slashCommands
+// so files may have been written where this transcript cannot see them), spawns (each
+// Agent/Task call as { background, type }, so a gate can tell a hand-off from a read-only
+// lookup), slashCommands
 // (the names the user typed, so a gate can match an announcement against them),
 // assistantText (everything the agent said this turn, which is where an announcement of a
 // skill lives when no Skill call followed it), notification (the turn was opened by a
 // background-task event rather than a prompt), and priorSkills (Skill calls in EARLIER
 // turns of this session, so a gate can spare a continuation of already-routed work,
 // counted across the whole file when the tail window missed the session start), and
-// startedAt (epoch ms of the prompt that opened the turn, NaN when the entry has none).
+// startedAt (epoch ms of the prompt that opened the turn, NaN when the entry has none), and
+// spawnedAt (on a notification turn, epoch ms of the reported agent's spawn, see spawnTime), and
+// reported (on a notification turn, the reported agent's { taskId, toolUseId }, see agentRun).
 function currentTurn(transcriptPath) {
   const out = { edits: [], commands: [], skills: [], slashCommand: false, readable: false,
-                turnId: '', sidechain: false, delegated: false, slashCommands: [],
-                assistantText: '', notification: false, priorSkills: 0, startedAt: NaN };
+                turnId: '', sidechain: false, delegated: false, spawns: [], slashCommands: [],
+                assistantText: '', notification: false, priorSkills: 0, startedAt: NaN,
+                spawnedAt: NaN, reported: null };
   const tail = readTailLines(transcriptPath);
   const lines = tail.lines;
   if (!lines.length) return out;
@@ -176,6 +214,10 @@ function currentTurn(transcriptPath) {
     // Only task-notification: a system-reminder can prefix a genuine prompt in the same
     // entry, and matching it would silently disarm the gate on ordinary routable work.
     out.notification = /^\s*<task-notification\b/.test(text);
+    if (out.notification) {
+      out.spawnedAt = spawnTime(entries.slice(0, start), text);
+      out.reported = { taskId: (text.match(TASK_ID) || [])[1] || '', toolUseId: (text.match(TOOL_USE_ID) || [])[1] || '' };
+    }
     let sc;
     const scRe = /<command-name>\s*\/?([A-Za-z0-9:_-]+)/g;
     while ((sc = scRe.exec(text)) !== null) out.slashCommands.push(sc[1]);
@@ -194,7 +236,10 @@ function currentTurn(transcriptPath) {
       if (!item || item.type !== 'tool_use') continue;
       const input = item.input || {};
       if (item.name === 'Skill') out.skills.push(input.skill || 'unknown');
-      else if (item.name === 'Agent' || item.name === 'Task') out.delegated = true;
+      else if (item.name === 'Agent' || item.name === 'Task') {
+        out.delegated = true;
+        out.spawns.push({ background: input.run_in_background === true, type: String(input.subagent_type || '') });
+      }
       else if (item.name === 'Bash') out.commands.push(String(input.command || ''));
       else if (/^(Edit|Write|MultiEdit|NotebookEdit)$/.test(item.name)) {
         const f = input.file_path || input.notebook_path;
@@ -211,12 +256,68 @@ function currentTurn(transcriptPath) {
   return out;
 }
 
+// The steps a reported agent took, in order, read from its own transcript: Claude Code
+// writes a subagent to <session>/subagents/agent-<agentId>.jsonl beside the session's
+// <session>.jsonl, and the notification's <task-id> is that agentId. A meta.json beside each
+// carries the spawning toolUseId, the fallback when the task id is absent. Each step is
+// { write } for an Edit-family call or { command, ok, background } for a Bash call, ok
+// meaning its tool_result came back without is_error. null when no transcript is found or
+// it cannot be read, which the verify gate treats as "not verified by the agent".
+const TASK_ID = /<task-id>\s*([^<\s]+)/;
+
+function agentFile(transcriptPath, reported) {
+  if (!reported) return '';
+  const dir = path.join(transcriptPath.replace(/\.jsonl$/, ''), 'subagents');
+  if (/^[A-Za-z0-9_-]+$/.test(reported.taskId)) {
+    const f = path.join(dir, 'agent-' + reported.taskId + '.jsonl');
+    if (fs.existsSync(f)) return f;
+  }
+  if (!reported.toolUseId) return '';
+  try {
+    for (const name of fs.readdirSync(dir)) {
+      if (!name.endsWith('.meta.json')) continue;
+      const meta = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
+      if (meta.toolUseId === reported.toolUseId) return path.join(dir, name.replace(/\.meta\.json$/, '.jsonl'));
+    }
+  } catch (e) { /* unreadable dir or meta: no transcript */ }
+  return '';
+}
+
+function agentRun(transcriptPath, reported) {
+  const file = agentFile(transcriptPath, reported);
+  if (!file) return null;
+  let lines;
+  try { lines = fs.readFileSync(file, 'utf8').split('\n'); } catch (e) { return null; }
+  const steps = [], bash = new Map();
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    let e;
+    try { e = JSON.parse(line); } catch (err) { continue; }
+    const content = e.message && e.message.content;
+    if (!Array.isArray(content)) continue;
+    for (const item of content) {
+      if (!item) continue;
+      if (item.type === 'tool_result' && bash.has(item.tool_use_id)) bash.get(item.tool_use_id).ok = item.is_error !== true;
+      if (item.type !== 'tool_use') continue;
+      if (/^(Edit|Write|MultiEdit|NotebookEdit)$/.test(item.name)) steps.push({ write: true });
+      else if (item.name === 'Bash') {
+        const input = item.input || {};
+        const step = { command: String(input.command || ''), background: input.run_in_background === true, ok: false };
+        bash.set(item.id, step);
+        steps.push(step);
+      }
+    }
+  }
+  return steps;
+}
+
 // A bounded budget of interruptions per turn, shared by every gate. Returns true while the
 // turn still has budget for this key, and counts the action.
 //
-// Two callers with different needs. The PreToolUse gates want exactly one prompt per turn,
-// because they fire per tool call and a ten-edit turn would otherwise cost ten prompts,
-// which trains clicking through. The Stop gates want more than one, because honoring
+// Two callers with different needs. gate-skill-first wants one prompt per turn, because it
+// fires per tool call and a ten-edit turn would otherwise cost ten prompts, which trains
+// clicking through (gate-delegate asks on every further edit by design and keeps no
+// budget). The Stop gates want more than one, because honoring
 // stop_hook_active unconditionally meant only the FIRST stop attempt was ever judged: a
 // turn could be blocked, change nothing, and stop again to get through.
 //
@@ -247,4 +348,4 @@ function onceInTurn(session, turnId, key) {
   return turnBudget(session, turnId, key, 1);
 }
 
-module.exports = { currentTurn, onceInTurn, turnBudget };
+module.exports = { currentTurn, onceInTurn, turnBudget, agentRun };

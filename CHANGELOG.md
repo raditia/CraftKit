@@ -7,6 +7,45 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.57.0 — 2026-10-06
+
+### Director mode: the main session directs, background agents build
+
+A main session that edits ten files itself burns its context on mechanics and leaves nobody
+to check the result, so larger work now goes to background agents with a verify contract.
+
+- Codex users: the PreToolUse hook's matcher changed, so Codex treats it as untrusted until you re-approve it once in `/hooks`; until then the Codex verify and delegate gates are skipped silently. Verified live on codex-cli 0.160.0: with `CRAFTKIT_DELEGATE=on` the 3rd file was handed to a subagent.
+- Rule 12a sets a budget: one review pass and one gate run per change, with measurement runs and extra reviews only on request.
+- `using-agent-skills` gains rule 12a (Claude Code): the main session assesses each prompt
+  first. Answers, lookups, edits touching up to two files and anything done in about 2 minutes
+  stay direct; long-running work, 3+ files, parallel pieces and orchestrator commands go to
+  background agents, and the call is stated in one line. The user's "do it here" or "in
+  background" overrides. The agent runs the verify command in the foreground. Refinements go through SendMessage, pivots through TaskStop and a respawn,
+  and integration requires the agent's verify result, else it is reported "not verified". It
+  lives in a `CRAFTKIT-DIRECTOR` block that Gemini and Cursor strip. Codex gets a delegation
+  paragraph in its `CRAFTKIT-CODEX` block: quick, coupled work of up to two files stays direct,
+  steering uses the available v1 or v2 agent tools, and every delegated result is collected
+  before replying. Passing verification is reused when the final tree is unchanged.
+- Codex verification runs through a PreToolUse command rewrite that observes the actual
+  process exit and matching start/finish snapshots. Codex 0.160 sends raw stdout to
+  PostToolUse without exit metadata, so yielded checks previously triggered repeated
+  verification requests even after success; stdout claims cannot grant verification credit.
+- New `gate-delegate.js` (`PreToolUse`, Bash included): asks on the 3rd distinct source file a
+  main turn edits, and on each further one until the turn hands the work off (a background
+  spawn, or a profile that can edit). Unattended `claude -p` sessions skip it, since an ask
+  there is auto-denied; `CRAFTKIT_DELEGATE=off` turns it off for any other automation.
+- Codex gets the same gate in `craftkit-codex.js`, opt-in with `CRAFTKIT_DELEGATE=on` (`PreToolUse` now on `Bash|apply_patch|spawn_agent`): Codex rejects `ask` and cannot tell `codex exec` from an interactive run, so it can only deny; it passes once the turn spawns an agent that can edit.
+- `gate-verify-on-stop.js`: a notification turn measures dirty files from the finished agent's
+  spawn time, so a background agent's edits are verified; agent worktree dirs are ignored. It
+  passes when the agent's own transcript shows the verify command succeeding after its last
+  write, so the main session does not re-run it, and ignores edits outside the repo root.
+- Cursor now strips `CRAFTKIT-CODEX`, which leaked into its rules before.
+- Sync migrates an installed hook off a matcher an earlier release registered; before, a
+  changed matcher never reached an existing install. A user-set matcher is left alone.
+- Measured: rule text alone delegated 0/5 multi-file tasks; with the gate, 2-3/5, every one
+  after a gate ask. Long-running single-file work and orchestrator commands are not gated and
+  stay rule-only guidance, a known gap.
+
 ## v1.56.0 — 2026-10-05
 
 ### Execution units: pick the smallest one that fits

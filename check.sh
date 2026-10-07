@@ -616,7 +616,7 @@ if ! command -v node >/dev/null 2>&1; then
     echo "    skipped (node not on PATH)"
 else
     _gx="$(mktemp -d)"
-    mkdir -p "$_gx/proj" && echo '{}' > "$_gx/proj/package.json"
+    mkdir -p "$_gx/proj" "$_gx/plain" && echo '{}' > "$_gx/proj/package.json" && echo '{}' > "$_gx/plain/package.json"
     python3 - "$_gx" << 'PYEOF'
 import json, sys
 gx = sys.argv[1]
@@ -747,7 +747,7 @@ PYEOF
             | TMPDIR="$_gx" node "$REPO_DIR/hooks/gate-skill-first.js" 2>/dev/null
     }
     _stopgate() {
-        printf '{"session_id":"%s","transcript_path":"%s","cwd":"%s"%s}' "${3:-v$RANDOM}" "$1" "$_gx/proj" "${2:-}" \
+        printf '{"session_id":"%s","transcript_path":"%s","cwd":"%s"%s}' "${3:-v$RANDOM}" "$1" "${4:-$_gx/proj}" "${2:-}" \
             | TMPDIR="$_gx" node "$REPO_DIR/hooks/gate-verify-on-stop.js" 2>/dev/null
     }
     _gd=0
@@ -902,6 +902,10 @@ PYEOF
         # fired on a PR body drafted in the session scratchpad until it excluded them.
         _stopgate "$_gx/scratch.jsonl" | grep -q '"decision"' \
             && { fail "stop gate demands verification for a scratchpad-only turn, firing on throwaway files"; _gd=1; }
+        # An edit outside the repo root (a memory note under ~/.claude) is not this
+        # project's to verify. Found when a memory write demanded check.sh.
+        _stopgate "$_gx/bare.jsonl" | grep -q '"decision"' \
+            && { fail "stop gate demands verification for an edit outside the repo root"; _gd=1; }
         # Delegating the edits hides them the same way the shell does: a subagent's writes
         # land in ITS transcript, so the parent's turn shows no edits at all.
         _stopgate "$_gx/delegated.jsonl" | grep -q '"decision":"block"' \
@@ -917,6 +921,98 @@ PYEOF
             || { fail "stop gate drops a turn-edited file whose name git quotes (a space)"; _gd=1; }
         _stopgate "$_gx/delegated-chmod.jsonl" | grep -q 'Mode.ts' \
             || { fail "stop gate drops a chmod-only change, since chmod leaves mtime alone"; _gd=1; }
+        # A background agent writes after the spawning turn's Stop and before its
+        # notification turn starts, so a cut at either turn's start misses every file it
+        # wrote. The fixture dirt is dated now; the spawn sits before it, the notification
+        # after it, which is exactly that gap.
+        python3 - "$_gx" << 'PYEOF'
+import json, sys
+gx = sys.argv[1]
+
+
+def at(year, entry):
+    return dict(entry, timestamp="%s-01-01T00:00:00.000Z" % year)
+
+
+def spawned(year, tid="toolu_bg1"):
+    return [at(year, {"type": "user", "message": {"role": "user", "content": "build it"}}),
+            at(year, {"type": "assistant", "message": {"role": "assistant", "content": [
+                {"type": "tool_use", "id": tid, "name": "Agent",
+                 "input": {"prompt": "implement", "run_in_background": True}}]}})]
+
+
+def notified(year, tid="toolu_bg1", verify=False):
+    lines = [at(year, {"type": "user", "message": {"role": "user", "content":
+              "<task-notification>\n<task-id>abc</task-id>\n<tool-use-id>%s</tool-use-id>\n"
+              "<status>completed</status>\n</task-notification>" % tid}})]
+    if verify:
+        lines.append({"type": "assistant", "message": {"role": "assistant", "content": [
+            {"type": "tool_use", "name": "Bash", "input": {"command": "rtk tsc --noEmit && rtk lint ViewX.tsx"}}]}})
+    lines.append({"type": "assistant", "message": {"role": "assistant", "content": [
+        {"type": "text", "text": "The agent finished."}]}})
+    return lines
+
+
+cases = {"bg-edited": spawned(2000) + notified(2999),
+         "bg-verified": spawned(2000) + notified(2999, verify=True),
+         "bg-clean": spawned(2998) + notified(2999),
+         "bg-unmatched": spawned(2000) + notified(2999, tid="toolu_zzz"),
+         "bg-unfindable": notified(2999)}
+for name, lines in cases.items():
+    with open("%s/%s.jsonl" % (gx, name), "w") as f:
+        f.write("\n".join(json.dumps(x) for x in lines) + "\n")
+
+# The reported agent's own transcript, at <session>/subagents/agent-<task-id>.jsonl.
+EDIT = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "e1", "name": "Edit", "input": {"file_path": "ViewX.tsx"}}]}}
+
+
+def verify(error=False):
+    return [{"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "v1", "name": "Bash",
+             "input": {"command": "rtk tsc --noEmit && rtk lint ViewX.tsx"}}]}},
+            {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "v1",
+             "is_error": error, "content": "ok"}]}}]
+
+
+import os
+for name, steps in {"bg-agent-verified": [EDIT] + verify(),
+                    "bg-agent-early": verify() + [EDIT],
+                    "bg-agent-failed": [EDIT] + verify(error=True)}.items():
+    with open("%s/%s.jsonl" % (gx, name), "w") as f:
+        f.write("\n".join(json.dumps(x) for x in spawned(2000) + notified(2999)) + "\n")
+    os.makedirs("%s/%s/subagents" % (gx, name))
+    with open("%s/%s/subagents/agent-abc.jsonl" % (gx, name), "w") as f:
+        f.write("\n".join(json.dumps(x) for x in steps) + "\n")
+PYEOF
+        # The agent's own verify run counts when it came after its last write and passed,
+        # so the main session need not re-run the gate; anything less still blocks.
+        _stopgate "$_gx/bg-agent-verified.jsonl" | grep -q '"decision"' \
+            && { fail "stop gate blocks a notification turn whose agent ran the verify command after its last edit"; _gd=1; }
+        _stopgate "$_gx/bg-agent-early.jsonl" | grep -q '"decision":"block"' \
+            || { fail "stop gate trusts an agent verify run that preceded the agent's last edit"; _gd=1; }
+        _stopgate "$_gx/bg-agent-failed.jsonl" | grep -q '"decision":"block"' \
+            || { fail "stop gate trusts an agent verify run that failed"; _gd=1; }
+        _stopgate "$_gx/bg-edited.jsonl" | grep -q '"decision":"block"' \
+            || { fail "stop gate misses a background agent's edits on its notification turn, so delegating to the background skips verification"; _gd=1; }
+        _stopgate "$_gx/bg-verified.jsonl" | grep -q '"decision"' \
+            && { fail "stop gate blocks a notification turn that ran the verify command"; _gd=1; }
+        _stopgate "$_gx/bg-clean.jsonl" | grep -q '"decision"' \
+            && { fail "stop gate blames a background agent for files dirty before it was spawned"; _gd=1; }
+        _stopgate "$_gx/bg-unmatched.jsonl" | grep -q '"decision":"block"' \
+            || { fail "stop gate drops the oldest-running-spawn fallback when the notification's tool-use id matches no spawn"; _gd=1; }
+        # No spawn to date the agent by: falling back to the turn start excluded every
+        # edit the agent made, which all predate its own notification.
+        _stopgate "$_gx/bg-unfindable.jsonl" | grep -q '"decision":"block"' \
+            || { fail "stop gate passes a notification turn whose spawn is not findable, so the agent's edits go unverified"; _gd=1; }
+        # An isolation: worktree spawn creates an untracked worktree dir in the main
+        # checkout, which the delegating turn then blamed on itself. Found when the gate
+        # fired on the very turn that spawned this check's author.
+        mkdir -p "$_gx/wtproj/.claude/worktrees/agent-x" && echo '{}' > "$_gx/wtproj/package.json"
+        (cd "$_gx/wtproj" && git init -q . && git add -A && git commit -qm init >/dev/null 2>&1) || true
+        echo x > "$_gx/wtproj/.claude/worktrees/agent-x/somefile.ts"
+        printf '{"session_id":"wt%s","transcript_path":"%s","cwd":"%s"}' "$RANDOM" "$_gx/delegated.jsonl" "$_gx/wtproj" \
+            | TMPDIR="$_gx" node "$REPO_DIR/hooks/gate-verify-on-stop.js" 2>/dev/null | grep -q '"decision"' \
+            && { fail "stop gate blames a delegating turn for the agent worktree directory it spawned"; _gd=1; }
     fi
     mkdir -p "$_gx/proj/.claude/skills/zzz-fixture-skill"
     _announcegate() {
@@ -971,10 +1067,11 @@ PYEOF
     _announcegate "$_gx/declare-silent-across-injection.jsonl" | grep -q '"decision":"block"' \
         || { fail "announce gate stopped seeing an undeclared turn once an injected entry appeared, so the turn fix disarmed check 2"; _gd=1; }
 
-    _stopgate "$_gx/repeat-edits.jsonl" | grep -q 'edited 1 file' \
+    # $_gx/plain is no repo, so the /x/ fixture paths count; proj is a repo by now.
+    _stopgate "$_gx/repeat-edits.jsonl" "" "" "$_gx/plain" | grep -q 'edited 1 file' \
         || { fail "stop gate counts repeat edits to one file as several files, inflating the reason line"; _gd=1; }
     # A blocked party cannot find the escape hatch in a file comment nobody reads mid-turn.
-    _stopgate "$_gx/bare.jsonl" | grep -q 'CRAFTKIT_GATE=off' \
+    _stopgate "$_gx/bare.jsonl" "" "" "$_gx/plain" | grep -q 'CRAFTKIT_GATE=off' \
         || { fail "stop gate refusal never names its own escape hatch, unlike the skill gate"; _gd=1; }
 
     for _g in gate-skill-first.js gate-verify-on-stop.js gate-announce-honored.js; do
@@ -1093,6 +1190,185 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# 23c. Tool-scoped marker blocks reach only their tool. CRAFTKIT-DIRECTOR carries
+#      Claude Code primitives (run_in_background, SendMessage, TaskStop) and
+#      CRAFTKIT-CODEX carries Codex's runtime guide; Cursor once copied rules
+#      verbatim and loaded the Codex guide in every session. Behavioral, from each
+#      adapter's own installer into a sandbox, so it never reads the real $HOME.
+# ---------------------------------------------------------------------------
+check "tool-scoped rule blocks reach only their tool"
+_tb=0
+_tf="$(mktemp -d)"
+_rule="$REPO_DIR/rules/using-agent-skills.md"
+grep -q '<!-- BEGIN CRAFTKIT-DIRECTOR -->' "$_rule" \
+    || { fail "rules/using-agent-skills.md has no CRAFTKIT-DIRECTOR block, so director mode never loads"; _tb=1; }
+( . "$REPO_DIR/adapters/claude.sh" >/dev/null 2>&1
+  CLAUDE_RULES_DIR="$_tf/claude-rules"; CLAUDE_MD="$_tf/CLAUDE.md"; CLAUDE_COMMANDS_DIR="$_tf/cmds"
+  install_claude_rule using-agent-skills "$_rule" >/dev/null 2>&1 )
+( . "$REPO_DIR/adapters/gemini.sh" >/dev/null 2>&1
+  GEMINI_SKILLS_DIR="$_tf/gemini"; GEMINI_MD="$_tf/GEMINI.md"
+  install_gemini_rule using-agent-skills "$_rule" >/dev/null 2>&1 )
+( . "$REPO_DIR/adapters/cursor.sh" >/dev/null 2>&1
+  CURSOR_RULES_DIR="$_tf/cursor"
+  install_cursor_rule using-agent-skills "$_rule" >/dev/null 2>&1 )
+grep -q 'CRAFTKIT-DIRECTOR' "$_tf/CLAUDE.md" 2>/dev/null \
+    || { fail "Claude managed block lacks the CRAFTKIT-DIRECTOR block, so the main session never delegates"; _tb=1; }
+for _out in "$_tf/GEMINI.md" "$_tf/cursor/using-agent-skills.mdc"; do
+    if [[ ! -s "$_out" ]]; then
+        fail "sandbox render produced no $(basename "$_out"), so the absence check proves nothing"; _tb=1
+    elif grep -qE 'CRAFTKIT-(DIRECTOR|CODEX)' "$_out"; then
+        fail "$(basename "$_out") carries a CRAFTKIT-DIRECTOR or CRAFTKIT-CODEX block meant for another tool"; _tb=1
+    fi
+done
+rm -rf "$_tf"
+[[ $_tb -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 23d. Delegated edits stay verified. A background agent's edits land between
+#      turns, so the contract carrying the verify command and the "not verified"
+#      report are the only things that keep "done" honest. Short phrases, so a
+#      reword passes and a deletion fails.
+# ---------------------------------------------------------------------------
+check "director and Codex blocks keep the verify contract"
+_dv=0
+_blk() { sed -n "/<!-- BEGIN CRAFTKIT-$1 -->/,/<!-- END CRAFTKIT-$1 -->/p" "$_rule"; }
+_dir="$(_blk DIRECTOR)"
+grep -q "project's verify command" <<<"$_dir" \
+    || { fail "CRAFTKIT-DIRECTOR contract no longer carries the project's verify command"; _dv=1; }
+grep -q "actual result" <<<"$_dir" \
+    || { fail "CRAFTKIT-DIRECTOR contract no longer asks the agent for the verify command's actual result"; _dv=1; }
+grep -q 'report "not verified"' <<<"$_dir" \
+    || { fail "CRAFTKIT-DIRECTOR integration no longer reports \"not verified\" on a missing or failing verify"; _dv=1; }
+grep -q 'report "not verified"' <<<"$(_blk CODEX)" \
+    || { fail "CRAFTKIT-CODEX block no longer reports \"not verified\" on a missing or failing verify"; _dv=1; }
+[[ $_dv -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 23e. The delegate gate asks from the 3rd source file of a main turn until the
+#      turn spawns an agent, and nowhere else. Rule 12a alone delegated 0/5
+#      multi-file tasks (T2b), so this gate is the enforcement; behavioral,
+#      because a gate that returns {} looks fine.
+# ---------------------------------------------------------------------------
+check "delegate gate asks from the third source file until a spawn"
+if ! command -v node >/dev/null 2>&1; then
+    echo "    skipped (node not on PATH)"
+else
+    _dx="$(mktemp -d)"
+    python3 - "$_dx" << 'PYEOF'
+import json, sys
+dx = sys.argv[1]
+prompt = {"type": "user", "message": {"role": "user", "content": "add a field"}}
+edit = {"type": "assistant", "message": {"role": "assistant", "content": [
+    {"type": "tool_use", "name": "Edit", "input": {"file_path": "/x/ModelFoo.ts"}}]}}
+edit2 = {"type": "assistant", "message": {"role": "assistant", "content": [
+    {"type": "tool_use", "name": "Edit", "input": {"file_path": "/x/HelperFoo.ts"}}]}}
+cases = {"none": [prompt],
+         "one": [prompt, edit],
+         "two": [prompt, edit, edit2],
+         "spawned": [prompt, edit, edit2, {"type": "assistant", "message": {"role": "assistant", "content": [
+             {"type": "tool_use", "name": "Agent", "input": {"run_in_background": True}}]}}],
+         "notification": [{"type": "user", "message": {"role": "user",
+                           "content": "<task-notification>\n<task-id>abc</task-id>\n"}}, edit, edit2],
+         "explore-fg": [prompt, edit, edit2, {"type": "assistant", "message": {"role": "assistant", "content": [
+             {"type": "tool_use", "name": "Agent", "input": {"subagent_type": "Explore"}}]}}],
+         "reviewer-fg": [prompt, edit, edit2, {"type": "assistant", "message": {"role": "assistant", "content": [
+             {"type": "tool_use", "name": "Task", "input": {"subagent_type": "code-quality"}}]}}],
+         "builder-fg": [prompt, edit, edit2, {"type": "assistant", "message": {"role": "assistant", "content": [
+             {"type": "tool_use", "name": "Agent", "input": {"subagent_type": "general-purpose"}}]}}],
+         "explore-bg": [prompt, edit, edit2, {"type": "assistant", "message": {"role": "assistant", "content": [
+             {"type": "tool_use", "name": "Agent", "input": {"subagent_type": "Explore", "run_in_background": True}}]}}],
+         "sidechain": [dict(prompt, isSidechain=True), dict(edit, isSidechain=True)]}
+for name, lines in cases.items():
+    with open("%s/%s.jsonl" % (dx, name), "w") as f:
+        f.write("\n".join(json.dumps(x) for x in lines) + "\n")
+PYEOF
+    _delgate() {
+        printf '{"session_id":"%s","transcript_path":"%s","tool_input":{"file_path":"%s"}}' "$1" "$2" "$3" \
+            | _delenv ${4:-} node "$REPO_DIR/hooks/gate-delegate.js" 2>/dev/null
+    }
+    # The caller's own switches must not leak in: under claude -p this check runs unattended.
+    _delenv() { env -u CRAFTKIT_GATE -u CRAFTKIT_DELEGATE -u CLAUDE_CODE_SESSION_ATTENDED TMPDIR="$_dx" "$@"; }
+    _de=0
+    _delgate d1 "$_dx/two.jsonl" /x/ViewFoo.tsx | grep -q '"permissionDecision":"ask"' \
+        || { fail "delegate gate lets a 3rd source file through in a main turn, so director mode is advisory again"; _de=1; }
+    _delgate d1b "$_dx/one.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "delegate gate asks on the 2nd source file, so two-file work costs a prompt"; _de=1; }
+    _delgate d2 "$_dx/none.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "delegate gate asks on the 1st source file, so single-file work costs a prompt"; _de=1; }
+    _delgate d3 "$_dx/two.jsonl" /x/ModelFoo.ts | grep -q 'permissionDecision' \
+        && { fail "delegate gate counts a re-edit of the same file as a 3rd file"; _de=1; }
+    _delgate d4 "$_dx/sidechain.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "delegate gate asks inside a subagent, which is already the delegate"; _de=1; }
+    _delgate d5 "$_dx/notification.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "delegate gate asks on a background-task notification, which is not a prompt"; _de=1; }
+    _delgate d6 "$_dx/two.jsonl" /x/docs/planning/foo.md | grep -q 'permissionDecision' \
+        && { fail "delegate gate counts a docs/planning edit as source"; _de=1; }
+    _delgate d7 "$_dx/two.jsonl" /private/tmp/x/scratchpad/probe.ts | grep -q 'permissionDecision' \
+        && { fail "delegate gate counts a throwaway scratchpad file as source"; _de=1; }
+    _delgate d8 /nope/missing.jsonl /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "delegate gate blocks on an unreadable transcript instead of failing open"; _de=1; }
+    _delgate d9 "$_dx/two.jsonl" /x/ViewFoo.tsx >/dev/null
+    _delgate d9 "$_dx/two.jsonl" /x/PresenterFoo.ts | grep -q '"permissionDecision":"ask"' \
+        || { fail "delegate gate lets a 3rd source file through after one ask, so a declined ask in a headless batch is ignored"; _de=1; }
+    _delgate d15 "$_dx/spawned.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "delegate gate still asks after the turn spawned an agent"; _de=1; }
+    # Parallel calls in one message: the 1st call's tool_use is not in the transcript yet.
+    _delgate d10 "$_dx/none.jsonl" /x/ModelFoo.ts >/dev/null
+    _delgate d10 "$_dx/none.jsonl" /x/HelperFoo.ts >/dev/null
+    _delgate d10 "$_dx/none.jsonl" /x/ViewFoo.tsx | grep -q '"permissionDecision":"ask"' \
+        || { fail "delegate gate misses a 3rd file whose sibling call has not reached the transcript yet"; _de=1; }
+    _delbash() {
+        printf '{"session_id":"%s","transcript_path":"%s","cwd":"/x","tool_name":"Bash","tool_input":{"command":"%s"}}' "$1" "$2" "$3" \
+            | _delenv node "$REPO_DIR/hooks/gate-delegate.js" 2>/dev/null
+    }
+    _delbash d11 "$_dx/none.jsonl" "sed -i 's/a/b/' src/a.js src/b.js src/c.js" | grep -q '"permissionDecision":"ask"' \
+        || { fail "delegate gate lets one sed -i across 3 source files through, so the shell bypasses it"; _de=1; }
+    _delbash d12 "$_dx/two.jsonl" "node --test test/*.test.js" | grep -q 'permissionDecision' \
+        && { fail "delegate gate asks on a Bash command that writes nothing"; _de=1; }
+    _delbash d13 "$_dx/two.jsonl" "echo hi > /private/tmp/x.js" | grep -q 'permissionDecision' \
+        && { fail "delegate gate counts a shell write to a throwaway path as source"; _de=1; }
+    _delbash d14 "$_dx/sidechain.jsonl" "sed -i 's/a/b/' src/a.js src/b.js src/c.js" | grep -q 'permissionDecision' \
+        && { fail "delegate gate asks on a subagent's shell write, which is already the delegate"; _de=1; }
+    # Only a spawn that takes the work disarms the gate: a foreground read-only lookup
+    # (Explore, or a Read/Grep/Glob reviewer) leaves the edits with the main session.
+    _delgate d16 "$_dx/explore-fg.jsonl" /x/ViewFoo.tsx | grep -q '"permissionDecision":"ask"' \
+        || { fail "delegate gate is disarmed by a foreground Explore spawn, which takes none of the work"; _de=1; }
+    _delgate d17 "$_dx/reviewer-fg.jsonl" /x/ViewFoo.tsx | grep -q '"permissionDecision":"ask"' \
+        || { fail "delegate gate is disarmed by a foreground read-only reviewer spawn"; _de=1; }
+    _delgate d18 "$_dx/builder-fg.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "delegate gate still asks after a foreground spawn of an agent that can edit"; _de=1; }
+    _delgate d19 "$_dx/explore-bg.jsonl" /x/ViewFoo.tsx | grep -q 'permissionDecision' \
+        && { fail "delegate gate still asks after a background spawn"; _de=1; }
+    # Quoted text is not a redirect: a phantom target made a commit message a 3rd file.
+    _delbash d20 "$_dx/two.jsonl" 'git commit -m \"x > y.js\"' | grep -q 'permissionDecision' \
+        && { fail "delegate gate reads a > inside a quoted commit message as a write"; _de=1; }
+    _delbash d21 "$_dx/two.jsonl" 'git commit -m \"fix x > y.js now\"' | grep -q 'permissionDecision' \
+        && { fail "delegate gate reads a > mid-way through a quoted commit message as a write"; _de=1; }
+    _delbash d22 "$_dx/two.jsonl" 'grep \"a>b.js\" f' | grep -q 'permissionDecision' \
+        && { fail "delegate gate reads a > inside a quoted grep pattern as a write"; _de=1; }
+    _delbash d23 "$_dx/two.jsonl" 'echo hi > \"src/a.js\"' | grep -q '/x/src/a.js' \
+        || { fail "delegate gate misses a quoted redirect target, so quoting a path bypasses it"; _de=1; }
+    # Headless: an ask is auto-denied under claude -p, so an unattended job that edits three
+    # files would fail outright. CLAUDE_CODE_SESSION_ATTENDED=0 observed under claude -p
+    # (2.1.291); interactive sessions carry 1.
+    _delgate d24 "$_dx/two.jsonl" /x/ViewFoo.tsx 'CRAFTKIT_DELEGATE=off' | grep -q 'permissionDecision' \
+        && { fail "CRAFTKIT_DELEGATE=off does not turn the delegate gate off"; _de=1; }
+    _delgate d25 "$_dx/two.jsonl" /x/ViewFoo.tsx 'CLAUDE_CODE_SESSION_ATTENDED=0' | grep -q 'permissionDecision' \
+        && { fail "delegate gate asks in an unattended session, where the ask is auto-denied"; _de=1; }
+    _delgate d26 "$_dx/two.jsonl" /x/ViewFoo.tsx 'CLAUDE_CODE_SESSION_ATTENDED=1' | grep -q '"permissionDecision":"ask"' \
+        || { fail "delegate gate stops asking in an attended session"; _de=1; }
+    # Concurrent calls in one message: each must record itself before reading, or two
+    # hooks that read first both see an empty log and both pass.
+    sed -n '/^function seen(/,/^}/p' "$REPO_DIR/hooks/gate-delegate.js" \
+        | awk '/appendFileSync/ && !r { a=1 } /readFileSync/ && !a { r=1 } END { exit !a }' \
+        || { fail "gate-delegate.js seen() reads its log before appending, so concurrent hooks miss each other"; _de=1; }
+    echo 'not json' | node "$REPO_DIR/hooks/gate-delegate.js" >/dev/null 2>&1 \
+        || { fail "gate-delegate.js exits non-zero on malformed stdin"; _de=1; }
+    rm -rf "$_dx"
+    [[ $_de -eq 0 ]] && pass
+fi
+
+# ---------------------------------------------------------------------------
 # 24. The hook table and hooks/ agree in both directions, same invariant as
 #     check 13 holds for adapters. A script in hooks/ that no table entry names
 #     is never installed, and a table entry with no script installs nothing while
@@ -1177,7 +1453,7 @@ else
         && { fail "Codex Stop blocks after verification on a continuation"; _cx=1; }
     echo 'not json' | node "$REPO_DIR/hooks/craftkit-codex.js" >/dev/null 2>&1 \
         || { fail "Codex gateway errors on malformed stdin"; _cx=1; }
-    echo '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"user-stop-hook"}]}]}}' > "$_cxf/home/.codex-hooks-before.json"
+    echo '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"user-stop-hook"}]}],"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"user-pre-hook"},{"type":"command","command":"node old/craftkit-codex.js"}]}],"PostToolUse":[{"matcher":"Bash|exec_command","hooks":[{"type":"command","command":"node old/craftkit-codex.js"}]}]}}' > "$_cxf/home/.codex-hooks-before.json"
     mkdir -p "$_cxf/home/.codex"
     cp "$_cxf/home/.codex-hooks-before.json" "$_cxf/home/.codex/hooks.json"
     (HOME="$_cxf/home"; source "$REPO_DIR/adapters/claude.sh"; source "$REPO_DIR/adapters/codex.sh"; install_codex_craftkit_hooks >/dev/null) \
@@ -1195,7 +1471,18 @@ assert len(hooks['Stop']) == 2
 assert hooks['Stop'][0]['hooks'][0]['command'] == 'user-stop-hook'
 for event in ('SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop'):
     assert any('craftkit-codex.js' in h['command'] for g in hooks[event] for h in g['hooks'])
+# The delegate gate needs patches and spawns: the legacy Bash matcher is migrated by moving
+# our hook out of a group it shared, and a matcher the user narrowed is left alone.
+pre = hooks['PreToolUse']
+assert [(g['matcher'], [h['command'] for h in g['hooks']]) for g in pre][0] == ('Bash', ['user-pre-hook'])
+assert pre[1]['matcher'] == 'Bash|apply_patch|spawn_agent' and 'craftkit-codex.js' in pre[1]['hooks'][0]['command']
+assert len(pre) == 2
+assert hooks['PostToolUse'][0]['matcher'] == 'Bash|exec_command'
 PYEOF
+    echo '[]' > "$_cxf/home/.codex/hooks.json"
+    (HOME="$_cxf/home"; source "$REPO_DIR/adapters/claude.sh"; source "$REPO_DIR/adapters/codex.sh"; install_codex_craftkit_hooks >/dev/null 2>&1)
+    [[ "$(cat "$_cxf/home/.codex/hooks.json")" == '[]' ]] \
+        || { fail "Codex hook installer rewrote a hooks.json shape it does not recognise"; _cx=1; }
     rm -rf "$_cxf"
     [[ $_cx -eq 0 ]] && pass
 fi
@@ -1365,6 +1652,59 @@ grep -q "_craftkit_hook_unregister" "$REPO_DIR/adapters/claude.sh" \
 grep -q 'STATE_DIR/claude-hooks' "$REPO_DIR/adapters/claude.sh" \
     || { fail "no hook state file, so the prune pass has no record of what was installed and removes nothing"; _ph=1; }
 [[ $_ph -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 28b. A hook whose matcher changed in _CRAFTKIT_HOOKS moves to the new matcher.
+#     The wiring pass found an installed hook by script name and stopped there,
+#     so widening gate-delegate.js to cover Bash left every existing install on
+#     the old matcher forever. Behavioral, on a fixture settings file: the gate
+#     moves off a retired craftkit matcher, a user hook sharing its old entry
+#     stays, a user-set matcher is left alone, and a rerun is a no-op.
+# ---------------------------------------------------------------------------
+check "a hook's matcher change migrates installed registrations"
+_mm=0
+_mmx="$(mktemp -d)"
+_mmspec="$(. "$REPO_DIR/adapters/claude.sh" >/dev/null 2>&1; printf '%s\n' "${_CRAFTKIT_HOOKS[@]}" | grep '^gate-delegate.js%' | cut -d'%' -f3)"
+cat > "$_mmx/settings.json" <<'JSON'
+{"hooks":{"PreToolUse":[{"matcher":"Edit|Write|MultiEdit|NotebookEdit","hooks":[
+  {"type":"command","command":"user-edit-hook"},
+  {"type":"command","command":"node /x/gate-delegate.js","timeout":10}]}]}}
+JSON
+_mmwire() { ( HOME="$_mmx/home"; . "$REPO_DIR/adapters/claude.sh" >/dev/null 2>&1; CLAUDE_SETTINGS="$_mmx/settings.json"; _craftkit_hook_wire_settings >/dev/null ); }
+_mmwire || { fail "wiring failed on the fixture"; _mm=1; }
+cp "$_mmx/settings.json" "$_mmx/first.json"
+_mmwire
+cmp -s "$_mmx/first.json" "$_mmx/settings.json" \
+    || { fail "a second wiring pass rewrote settings.json, so sync never settles"; _mm=1; }
+python3 - "$_mmx/settings.json" "$_mmspec" <<'PYEOF' \
+    || { fail "gate-delegate.js still sits under its old matcher, or the user hook beside it moved"; _mm=1; }
+import json, sys
+pre = json.load(open(sys.argv[1]))['hooks']['PreToolUse']
+where = [e.get('matcher', '') for e in pre for h in e['hooks'] if 'gate-delegate.js' in h['command']]
+assert where == [sys.argv[2]], where
+user = [e.get('matcher', '') for e in pre for h in e['hooks'] if h['command'] == 'user-edit-hook']
+assert user == ['Edit|Write|MultiEdit|NotebookEdit'], user
+PYEOF
+# A matcher that is no prior craftkit value was set by the user, often to narrow the gate,
+# and a sync that widened it back would silently undo that choice.
+cat > "$_mmx/settings.json" <<'JSON'
+{"hooks":{"PreToolUse":[{"matcher":"Edit","hooks":[
+  {"type":"command","command":"node /x/gate-delegate.js","timeout":10}]}]}}
+JSON
+_mmwire || { fail "wiring failed on the custom-matcher fixture"; _mm=1; }
+cp "$_mmx/settings.json" "$_mmx/first.json"
+_mmwire
+cmp -s "$_mmx/first.json" "$_mmx/settings.json" \
+    || { fail "a second wiring pass rewrote a custom-matcher settings.json, so sync never settles"; _mm=1; }
+python3 - "$_mmx/settings.json" <<'PYEOF' \
+    || { fail "sync overwrote a user-narrowed gate-delegate.js matcher"; _mm=1; }
+import json, sys
+pre = json.load(open(sys.argv[1]))['hooks']['PreToolUse']
+where = [e.get('matcher', '') for e in pre for h in e['hooks'] if 'gate-delegate.js' in h['command']]
+assert where == ['Edit'], where
+PYEOF
+rm -rf "$_mmx"
+[[ $_mm -eq 0 ]] && pass
 
 # ---------------------------------------------------------------------------
 # 29. Drift detector distinguishes clean, drifted and cannot-verify. The third

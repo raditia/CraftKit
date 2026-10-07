@@ -17,9 +17,9 @@ _rebuild_gemini_md() {
         for f in "$GEMINI_SKILLS_DIR"/*.md; do
             [[ -f "$f" ]] || continue
             echo ""
-            # The CRAFTKIT-CODEX block is Codex-only runtime guidance (hooks/craftkit-codex.js
-            # extracts it); a full-body block would load it into every session here.
-            awk '/<!-- BEGIN CRAFTKIT-CODEX -->/{s=1} !s{print} /<!-- END CRAFTKIT-CODEX -->/{s=0}' "$f"
+            # CRAFTKIT-CODEX (Codex runtime guide) and CRAFTKIT-DIRECTOR (Claude Code primitives)
+            # belong to other tools; a full-body block would load them into every session here.
+            awk '/<!-- BEGIN CRAFTKIT-(CODEX|DIRECTOR) -->/{s=1} !s{print} /<!-- END CRAFTKIT-(CODEX|DIRECTOR) -->/{s=0}' "$f"
             echo ""
         done
         echo "$_SECTION_END"

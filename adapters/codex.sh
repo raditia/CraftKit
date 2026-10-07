@@ -183,39 +183,65 @@ install_codex_craftkit_hooks() {
         fi
     done
     node_bin="$(_resolve_node_bin)"
-    python3 - "$CODEX_HOOKS_CONFIG" "$node_bin" "$CODEX_HOOKS_DIR/craftkit-codex.js" <<'PYEOF'
-import json, os, sys
+    python3 - "$CODEX_HOOKS_CONFIG" "$node_bin" "$CODEX_HOOKS_DIR/craftkit-codex.js" <<'PYEOF' || return 0
+import json, os, stat, sys
 config, node, script = sys.argv[1:]
+EVENTS = ('SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop')
 try:
     with open(config) as f:
         data = json.load(f)
+    assert isinstance(data, dict) and isinstance(data.get('hooks', {}), dict)
+    for event in EVENTS:
+        groups = data.get('hooks', {}).get(event, [])
+        assert isinstance(groups, list) and all(isinstance(g, dict) and isinstance(g.get('hooks', []), list) for g in groups)
 except FileNotFoundError:
     data = {}
+except (ValueError, AssertionError):
+    print('    ! ~/.codex/hooks.json has a shape this sync does not recognise, Codex hooks left as is')
+    sys.exit(3)
 command = json.dumps(node) + ' ' + json.dumps(script)
-changed = False
-for event in ('SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop'):
+ours = lambda h: isinstance(h, dict) and 'craftkit-codex.js' in str(h.get('command', ''))
+# PreToolUse also sees file patches and spawns, for the delegate gate. Only the matcher
+# this installer used to write is migrated; a matcher the user narrowed is theirs.
+matchers = {'PreToolUse': 'Bash|apply_patch|spawn_agent', 'PostToolUse': 'Bash'}
+LEGACY = 'Bash'
+before = json.dumps(data, sort_keys=True)
+for event in EVENTS:
     groups = data.setdefault('hooks', {}).setdefault(event, [])
     found = False
-    for group in groups:
-        for hook in group.get('hooks', []):
-            if 'craftkit-codex.js' in hook.get('command', ''):
-                found = True
-                if hook.get('command') != command:
-                    hook['command'] = command
-                    changed = True
+    for group in list(groups):
+        for hook in [h for h in group.get('hooks', []) if ours(h)]:
+            found = True
+            hook['command'] = command
+            if event in matchers and group.get('matcher') == LEGACY != matchers[event]:
+                if len(group['hooks']) == 1:
+                    group['matcher'] = matchers[event]
+                else:
+                    group['hooks'].remove(hook)
+                    groups.append({'matcher': matchers[event], 'hooks': [hook]})
     if not found:
         entry = {'type': 'command', 'command': command, 'timeout': 10}
         if event == 'SessionStart':
             entry['additionalContextLimit'] = 100000
         group = {'hooks': [entry]}
-        if event in ('PreToolUse', 'PostToolUse'):
-            group['matcher'] = 'Bash'
+        if event in matchers:
+            group['matcher'] = matchers[event]
         groups.append(group)
-        changed = True
-if changed:
-    with open(config, 'w') as f:
-        json.dump(data, f, indent=2)
-        f.write('\n')
+if json.dumps(data, sort_keys=True) != before:
+    # Same atomic write as the agent-log installer above: through the symlink, keeping the mode.
+    real = os.path.realpath(config)
+    mode = stat.S_IMODE(os.stat(real).st_mode) if os.path.exists(real) else 0o600
+    tmp = real + '.tmp'
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+    try:
+        os.fchmod(fd, mode)
+        with os.fdopen(fd, 'w') as f:
+            json.dump(data, f, indent=2)
+            f.write('\n')
+        os.replace(tmp, real)
+    except BaseException:
+        if os.path.exists(tmp): os.remove(tmp)
+        raise
     print('    + Codex hooks registered; review and trust them with /hooks')
 PYEOF
 }

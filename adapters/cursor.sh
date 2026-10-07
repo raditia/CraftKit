@@ -31,12 +31,16 @@ _cursor_rule_globs() {
     echo "$all"
 }
 
+# CRAFTKIT-CODEX (Codex runtime guide) and CRAFTKIT-DIRECTOR (Claude Code primitives) belong
+# to other tools, so the render drops them.
+_CURSOR_STRIP='/<!-- BEGIN CRAFTKIT-(CODEX|DIRECTOR) -->/{s=1} s{if (/<!-- END CRAFTKIT-(CODEX|DIRECTOR) -->/) s=0; next}'
+
 _cursor_render_rule() {
     local globs
     if globs="$(_cursor_rule_globs "$1")"; then
-        awk -v g="$globs" 'NR==1 && /^---$/{print; print "alwaysApply: false"; print "globs: " g; next} {print}' "$1" > "$2"
+        awk -v g="$globs" "$_CURSOR_STRIP"' NR==1 && /^---$/{print; print "alwaysApply: false"; print "globs: " g; next} {print}' "$1" > "$2"
     else
-        awk 'NR==1 && /^---$/{print; print "alwaysApply: true"; next} {print}' "$1" > "$2"
+        awk "$_CURSOR_STRIP"' NR==1 && /^---$/{print; print "alwaysApply: true"; next} {print}' "$1" > "$2"
     fi
 }
 

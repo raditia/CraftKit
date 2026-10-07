@@ -1,0 +1,88 @@
+---
+slug: director-mode
+status: active
+created: 2026-10-06
+---
+
+# Director mode: main session delegates, chat stays open
+
+## Spec
+**Updated:** 2026-10-06 · **By:** /spec
+
+- **Objective:** Make the main session the thinker: it routes, delegates and integrates, so any task above a size threshold runs in background subagents and the user can send a new task or a refinement while work is in flight.
+- **Users & job:** Engineers running CraftKit in Claude Code or Codex who want to keep talking to the session while it works, and steer running work without waiting for it to finish.
+- **Success:**
+  1. Multi-file source work is delegated by enforcement, not by rule text: in a main turn, the 2nd and each further distinct source file (Edit/Write or a shell write) is asked until the turn spawns an agent (`check.sh` 23e). Observed in headless runs: every multi-file task the gate saw ended in a background agent, at most 1/5 single-file prompts delegate, and a follow-up is answered while the agent runs. Rule-only delegation (long-running single-file work, orchestrator commands) is guidance, measured, not a pass criterion.
+  2. Observed over the same runs: every refinement sent mid-run is relayed with `SendMessage` or answered with a stop-and-respawn, and the main reply names which in one line.
+  3. The new hook prompts (does not block) when the main turn edits a second distinct source file; it passes for subagent (sidechain) edits, task-notification turns, and single-file edits. Behavioral `check.sh` fixtures cover all four cases; the ask case is confirmed failing before the hook exists.
+  4. Edits landed by a background agent get verified: the agent's contract carries the project's verify command and its result. On the notification turn of an agent that edited source, the Stop gate blocks until the verify command has run (`check.sh` fixture), and the live runs show "not verified" rather than "done" when it has not.
+  5. Cursor and Gemini installed output changes only by the removal of blocks meant for other tools (`CRAFTKIT-DIRECTOR`, and for Cursor also `CRAFTKIT-CODEX`, which leaks into it today): a `sync.sh` diff on a fixture HOME, with those blocks stripped from the `main` side, is empty.
+  6. `bash check.sh` exits 0 and a second consecutive `sync.sh` reports `(up to date)` everywhere.
+- **In scope:**
+  - Keep rule #12 in `rules/using-agent-skills.md` unchanged for every tool, and add a `CRAFTKIT-DIRECTOR` marker block after it that supersedes its "Main task" row for Claude and Codex (pattern: `adapters/claude.sh:81` strips `CRAFTKIT-CODEX`). The block carries: delegate threshold (main works directly on answers, a lookup in a known file, an edit confined to one file; everything multi-file, multi-step, long-running, or an orchestrator command goes to a background agent), agent contract (goal, inputs, output, done check, verify command), isolation (one editing agent in the main checkout, concurrent editors `isolation: worktree`, read-only agents unrestricted), refinement relay (tweak → `SendMessage`, pivot → `TaskStop` + respawn), integration (review against the contract, confirm verify, merge worktrees).
+  - Routing-hook text in `hooks/craftkit-routing.js` mirrors the rule (one line).
+  - New hook `hooks/gate-delegate.js` (PreToolUse, soft prompt), reusing `craftkit-transcript.js` for `sidechain` / `notification` / turn edits; `_CRAFTKIT_HOOKS` row in `adapters/claude.sh`; README Enforcement-gates entry.
+  - Extend `hooks/gate-verify-on-stop.js`: on a task-notification turn, collect dirty files changed since the finished agent was spawned, not since the turn began.
+  - Strip `CRAFTKIT-DIRECTOR` in the Gemini adapter, and both `CRAFTKIT-DIRECTOR` and `CRAFTKIT-CODEX` in the Cursor adapter (`adapters/cursor.sh:37-39` filters no blocks today).
+  - Codex: the Codex runtime section of `using-agent-skills.md` gets the same threshold and contract, worded to the Codex primitives that verification confirms exist.
+  - `check.sh` behavioral fixtures for the hook and the background-verify report.
+- **Out of scope:**
+  - Cursor and Gemini behavior.
+  - `/team-build`.
+  - Internals of `/parallel-*`, `/fix`, `/define`: they are launched in the background, not rewritten.
+  - A hard-blocking gate, a queue/scheduler for tasks, a dashboard of running agents.
+- **Constraints:** bash 3.2 for adapters; hooks are Node with absolute non-version-pinned node path (check.sh); no em-dashes in prose; README sync matrix; shipped agent profiles set `omitClaudeMd: true` (`check.sh:2054` checks only `agents/*.md`), so for them the verify command arrives only through the contract payload; a generic agent's CLAUDE.md loading is not guaranteed either way, so the contract always carries it.
+- **Key decisions:**
+  - Always-on, chosen by task size, not an opt-in mode: the author wants the behavior without remembering a switch; the threshold keeps trivial turns cheap.
+  - Hook fires on the 2nd source file, not the 1st (plan-roaster suggested the 1st): the 1st would prompt on the single-file edits the threshold allows. If the measured delegate rate misses the bar, escalate to a prompt-time check rather than a 1st-edit trigger.
+  - Soft prompt, not block: integration and merge edits are legitimate main-session multi-file work, and a soft prompt lets them through with one click. Task-notification turns are exempt outright, since that is where integration usually happens (`hooks/gate-skill-first.js:50` already exempts them the same way).
+  - Background-edit verification is enforced in the Stop gate, with the contract as the first line: the gate collects dirty files whose mtime/ctime is at or after `turn.startedAt`, only when the turn delegated or wrote through the shell (`hooks/gate-verify-on-stop.js:74-75,109`). A background agent's edits land after the spawning turn ends and before the notification turn starts, so neither turn sees them. Measuring from the finished agent's spawn time on the notification turn closes that. Stop is the only event guaranteed to run on a reply-only turn; a PreToolUse ask would never fire there (cross-review, consensus). Corrects an earlier wrong "turn-start snapshot" description.
+  - One writer in the main checkout, worktree for concurrent editors: keeps rule #12's existing "separate worktrees" law without paying a merge on every solo task.
+- **Risks & open questions:**
+  - Codex (verified by T1, `docs/research/codex-background-subagents.md`): spawn, steer and stop exist, but an idle parent is not woken on child completion, so the Codex section is "delegate, wait, integrate" and criterion 1 is Claude-only. Whether subagents survive the parent's turn end is still unverified.
+  - Mid-size tasks pay a subagent round-trip and cold context; measure on one real task before tuning the threshold.
+  - Known gap (measured, accepted 2026-10-06): the model delegated 0/12 times on its own initiative; long-running single-file loops (test-fix), single non-source outputs (a research .md), and orchestrator commands run in the foreground stay in the main session. Closing it needs harness-level delegation (orchestrators that launch themselves in a background agent), a separate feature.
+  - A user who approves direct multi-file work is asked once per further file in that turn; `CRAFTKIT_GATE=off` is the escape.
+  - Worktree merges can conflict; the rule says the main session surfaces a conflict to the user rather than resolving it silently.
+  - A user-typed integration turn ("merge the worktrees") gets a false soft prompt; accepted cost, one click. Docs/planning edits never count toward the second file.
+  - Finding the finished agent's spawn time from the notification (matching its tool-use id to the spawning call in the main transcript) is unproven; T4b establishes it, or falls back to the session's oldest still-running background spawn.
+  - Cursor sessions lose the `CRAFTKIT-CODEX` text they carry today; it was Codex-only guidance, so this is a fix, but it is a visible Cursor change.
+- **Bar waiver (author, 2026-10-06):** T2b's original bar (>=4/5 multi-file delegations) was missed (0/5, 3/5, 2/5; 0/12 on the model's own initiative). The author chose the gate-enforced scope after run 3. The replacement bar is numeric: every turn where the gate fired ends in a background spawn (measured 4/4 in runs 2-3), and single-file delegation stays <=1/5 (measured 0/15). Not yet measured live: that the re-ask change (161c735) stops the 3rd direct source edit; in run 3 the main session still edited 2 to 3 files before handing off, and check 23e is the only evidence for the fix. Rule-only delegation stays a measured gap, not a pass criterion.
+- **Acceptance:**
+  - [x] `CRAFTKIT-DIRECTOR` block added after rule #12 with threshold, contract, isolation, relay, integration; rule #12 itself unchanged; token-audited.
+  - [x] Routing hook carries one director line; check.sh routing checks still pass.
+  - [ ] `gate-delegate.js` asks on the 2nd and each further source file (incl. shell writes, parallel calls) until the turn spawns an agent; passes sidechain, notification, single-file; fixtures prove each.
+  - [ ] Stop gate blocks a notification turn whose agent edited source with no verify run, and passes once verify ran; fixtures prove both.
+  - [x] Codex section updated to verified primitives, or degradation stated.
+  - [x] Cursor/Gemini installed output changes only by stripped foreign blocks (fixture-HOME `diff -r` empty, T7, commit d90f604).
+  - [x] README hook + rule rows updated; CHANGELOG + version bump (161c735).
+  - [ ] `bash check.sh` exit 0; `sync.sh` twice, second run all `(up to date)`.
+
+## Task Plan
+**Updated:** 2026-10-06 · **By:** /plan
+
+| ID | Task | Acceptance | Depends on | TCs | Executes via |
+|----|------|-----------|-----------|-----|--------------|
+| T1 | Establish whether Codex supports non-blocking subagent spawn and mid-run messaging to a running subagent | Cited note in `docs/research/` answering both yes/no from primary sources (Codex docs or CLI source) | none | none | /research |
+| T2 | Add a `CRAFTKIT-DIRECTOR` block after rule #12 (rule #12 unchanged); strip it in the Gemini adapter, and strip it plus `CRAFTKIT-CODEX` in the Cursor adapter. Claude primitives only; Codex wording goes in T6 | `bash check.sh` exit 0, plus a new check that the Claude block carries `CRAFTKIT-DIRECTOR` and Gemini/Cursor output does not; no em-dash | none | none | direct edit |
+| T2b | Measure: sync the draft, run 5 multi-file and 5 single-file canned prompts in live Claude Code; record delegated, follow-up answered mid-run, refinement relayed, "not verified" reported | Rates written into this file; bar: ≥4/5 multi-file delegate, ≤1/5 single-file delegate. Miss → add a prompt-time task to T4 before continuing | T2, T3 | none | manual (author) |
+| T3 | Add one director line to `hooks/craftkit-routing.js` mirroring T2 | `bash check.sh` routing checks pass; line names threshold + background delegation | T2 | none | direct edit |
+| T4 | Add `hooks/gate-delegate.js` (PreToolUse, soft ask) using `craftkit-transcript.js`; `_CRAFTKIT_HOOKS` row in `adapters/claude.sh`; README Enforcement-gates entry | New `check.sh` behavioral check: asks on 2nd distinct source file in a main turn; passes sidechain, notification, single-file, docs/planning edits. The ask case confirmed failing before the hook exists | T2b | none | direct edit, then /code-quality |
+| T4b | Extend `gate-verify-on-stop.js`: on a task-notification turn, measure dirty files from the finished agent's spawn time (tool-use id → spawning call timestamp) instead of `turn.startedAt` | `check.sh` fixtures: notification turn after an agent edited source, no verify run → blocks (confirmed failing first); verify run → passes; agent edited nothing → passes. Spawn time not found → fall back to the oldest running background spawn, stated in the hook | T2b | none | direct edit, then /code-quality |
+| T5 | Add a `check.sh` content check that rule #12 keeps the verify-command contract field and the "not verified" report wording | Check fails when either phrase is removed, passes with T2's text | T2 | none | direct edit |
+| T6 | Update the Codex runtime section of `using-agent-skills.md` to T1's verified primitives, or state the delegate-wait-integrate degradation | Section names only primitives T1 confirmed; `bash check.sh` exit 0 | T1, T2 | none | direct edit |
+| T7 | Prove Cursor and Gemini output changed only by stripped foreign blocks | `sync.sh` into a fixture HOME on `main` and on the branch; strip `CRAFTKIT-CODEX` from `main`'s Cursor output, then `diff -r` of Cursor rules and `~/GEMINI.md` is empty | T2, T3, T6 | none | direct (bash) |
+| T8 | README rule/hook rows, CHANGELOG section, version bump in `package.json` + README header | `bash check.sh` version and README checks pass | T4, T4b, T5, T6 | none | direct edit |
+| T9 | Final gate: `check.sh`, `sync.sh` twice, re-run T2b's prompts with hooks installed | `bash check.sh` exit 0; second `sync.sh` all `(up to date)`; T2b bar still met | T7, T8 | none | /parallel-ship |
+
+**T2b result (2026-10-06, headless `claude -p`, toy Node repo):** multi-file delegate 0/5, single-file delegate 0/5; follow-up mid-run and refinement relay unmeasured (no agent ever ran); M3 reported real test output. Rule 12a and the hook line reached the model (probe quoted both); it overruled them on task size ("touches 4 small files... so I'll do it directly"). Bar missed, so T4's hook carries the enforcement: on the 2nd source file the ask reason tells the model to hand the work to a background agent, and a declined ask (auto-denied headless) forces the re-plan. Re-measure T2b with T4 installed before T8. Confounds: headless has no waiting user; tasks took 10 to 75 s.
+
+**T2b runs 2-3 (2026-10-06, delegate gate installed, real repo path):** run 2 multi-file 3/5, run 3 2/5 (n=5, within noise); single-file 0/5 both. First-turn delegations 0/12 in run 3: every background spawn followed a delegate-gate ask. Proven live: follow-up answered mid-run 2/2, refinement relayed via SendMessage (X2), Stop gate on notification turns 4/4, parallel-batch race fixed. Misses are what the gate cannot see: a long test-fix loop on 2 files (M3), a single .md research output (M4), an orchestrator command run foreground (M5). Also found: once-per-turn ask lets later edits in the same batch land; `perl -pi` passes (marked ceiling); Stop gate demands `rtk tsc`/`rtk lint` in plain JS repos (pre-existing).
+
+**Parallelizable now:** T1, T2
+**Critical path:** T2 → T3 → T2b → T4 → T8 → T9
+**Cross-review:** 2026-10-06, claude + codex, 1 error 2 warnings 2 suggestions folded: rule #12 kept with an added director block, Cursor strips foreign blocks, notification verify moved to the Stop gate, mechanism corrected.
+**Roaster:** 5/10 (2026-10-06). Folded: measurement task T2b, notification-turn verify check T4b, Codex wording isolated to T6, director marker block for criterion 5. Partly rejected: 1st-edit hook trigger (contradicts the single-file threshold).
+
+## Decisions
+_(pointers appended by /adr)_

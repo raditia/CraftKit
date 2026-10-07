@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { currentTurn, turnBudget } = require(path.join(__dirname, 'craftkit-transcript.js'));
+const { currentTurn, turnBudget, agentRun } = require(path.join(__dirname, 'craftkit-transcript.js'));
 
 const CODE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|kt|java|swift|m|mm)$/i;
 
@@ -57,6 +57,13 @@ function wroteViaShell(commands) {
 // untracked doc gated every delegating turn. ctime joins mtime because a chmod moves only
 // ctime. A missing file (deleted) or an unknown start time counts, failing toward the gate
 // firing.
+function gitRoot(cwd) {
+  try {
+    return execFileSync('git', ['-C', cwd, 'rev-parse', '--show-toplevel'],
+      { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch (e) { return ''; }
+}
+
 function gitDirty(cwd, since) {
   const git = args => execFileSync('git', ['-C', cwd].concat(args),
     { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] });
@@ -67,7 +74,11 @@ function gitDirty(cwd, since) {
     const files = [];
     for (let i = 0; i < entries.length; i++) {
       if (!entries[i]) continue;
-      files.push(path.join(root, entries[i].slice(3)));
+      const rel = entries[i].slice(3);
+      // An isolation: worktree spawn leaves its checkout untracked here; the agent's edits
+      // are its own to verify. Matched repo-relative, so a session running inside a
+      // worktree still gates its own files.
+      if (!rel.startsWith('.claude/worktrees/')) files.push(path.join(root, rel));
       if (/[RC]/.test(entries[i].slice(0, 2))) i++;
     }
     return files.filter(f => {
@@ -77,6 +88,18 @@ function gitDirty(cwd, since) {
   } catch (e) {
     return [];
   }
+}
+
+// The reported agent already ran the gate, so the main session re-running it buys nothing:
+// every pattern matched by a foreground Bash call that came back without an error, after the
+// agent's last write. A missing transcript (null) is not verified.
+function agentVerified(steps, patterns) {
+  if (!steps) return false;
+  let last = -1;
+  const isGate = c => patterns.some(p => p.test(c));
+  steps.forEach((s, i) => { if (s.write || (s.command && !isGate(s.command) && wroteViaShell([s.command]))) last = i; });
+  const after = steps.slice(last + 1).filter(s => s.command && s.ok && !s.background);
+  return patterns.every(p => after.some(s => p.test(s.command)));
 }
 
 const pass = () => process.stdout.write('{}');
@@ -105,13 +128,24 @@ process.stdin.on('end', () => {
   // scratchpad demanded a full gate run. A gate that fires on throwaway files is the
   // click-through trainer these gates are written to avoid.
   const THROWAWAY = /\/scratchpad\/|^\/tmp\/|^\/private\/tmp\/|^\/var\/folders\//;
-  let touched = turn.edits.filter(f => !THROWAWAY.test(f));
-  if (wroteViaShell(turn.commands) || turn.delegated) touched = touched.concat(gitDirty(cwd, turn.startedAt));
+  // A file outside the repo (a memory note under ~/.claude) is not this project's to verify.
+  // No repo leaves every edit counted.
+  const root = gitRoot(cwd);
+  let touched = turn.edits.filter(f => !THROWAWAY.test(f) &&
+    (!root || !path.relative(root, path.resolve(cwd, f)).startsWith('..')));
+  // A notification turn reports on an agent whose edits predate the turn, so its cut is
+  // the agent's spawn. No spawn found leaves it NaN, which counts every dirty file: the turn
+  // start would exclude all of the agent's edits.
+  const since = turn.notification ? turn.spawnedAt : turn.startedAt;
+  if (wroteViaShell(turn.commands) || turn.delegated || turn.notification) {
+    touched = touched.concat(gitDirty(cwd, since));
+  }
   touched = touched.filter((f, i) => touched.indexOf(f) === i);
   const edited = gate.gatesEveryFile ? touched : touched.filter(f => CODE_EXT.test(f));
   if (!edited.length) return pass();
 
   if (gate.patterns.every(p => turn.commands.some(c => p.test(c)))) return pass();
+  if (turn.notification && agentVerified(agentRun(payload.transcript_path, turn.reported), gate.patterns)) return pass();
 
 
   // Budget checked only once the turn is known to be failing, so a compliant turn spends
