@@ -1233,7 +1233,7 @@ Loaded automatically on every session. Never invoke these; they're always presen
 | [`flag-safety`](rules/flag-safety.md) | Flag OFF stays behavior-identical: code paths, persisted state, API contracts, analytics. `flag:` marker, both states tested |
 | [`grounding`](rules/grounding.md) | Claims that drive action carry provenance: `[verified: how]`, `[from context.md @sha]`, `[UNVERIFIED]`. An `[UNVERIFIED]` claim cannot back an `[ERROR]` finding or an edit. Cold agents review handed content only; staleness reports cannot-verify, never clean |
 | [`karpathy-guidelines`](rules/karpathy-guidelines.md) | Think before coding, simplicity, surgical changes, goal-driven, read before write, tests verify intent, checkpoint after steps |
-| [`using-agent-skills`](rules/using-agent-skills.md) | Skill routing (mandatory gate: classify before every response, announce match or "No skill matched."), model selection, severity labels, parallel classifier, model for judgment only, surface conflicts, director mode (12a: assess first; quick work of up to two files stays direct, long-running, 3+ file or parallel work goes to background agents, Claude Code only) |
+| [`using-agent-skills`](rules/using-agent-skills.md) | Skill routing (mandatory gate: classify before every response, announce match or "No skill matched."), model selection, severity labels, parallel classifier, model for judgment only, surface conflicts, director mode (12a: assess first; quick work of up to two files stays direct, long-running, 3+ file or parallel work goes to background agents, and every turn reaps finished or stalled agents via `ListAgents` + `TaskStop`, Claude Code only) |
 
 ### Frontend skills, on demand
 

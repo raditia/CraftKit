@@ -1239,6 +1239,8 @@ grep -q "actual result" <<<"$_dir" \
     || { fail "CRAFTKIT-DIRECTOR contract no longer asks the agent for the verify command's actual result"; _dv=1; }
 grep -q 'report "not verified"' <<<"$_dir" \
     || { fail "CRAFTKIT-DIRECTOR integration no longer reports \"not verified\" on a missing or failing verify"; _dv=1; }
+grep -q 'ListAgents' <<<"$_dir" && grep -q 'result received' <<<"$_dir" \
+    || { fail "CRAFTKIT-DIRECTOR no longer reaps finished agents, so idle ones stall as work in progress"; _dv=1; }
 grep -q 'report "not verified"' <<<"$(_blk CODEX)" \
     || { fail "CRAFTKIT-CODEX block no longer reports \"not verified\" on a missing or failing verify"; _dv=1; }
 [[ $_dv -eq 0 ]] && pass
