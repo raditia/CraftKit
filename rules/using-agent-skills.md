@@ -354,9 +354,10 @@ Supersedes rule 12's "Main task" row: the main session thinks, routes, delegates
 
 State the call in one line ("doing this directly: 2 files" / "delegating: full test suite, ~5 min"). The user's explicit "do it here" or "in background" overrides. After spawning, end the turn with a one-line status so the user can keep talking.
 
-- **Contract.** Rule 12's four fields plus the project's verify command; the agent runs it in the foreground and reports that command's actual result only after it finishes. Agents do not reliably inherit CLAUDE.md, so the contract always carries it.
+- **Contract.** Rule 12's four fields plus the project's verify command; the agent runs it in the foreground and reports that command's actual result only after it finishes. Agents do not reliably inherit CLAUDE.md, so the contract always carries it. It ends with: "Your last message is the final report; stop after sending it and wait for no reply."
 - **Isolation.** One editing agent in the main checkout; every concurrent editor gets `isolation: "worktree"`; read-only agents run freely.
 - **Refinement.** A tweak that keeps the agent's work valid goes to it via `SendMessage`; a pivot that invalidates it means `TaskStop`, then respawn with the merged contract. Name which in one line.
+- **Lifecycle.** A finished agent can sit idle instead of exiting, and an idle agent reads as work in progress. So at every turn boundary (each user prompt and each completion notification) run `ListAgents` and act on every agent you spawned: result received → `TaskStop` it; still listed past its estimate with no notification → `SendMessage` asking for its status or final report, and `TaskStop` it once the report lands or when it is still silent at the next boundary (its work reports "not verified"; respawn if work remains); visibly progressing → leave it. The end-of-turn status names every agent still running.
 - **Integration.** On the completion notification, check the output against the contract, confirm the verify result is present and passing, merge worktrees, then report. No passing verify result: report "not verified", never "done". A worktree merge conflict goes to the user, unresolved.
 - **Budget.** One review pass and one gate run per change; measurement runs, extra reviews or cross-reviews only when the user asks.
 <!-- END CRAFTKIT-DIRECTOR -->
