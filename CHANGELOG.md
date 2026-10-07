@@ -7,6 +7,27 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.58.0 — 2026-10-07
+
+### Director mode reaps finished and stalled subagents
+
+A finished background agent could sit idle instead of exiting, and an idle agent reads as
+work in progress, so the director waited on agents that had nothing left to do.
+
+- Rule 12a gains a Lifecycle step: at every turn boundary (each user prompt and each completion
+  notification) the director runs `ListAgents` and acts on every agent it spawned. Result
+  received: `TaskStop` it. Past its estimate with no notification: `SendMessage` for status or
+  the final report, then `TaskStop` once it lands or when it is still silent at the next
+  boundary, reporting its work "not verified". Still progressing: left alone. The end-of-turn
+  status names every agent still running.
+- The delegation contract now ends with "your last message is the final report; stop after
+  sending it and wait for no reply", so agents stop waiting for a reply after they finish.
+- The routing hook's director line carries the short form, and `check.sh` check 23d fails if
+  the Lifecycle step is deleted.
+- The repo-local `CLAUDE.md` Release section now says which number to bump: left for a major
+  update or revamp, middle for a minor update, right for a bug fix, with the numbers to the
+  right reset to 0 and the largest bump winning in a mixed release.
+
 ## v1.57.0 — 2026-10-06
 
 ### Director mode: the main session directs, background agents build

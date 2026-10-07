@@ -21,6 +21,16 @@ AGENTIC_SETUP=1 bash sync.sh   # also run ensure_tools (installs/updates rtk, wi
 
 Release: bump `version` in `package.json` + the `# craftkit \`vX.Y.Z\`` header in README + add a `## vX.Y.Z — date` section at the top of `CHANGELOG.md`. Pushing to `main` triggers `.github/workflows/release.yml`, which creates a git tag and a GitHub release using that section as the notes; it fails loudly if the section is missing, so the notes can never silently degrade to a placeholder. Its `publish` job then runs `check.sh` and `npm publish` whenever the `package.json` version is not yet on the registry, authenticating through npm trusted publishing (OIDC, no `NPM_TOKEN`), so a failed or skipped publish self-heals on the next push to `main`. The workflow reads the version from the **README header**, not `package.json`, so a mismatch between the two silently releases the wrong number, and `check.sh` guards that.
 
+Pick the bump by the change's size, and reset every number to its right to 0:
+
+| Change | Bump | Example |
+|--------|------|---------|
+| Major update or revamp (restructured workflow, renamed or removed skills, changed install behavior) | left `X` | `1.57.0` → `2.0.0` |
+| Minor update (new or extended rule, skill, command, agent, hook, or check) | middle `Y` | `1.57.0` → `1.58.0` |
+| Bug fix (restores intended behavior, adds nothing) | right `Z` | `1.57.0` → `1.57.1` |
+
+A release mixing kinds takes the largest bump. Name the kind in the commit message so a reviewer can check the pick.
+
 Site: `site/` is the GitHub Pages landing page (Vite + React, outside the npm `files` list). `.github/workflows/pages.yml` builds it on PRs and deploys it on `main`. It reads version, package name, description and repo URL from `package.json` at build time, so a release refreshes it unprompted, and the build prerenders the page with canonical, Open Graph and JSON-LD head tags taken from the same file. What it cannot derive (README anchors, repo file links, workflow command names, the tool list) goes through `site/src/repo.js` helpers that `check.sh` check 41 resolves. Preview with `cd site && npm ci && npm run dev`; `site/README.md` holds the design constraints.
 
 ## Architecture: how distribution works
