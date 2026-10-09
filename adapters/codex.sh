@@ -129,6 +129,11 @@ hooks = data.setdefault('hooks', {})
 for event in EVENTS:
     current = hooks.get(event, [])
     if on and any(isinstance(h, dict) and h.get('command') == command for g in current for h in g.get('hooks', [])):
+        if event == 'SessionEnd':
+            for g in current:
+                for h in g.get('hooks', []):
+                    if isinstance(h, dict) and h.get('command') == command:
+                        h['timeout'] = 3
         continue
     groups = []
     for g in current:
@@ -136,7 +141,7 @@ for event in EVENTS:
         if kept or not g.get('hooks'):
             groups.append(dict(g, hooks=kept) if 'hooks' in g else g)
     if on:
-        groups.append({'hooks': [{'type': 'command', 'command': command, 'timeout': 5}]})
+        groups.append({'hooks': [{'type': 'command', 'command': command, 'timeout': 3 if event == 'SessionEnd' else 5}]})
     if groups:
         hooks[event] = groups
     else:

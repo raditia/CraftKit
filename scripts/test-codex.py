@@ -327,6 +327,36 @@ class CodexGatewayTests(unittest.TestCase):
         self.assertNotIn('old guide', content)
         self.assertIn('parallel', content)
 
+    def test_dashboard_session_end_timeout_is_capped_and_migrated(self):
+        config = self.home / '.codex/hooks.json'
+        script = 'source adapters/claude.sh\nsource adapters/codex.sh\ninstall_codex_dashboard_hook'
+        env = dict(self.env, REPO_DIR=str(REPO), CRAFTKIT_DASHBOARD_ON='1')
+
+        def install():
+            subprocess.run(['/bin/bash', '-c', script], cwd=REPO, env=env,
+                           capture_output=True, check=True)
+            return json.loads(config.read_text())
+
+        data = install()
+        for event, groups in data['hooks'].items():
+            self.assertEqual(groups[0]['hooks'][0]['timeout'], 3 if event == 'SessionEnd' else 5)
+        managed = data['hooks']['SessionEnd'][0]['hooks'][0]
+        managed['timeout'] = 5
+        managed['custom'] = 'preserve'
+        foreign = {'type': 'command', 'command': 'their-hook', 'timeout': 2}
+        data['hooks']['SessionEnd'][0]['hooks'].append(foreign)
+        config.write_text(json.dumps(data))
+
+        migrated = install()
+        hooks = migrated['hooks']['SessionEnd'][0]['hooks']
+        self.assertEqual(hooks, [dict(managed, timeout=3), foreign])
+        before = config.read_bytes()
+        install()
+        self.assertEqual(config.read_bytes(), before)
+        env['CRAFTKIT_DASHBOARD_ON'] = '0'
+        disabled = install()
+        self.assertEqual(disabled['hooks'], {'SessionEnd': [{'hooks': [foreign]}]})
+
     def patch(self, *files, turn='main-turn', body=None, **fields):
         # Absolute, because the fixture repo sits under the temp dir the gate ignores as throwaway.
         if body is None:
