@@ -30,6 +30,7 @@ Working agreements:
 - Make the smallest change that fulfills the request; verify affected behavior before reporting completion.
 - For flag-gated changes, preserve and verify behavior with the flag off.
 - Follow the current project's AGENTS.md for project-specific conventions.
+- At the end of every completed task, suggest one concrete, relevant next step based on the current state. If it needs new authorization, end with a specific question such as "Want me to commit this fix and open a PR?" Continue already-authorized work before ending the turn. Never suggest an action already completed or invent unnecessary work; if no useful next step remains, say the task is complete. Respect requests to omit suggestions or use an exact response format.
 
 Full rule references, read when relevant:
 EOF
