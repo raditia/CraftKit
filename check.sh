@@ -42,6 +42,17 @@ agent_names() { ls "$AGENTS_DIR"/*.md 2>/dev/null | xargs -n1 basename | sed 's/
 command_names() { ls "$COMMANDS_DIR"/*.md 2>/dev/null | xargs -n1 basename | sed 's/\.md$//' | sort; }
 rule_names() { ls "$RULES_DIR"/*.md 2>/dev/null | xargs -n1 basename | sed 's/\.md$//' | sort; }
 
+# sync.sh's config table and the named functions from repo $1, printed for sourcing alone.
+# A name sync.sh does not define prints nothing, so an older tree yields what it has.
+sync_fns() {
+    local r="$1" fn; shift
+    awk '/^_CK_KEYS=\(/{p=1} p{print} p&&/^\)/{exit}' "$r/sync.sh"
+    echo '_CK_WARNED=""'
+    for fn in "$@"; do
+        awk -v f="$fn() {" 'index($0, f) == 1 {p=NR} p{print} p&&(/^}/||(NR==p&&/; }$/)){exit}' "$r/sync.sh"
+    done
+}
+
 # ---------------------------------------------------------------------------
 # 1. Every subagent_type reference resolves to a real agent file.
 #    Renaming an agent without updating its callers leaves a command spawning
@@ -1806,6 +1817,7 @@ EOF
     sed -n '/^_CRAFTKIT_INJECTED_START=/p;/^_CRAFTKIT_INJECTED_END=/p' "$REPO_DIR/sync.sh"
     sed -n '/^craftkit_inject_list() {/,/^}/p' "$REPO_DIR/sync.sh"
     sed -n '/^craftkit_strip_frontmatter() {/,/^}/p' "$REPO_DIR/sync.sh"
+    sed -n '/^craftkit_strip_gate_blocks() {/,/^}/p' "$REPO_DIR/sync.sh"
     sed -n '/^craftkit_render_injected() {/,/^}/p' "$REPO_DIR/sync.sh"
     echo 'craftkit_render_injected "$1" "$2"'
 } > "$_six/render.sh"
@@ -2225,7 +2237,7 @@ _cxt="$(mktemp -d)"
     mkdir -p "$STATE_DIR"
     sed -n '/^_CRAFTKIT_INJECTED_START=/p;/^_CRAFTKIT_INJECTED_END=/p' "$REPO_DIR/sync.sh" > "$_cxt/lib.sh"
     for _fn in contains read_state read_current_skills read_current_commands craftkit_inject_list \
-               craftkit_strip_frontmatter craftkit_render_injected sync_adapter sync_commands_adapter; do
+               craftkit_strip_frontmatter craftkit_strip_gate_blocks craftkit_render_injected sync_adapter sync_commands_adapter; do
         awk -v f="$_fn() {" '$0==f{p=1} p{print} p&&/^}/{exit}' "$REPO_DIR/sync.sh" >> "$_cxt/lib.sh"
     done
     source "$_cxt/lib.sh"
@@ -2600,12 +2612,12 @@ sys.exit(0 if ok and mode==0o600 and dmode==0o700 else 1)" \
     mkdir -p "$_dbx/.craftkit/agent-tree/events"
     HOME="$_dbx" bash -c "ADAPTERS=(claude codex); $(sed -n '/^prune_orphan_staging()/,/^}/p' "$REPO_DIR/sync.sh"); prune_orphan_staging" >/dev/null
     [[ -d "$_dbx/.craftkit/agent-tree" ]] || { fail "the orphan staging-dir prune deletes the dashboard logs on every sync"; _db=1; }
-    sed -n '/^craftkit_dashboard_resolve()/,/^}/p' "$REPO_DIR/sync.sh" > "$_dbx/resolve.sh"
+    sync_fns "$REPO_DIR" _ck_bool _ck_var _ck_known _ck_warn craftkit_config_set _ck_save_state craftkit_config_resolve > "$_dbx/resolve.sh"
     # "-" is an unset variable: the persisted choice from the case before it must survive.
     for _case in "1 1" "on 1" "TRUE 1" "- 1" "0 0" "off 0" "bogus 0" "- 0"; do
         set -- $_case
         [[ "$1" == "-" ]] && set -- "" "$2"
-        _got="$(STATE_DIR="$_dbx/r" bash -c "mkdir -p \$STATE_DIR; . '$_dbx/resolve.sh'; CRAFTKIT_DASHBOARD='$1' craftkit_dashboard_resolve 2>/dev/null; echo \$CRAFTKIT_DASHBOARD_ON")"
+        _got="$(STATE_DIR="$_dbx/r" CRAFTKIT_CONFIG="$_dbx/r/config" bash -c "mkdir -p \$STATE_DIR; . '$_dbx/resolve.sh'; CRAFTKIT_DASHBOARD='$1' craftkit_config_resolve 2>/dev/null; echo \$CRAFTKIT_DASHBOARD_ON")"
         [[ "$_got" == "$2" ]] || { fail "CRAFTKIT_DASHBOARD='$1' resolved to $_got, expected $2"; _db=1; }
     done
     rm -rf "$_dbx"
@@ -2855,6 +2867,380 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# 42. Config toggles: no config changes nothing, off means absent everywhere, and on
+#     again restores. ~/.craftkit-state/config is the only channel a git-pull sync sees,
+#     so a toggle that left a gate's hook registered, its prose in any tool's rules, or an
+#     extra on disk would be a choice the user made and craftkit ignored. Behavioral: the
+#     real sync.sh and adapter functions run against throwaway HOMEs (a full sync costs
+#     ~40s), with npm and playwright-cli stubbed so nothing installs or downloads.
+#     _tg_suite takes the repo to test, so 42b can run it against a mutated copy.
+# ---------------------------------------------------------------------------
+# Gate vocabulary per group: the words an installed rule may only carry while that group
+# is on. A rule edit that mentions a gate outside its CRAFTKIT-GATE-* markers fails here.
+_TG_VOCAB_routing='MANDATORY GATE|BLOCKING REQUIREMENT|gate-skill-first|gate-announce-honored|never silently bypass this gate|skill-first gate'
+_TG_VOCAB_verify='`Stop` hook checks this|Stop hook checks project verification|gate-verify-on-stop'
+_TG_VOCAB_director='Director mode|ListAgents|TaskStop|Keep quick, coupled work|gate-delegate'
+_TG_HOOKS_routing='gate-skill-first.js gate-announce-honored.js'
+# TC-001's baseline and the line prefixes allowed to differ from it: T13's spawn label in
+# rule 12a, and the Codex next-step agreement #41 added after v1.58.0 shipped.
+_TG_BASE=v1.58.0
+_TG_ALLOW="- **Contract.** Rule 12's four fields plus the project's verify command;
+- At the end of every completed task, suggest one concrete, relevant next step"
+_TG_HOOKS_verify='gate-verify-on-stop.js'
+_TG_HOOKS_director='gate-delegate.js'
+
+# sync.sh's config, rules and extras functions plus every adapter, from repo $1, into $2.
+_tg_lib() {
+    local fn
+    {
+        echo "REPO_DIR='$1'; RULES_DIR='$1/rules'; SKILLS_DIR='$1/skills'; COMMANDS_DIR='$1/commands'"
+        echo "AGENTS_DIR='$1/agents'; PARTIALS_DIR='$1/partials'"
+        echo 'STATE_DIR="$HOME/.craftkit-state"; CRAFTKIT_CONFIG="$STATE_DIR/config"; mkdir -p "$STATE_DIR"'
+        sync_fns "$1" _ck_bool _ck_var _ck_known _ck_warn craftkit_config_set _ck_save_state craftkit_config_resolve \
+                  craftkit_configure contains read_current_rules craftkit_strip_gate_blocks sync_rules_adapter \
+                  _pw_note _pw_skill_ok sync_playwright sync_extras
+        for fn in claude cursor gemini codex; do echo ". '$1/adapters/$fn.sh'"; done
+    } > "$2"
+}
+
+# Every installed rule surface of the 4 tools under HOME $1, HOME rewritten so two HOMEs compare.
+_tg_rules_out() {
+    local h="$1" f
+    for f in "$h/.claude/CLAUDE.md" "$h/GEMINI.md" "$h/.codex/AGENTS.md" "$h"/.craftkit/claude-rules/*.md \
+             "$h"/.craftkit/gemini/*.md "$h"/.craftkit/codex/rules/*.md "$h"/.cursor/rules/*.mdc; do
+        [[ -f "$f" ]] || continue
+        echo "== ${f#$h/}"
+        sed "s|$h|HOME|g" "$f"
+    done
+}
+
+# _tg_run <lib> <home> <config lines> <command...>: resolves that config in HOME, then runs it.
+_tg_run() {
+    local lib="$1" home="$2" cfg="$3"; shift 3
+    ( export HOME="$home"; mkdir -p "$HOME/.craftkit-state"
+      if [[ -n "$cfg" ]]; then printf '%s\n' "$cfg" > "$HOME/.craftkit-state/config"; else rm -f "$HOME/.craftkit-state/config"; fi
+      . "$lib"; craftkit_config_resolve; "$@" ) 2>&1
+}
+_tg_rules_all() { local a; for a in claude cursor gemini codex; do sync_rules_adapter "$a"; done; }
+_tg_render() { _tg_run "$1" "$2" "$3" _tg_rules_all; }
+_tg_claude_install() { _tg_run "$1" "$2" "$3" install_claude_craftkit_hook; }
+
+# Registered Claude hook scripts under HOME $1, one per line, sorted.
+_tg_hooks() {
+    python3 - "$1/.claude/settings.json" << 'PYEOF'
+import json, sys
+s = json.load(open(sys.argv[1]))
+print('\n'.join(sorted({h['command'].rsplit('/', 1)[-1].strip('"') for gs in s.get('hooks', {}).values() for g in gs for h in g.get('hooks', [])})))
+PYEOF
+}
+
+# _tg_suite <repo> <part>: prints one FAIL line per broken guarantee, exit 1 if any.
+_tg_suite() {
+    local r="$1" part="$2" x lib bad=0 out g v k h
+    x="$(mktemp -d)"; lib="$x/lib.sh"
+    _tg_lib "$r" "$lib"
+    _no() { echo "FAIL: $*"; bad=1; }
+    case "$part" in
+    rules)
+        # TC-001: no config renders exactly what the tree renders with the marker lines gone.
+        mkdir -p "$x/plain"
+        for f in "$r"/rules/*.md; do grep -v '^<!-- \(BEGIN\|END\) CRAFTKIT-GATE-[A-Z]* -->$' "$f" > "$x/plain/$(basename "$f")"; done
+        _tg_render "$lib" "$x/a" "" >/dev/null
+        ( export HOME="$x/b"; mkdir -p "$HOME"; . "$lib"; RULES_DIR="$x/plain"
+          for a in claude cursor gemini codex; do sync_rules_adapter "$a"; done ) >/dev/null 2>&1
+        [[ "$(_tg_rules_out "$x/a")" == "$(_tg_rules_out "$x/b" | sed "s|$x/b|HOME|g")" ]] \
+            || _no "with no config the installed rules differ from the unmarked tree, so upgrading changes every tool"
+        _tg_rules_out "$x/a" | grep -q 'CRAFTKIT-GATE-' && _no "a CRAFTKIT-GATE marker line reached an installed rule"
+        # TC-001 against the release: v1.58.0's own code renders its own rules, and the only
+        # lines allowed to differ are the _TG_ALLOW ones.
+        if git -C "$REPO_DIR" cat-file -e "$_TG_BASE^{commit}" 2>/dev/null; then
+            mkdir -p "$x/old"
+            git -C "$REPO_DIR" archive "$_TG_BASE" sync.sh adapters hooks rules | tar -x -C "$x/old"
+            _tg_lib "$x/old" "$x/oldlib.sh"
+            ( export HOME="$x/c"; mkdir -p "$HOME"; . "$x/oldlib.sh"; _tg_rules_all ) >/dev/null 2>&1
+            out="$(diff <(_tg_rules_out "$x/c") <(_tg_rules_out "$x/a") | grep '^[<>]' | cut -c3- | grep -vF -- "$_TG_ALLOW" | head -3)"
+            [[ -n "$out" ]] && _no "with no config the installed rules differ from $_TG_BASE beyond _TG_ALLOW: $(echo "$out" | cut -c1-80 | tr '\n' ';')"
+            [[ "$(diff <(_tg_rules_out "$x/c") <(_tg_rules_out "$x/a") | grep -c '^>')" -gt 0 ]] \
+                || _no "the $_TG_BASE baseline renders identically, so the allowlist is stale"
+        else
+            echo "CANNOT-VERIFY: $_TG_BASE is not reachable (shallow clone?), so the release baseline diff did not run"
+        fi
+        for k in 'MANDATORY GATE' 'Director mode (Claude Code)' '`Stop` hook checks this'; do
+            grep -qF "$k" "$x/a/.claude/CLAUDE.md" 2>/dev/null || _no "with no config CLAUDE.md lost '$k'"
+        done
+        grep -q 'Stop hook checks project verification' "$x/a/.codex/AGENTS.md" 2>/dev/null || _no "with no config the Codex guide lost its verify sentence"
+        _tg_rules_out "$x/a" > "$x/a.out"
+        for g in routing verify director; do
+            # TC-004/005/007: off removes the group's prose from all 4 tools and keeps the rest.
+            _tg_render "$lib" "$x/a" "gates.$g=off" >/dev/null
+            v="_TG_VOCAB_$g"
+            out="$(_tg_rules_out "$x/a" | grep -E "${!v}" | head -3)"
+            [[ -n "$out" ]] && _no "gates.$g=off still installs its prose: $(echo "$out" | cut -c1-80 | tr '\n' ';')"
+            for k in routing verify director; do
+                [[ "$k" == "$g" ]] && continue
+                v="_TG_VOCAB_$k"
+                grep -qE "${!v}" "$x/a/.claude/CLAUDE.md" || _no "gates.$g=off also stripped the $k prose"
+            done
+            # TC-017: on again restores the no-config output; TC-003: a repeat run does nothing.
+            _tg_render "$lib" "$x/a" "gates.$g=on" >/dev/null
+            [[ "$(_tg_rules_out "$x/a")" == "$(cat "$x/a.out")" ]] || _no "gates.$g back on does not restore the no-config rules"
+            out="$(_tg_render "$lib" "$x/a" "gates.$g=on")"
+            [[ "$(printf '%s\n' "$out" | grep -c 'rules: (up to date)')" -eq 4 ]] || _no "a repeat sync after gates.$g=on reported rule work"
+        done
+        ;;
+    hooks)
+        _tg_claude_install "$lib" "$x/h" "" >/dev/null
+        _tg_hooks "$x/h" > "$x/all"
+        for g in routing verify director; do
+            v="_TG_HOOKS_$g"
+            for k in ${!v}; do grep -qx "$k" "$x/all" || _no "with no config $k is not registered"; done
+            _tg_claude_install "$lib" "$x/h" "gates.$g=off" >/dev/null
+            for k in ${!v}; do
+                _tg_hooks "$x/h" | grep -qx "$k" && _no "gates.$g=off left $k registered in settings.json"
+                [[ -f "$x/h/.claude/hooks/$k" ]] && _no "gates.$g=off left the $k script installed"
+            done
+            [[ "$(_tg_hooks "$x/h" | wc -l)" -eq "$(( $(wc -l < "$x/all") - $(echo ${!v} | wc -w) ))" ]] \
+                || _no "gates.$g=off removed more hooks than its own"
+            _tg_claude_install "$lib" "$x/h" "gates.$g=on" >/dev/null
+            [[ "$(_tg_hooks "$x/h")" == "$(cat "$x/all")" ]] || _no "gates.$g back on does not restore the hook set"
+        done
+        # TC-018: a matcher the user narrowed survives the gate going off and on.
+        python3 - "$x/h/.claude/settings.json" << 'PYEOF'
+import json, sys
+p = sys.argv[1]; s = json.load(open(p))
+for g in s['hooks']['PreToolUse']:
+    if any('gate-delegate.js' in h['command'] for h in g['hooks']):
+        g['matcher'] = 'Edit|Write'
+json.dump(s, open(p, 'w'), indent=2)
+PYEOF
+        _tg_claude_install "$lib" "$x/h" "gates.director=off" >/dev/null
+        out="$(_tg_claude_install "$lib" "$x/h" "gates.director=on")"
+        printf '%s\n' "$out" | grep -q 'keeps its custom matcher Edit|Write' || _no "turning a gate back on printed no note about the user's matcher"
+        python3 -c "
+import json,sys
+s=json.load(open(sys.argv[1]))
+sys.exit(0 if any(g.get('matcher')=='Edit|Write' for g in s['hooks']['PreToolUse'] for h in g['hooks'] if 'gate-delegate.js' in h['command']) else 1)" \
+            "$x/h/.claude/settings.json" || _no "a gate going off and on again overwrote the user's narrowed matcher"
+        ;;
+    routing)
+        # TC-007: routing off keeps the tier line and drops the gate; director off drops its line.
+        mkdir -p "$x/r/.craftkit-state"
+        _ctx() { echo '{"cwd":"/"}' | HOME="$x/r" node "$r/hooks/craftkit-routing.js" | python3 -c 'import json,sys; print(json.load(sys.stdin)["hookSpecificOutput"]["additionalContext"])'; }
+        out="$(_ctx)"
+        grep -q 'skill-first gate' <<<"$out" && grep -q '^Director mode:' <<<"$out" && grep -q '^Model tiers' <<<"$out" \
+            || _no "with no gate files the routing hook lost its gate, director or tier line"
+        echo off > "$x/r/.craftkit-state/gate-director"
+        grep -q 'Director mode' <<<"$(_ctx)" && _no "gates.director=off still injects the Director mode line"
+        echo off > "$x/r/.craftkit-state/gate-routing"
+        out="$(_ctx)"
+        grep -q '^Model tiers' <<<"$out" || _no "gates.routing=off dropped the tier line the Model routing rule depends on"
+        grep -qE 'skill-first|Orchestrators:|Cannot spawn' <<<"$out" && _no "gates.routing=off still injects the skill-first gate"
+        grep -q 'Director mode' <<<"$out" && _no "gates.routing=off with director off injects the Director mode line"
+        # W4: director is its own group, so routing off with director on keeps its line.
+        rm -f "$x/r/.craftkit-state/gate-director"
+        out="$(_ctx)"
+        grep -q '^Director mode:' <<<"$out" && grep -q '^Model tiers' <<<"$out" \
+            || _no "gates.routing=off with director on dropped the Director mode or tier line"
+        grep -q 'skill-first' <<<"$out" && _no "gates.routing=off with director on still injects the skill-first gate"
+        ;;
+    codex)
+        ( cd "$r" && python3 scripts/test-codex.py CodexGatewayTests.test_director_config_overrides_delegate_env \
+            CodexGatewayTests.test_verify_gate_off_never_blocks CodexGatewayTests.test_delegate_gate_is_opt_in_for_codex ) >/dev/null 2>&1 \
+            || _no "the Codex hook ignores gates.director or gates.verify (scripts/test-codex.py)"
+        ;;
+    extras)
+        mkdir -p "$x/bin" "$x/nonpm"
+        printf '#!/bin/sh\necho "v${STUB_NODE:-22.3.0}"\n' > "$x/bin/node"
+        printf '#!/bin/sh\necho "pw $*" >> "$HOME/pw.log"\n[ -e "$HOME/pw-noskill" ] && exit 0\nmkdir -p "$HOME/.agents/skills/playwright-cli"; echo stub > "$HOME/.agents/skills/playwright-cli/SKILL.md"\n' > "$x/pwcli"
+        cat > "$x/bin/npm" << NPMEOF
+#!/bin/sh
+echo "npm \$*" >> "\$HOME/npm.log"
+[ -e "\$HOME/npm-fail" ] && exit 1
+case "\$1" in
+    install) cp "$x/pwcli" "$x/bin/playwright-cli"; chmod +x "$x/bin/playwright-cli" ;;
+    uninstall) rm -f "$x/bin/playwright-cli" ;;
+esac
+NPMEOF
+        cp "$x/bin/node" "$x/nonpm/node"
+        chmod +x "$x/bin/node" "$x/bin/npm" "$x/nonpm/node"
+        _ex() { ( export HOME="$1" PATH="$2:/usr/bin:/bin" STUB_NODE="${4:-}"; mkdir -p "$HOME/.craftkit-state"
+                  printf '%s\n' "$3" > "$HOME/.craftkit-state/config"; . "$lib"; craftkit_config_resolve; sync_extras ) 2>&1; }
+        # TC-008: on installs package and skill, off takes both back, each repeat run is a no-op.
+        out="$(_ex "$x/p" "$x/bin" playwright=on)"
+        [[ -x "$x/bin/playwright-cli" && -f "$x/p/.agents/skills/playwright-cli/SKILL.md" ]] || _no "playwright=on did not install the CLI and its skill: $out"
+        grep -qx package "$x/p/.craftkit-state/playwright-owned" 2>/dev/null || _no "playwright=on did not record that craftkit owns the package"
+        _ex "$x/p" "$x/bin" playwright=on | grep -q 'extras: (up to date)' || _no "a repeat playwright=on sync reported work"
+        _ex "$x/p" "$x/bin" playwright=off >/dev/null
+        [[ -e "$x/bin/playwright-cli" || -e "$x/p/.agents/skills/playwright-cli" ]] && _no "playwright=off left the craftkit-installed CLI or skill"
+        _ex "$x/p" "$x/bin" playwright=off | grep -q 'extras: (up to date)' || _no "a repeat playwright=off sync reported work"
+        # TC-009: a CLI the user installed first is never uninstalled.
+        cp "$x/pwcli" "$x/bin/playwright-cli"; chmod +x "$x/bin/playwright-cli"; rm -f "$x/q.log"
+        _ex "$x/q" "$x/bin" playwright=on >/dev/null
+        _ex "$x/q" "$x/bin" playwright=off >/dev/null
+        [[ -x "$x/bin/playwright-cli" ]] || _no "playwright=off uninstalled a CLI the user installed before craftkit"
+        grep -q 'uninstall' "$x/q/npm.log" 2>/dev/null && _no "playwright=off ran npm uninstall on a package craftkit does not own"
+        [[ -e "$x/q/.agents/skills/playwright-cli" ]] && _no "playwright=off left the skill craftkit installed"
+        rm -f "$x/bin/playwright-cli"
+        # TC-010: no npm, or Node below 20, warns and the sync goes on.
+        out="$(_ex "$x/n" "$x/nonpm" playwright=on)" || _no "playwright=on without npm made the extras pass fail"
+        grep -q 'npm not found' <<<"$out" || _no "playwright=on without npm printed no warning"
+        out="$(_ex "$x/o" "$x/bin" playwright=on 18.19.0)" || _no "playwright=on on Node 18 made the extras pass fail"
+        grep -q 'Node 20+' <<<"$out" || _no "playwright=on on Node 18 printed no warning"
+        # E1: owned names come from a state file, so . and .. or a link never reach rm -rf.
+        mkdir -p "$x/e/.agents/skills/other" "$x/e/outside" "$x/e/.craftkit-state"
+        echo keep > "$x/e/.agents/keep"; echo keep > "$x/e/.agents/skills/other/SKILL.md"; echo keep > "$x/e/outside/f"
+        ln -s "$x/e/outside" "$x/e/.agents/skills/linked"
+        printf 'skill ..\nskill .\nskill \nskill linked\n' > "$x/e/.craftkit-state/playwright-owned"
+        _ex "$x/e" "$x/bin" playwright=off >/dev/null
+        [[ -f "$x/e/.agents/keep" && -f "$x/e/.agents/skills/other/SKILL.md" && -L "$x/e/.agents/skills/linked" && -f "$x/e/outside/f" ]] \
+            || _no "playwright=off deleted outside its own skill folders from a tampered playwright-owned"
+        # W3: a CLI that adds no skill folder records a failure, and only an explicit run retries.
+        mkdir -p "$x/w"; : > "$x/w/pw-noskill"
+        cp "$x/pwcli" "$x/bin/playwright-cli"; chmod +x "$x/bin/playwright-cli"
+        out="$(_ex "$x/w" "$x/bin" playwright=on)"
+        grep -q 'added no skill folder' <<<"$out" || _no "playwright-cli adding no skill folder printed no note"
+        grep -qx skills "$x/w/.craftkit-state/playwright-owned" 2>/dev/null && _no "playwright=on wrote its success sentinel with no skill installed"
+        _ex "$x/w" "$x/bin" playwright=on >/dev/null
+        [[ "$(grep -c '^pw install' "$x/w/pw.log")" -eq 1 ]] || _no "an unattended sync retried a failed playwright install"
+        rm -f "$x/w/pw-noskill"
+        AGENTIC_SETUP=1 _ex "$x/w" "$x/bin" playwright=on >/dev/null
+        grep -qx skills "$x/w/.craftkit-state/playwright-owned" 2>/dev/null && [[ ! -e "$x/w/.craftkit-state/playwright-failed" ]] \
+            || _no "an explicit install did not retry a failed playwright install"
+        rm -f "$x/bin/playwright-cli"
+        mkdir -p "$x/f"; : > "$x/f/npm-fail"
+        _ex "$x/f" "$x/bin" playwright=on >/dev/null
+        _ex "$x/f" "$x/bin" playwright=on >/dev/null
+        [[ "$(grep -c '^npm install' "$x/f/npm.log")" -eq 1 && -f "$x/f/.craftkit-state/playwright-failed" ]] \
+            || _no "a failed npm install was not recorded, or an unattended sync retried it"
+        # TC-011: humanizer off removes the skill and craftkit's link to it, then stays quiet.
+        mkdir -p "$x/z/.agents/skills/humanizer" "$x/z/.claude/skills" "$x/z/.craftkit-state"
+        echo hz > "$x/z/.agents/skills/humanizer/SKILL.md"
+        ln -s "$x/z/.agents/skills/humanizer" "$x/z/.claude/skills/humanizer"
+        echo "$x/z/.agents/skills/humanizer" > "$x/z/.craftkit-state/humanizer-owned"
+        _ex "$x/z" "$x/bin" humanizer=on | grep -q 'extras: (up to date)' || _no "humanizer=on touched an installed humanizer"
+        _ex "$x/z" "$x/bin" humanizer=off >/dev/null
+        [[ -e "$x/z/.agents/skills/humanizer" || -L "$x/z/.claude/skills/humanizer" ]] && _no "humanizer=off left the skill or its ~/.claude/skills link"
+        _ex "$x/z" "$x/bin" humanizer=off | grep -q 'extras: (up to date)' || _no "a repeat humanizer=off sync reported work"
+        # W2: a humanizer craftkit has no ownership record for is the user's, and stays.
+        mkdir -p "$x/u/.agents/skills/humanizer" "$x/u/.claude/skills"
+        echo hz > "$x/u/.agents/skills/humanizer/SKILL.md"
+        ln -s "$x/u/.agents/skills/humanizer" "$x/u/.claude/skills/humanizer"
+        _ex "$x/u" "$x/bin" humanizer=off | grep -q 'extras: (up to date)' || _no "humanizer=off reported work on a humanizer the user installed"
+        [[ -f "$x/u/.agents/skills/humanizer/SKILL.md" && -L "$x/u/.claude/skills/humanizer" ]] \
+            || _no "humanizer=off removed a humanizer craftkit did not install"
+        ;;
+    config)
+        _rv() { ( export HOME="$x/c"; . "$lib"; craftkit_config_resolve; echo "dash=$CRAFTKIT_DASHBOARD_ON verify=${CK_gates_verify:-unset} hz=$CK_humanizer" ) 2>&1; }
+        mkdir -p "$x/c/.craftkit-state"
+        # TC-001 at the state level: no config resolves to the defaults and writes nothing.
+        [[ "$(_rv)" == "dash=0 verify=unset hz=on" ]] || _no "no config does not resolve to the defaults: $(_rv)"
+        ls "$x/c/.craftkit-state" | grep -q . && _no "resolving with no config wrote state files: $(ls "$x/c/.craftkit-state" | tr '\n' ' ')"
+        # TC-013: the v1.56-v1.58 dashboard file becomes a config line.
+        : > "$x/c/.craftkit-state/dashboard"
+        [[ "$(_rv)" == "dash=1 verify=unset hz=on" ]] || _no "the legacy dashboard file no longer turns the dashboard on"
+        grep -qx 'dashboard=on' "$x/c/.craftkit-state/config" || _no "the legacy dashboard file was not migrated into the config"
+        # E3: the legacy file mirrors dashboard=on, so a rollback to v1.58.0 keeps the dashboard.
+        [[ -f "$x/c/.craftkit-state/dashboard" ]] || _no "dashboard=on left no ~/.craftkit-state/dashboard, so a rollback to v1.58.0 loses the dashboard"
+        [[ "$(stat -f %Lp "$x/c/.craftkit-state/config" 2>/dev/null || stat -c %a "$x/c/.craftkit-state/config")" == 600 ]] \
+            || _no "craftkit_config_set left the config readable by others"
+        ls "$x/c/.craftkit-state" | grep -q '^config\.' && _no "craftkit_config_set left a temp file beside the config"
+        # TC-002: the saved choice holds for a sync that sees an empty environment.
+        out="$(env -i HOME="$x/c" PATH="/usr/bin:/bin" bash -c ". '$lib'; craftkit_config_resolve; echo \$CRAFTKIT_DASHBOARD_ON")"
+        [[ "$out" == 1 ]] || _no "dashboard=on in the config is lost under env -i (a post-merge sync)"
+        # TC-012: the env var beats the file.
+        printf 'dashboard=off\n' > "$x/c/.craftkit-state/config"
+        _rv >/dev/null
+        [[ -e "$x/c/.craftkit-state/dashboard" ]] && _no "dashboard=off kept the ~/.craftkit-state/dashboard mirror"
+        out="$(export HOME="$x/c" CRAFTKIT_DASHBOARD=1; . "$lib"; craftkit_config_resolve; echo $CRAFTKIT_DASHBOARD_ON)"
+        [[ "$out" == 1 ]] || _no "CRAFTKIT_DASHBOARD=1 lost to dashboard=off in the config"
+        # W5: after the checklist the alias must not overwrite the answer the user just gave.
+        printf 'dashboard=off\n' > "$x/c/.craftkit-state/config"
+        ( export HOME="$x/c" CRAFTKIT_DASHBOARD=1; . "$lib"; craftkit_config_resolve --after-checklist ) >/dev/null 2>&1
+        grep -qx 'dashboard=off' "$x/c/.craftkit-state/config" || _no "the resolve after --configure saved CRAFTKIT_DASHBOARD over the checklist answer"
+        # E2: a one-run override reaches this run's install, never the gate files later runs read.
+        printf 'gates.verify=off\n' > "$x/c/.craftkit-state/config"
+        out="$(export HOME="$x/c" CRAFTKIT_GATES_DIRECTOR=on CRAFTKIT_GATES_VERIFY=on; . "$lib"; craftkit_config_resolve; echo "$CK_gates_director $CK_gates_verify")"
+        [[ "$out" == "on on" ]] || _no "CRAFTKIT_GATES_* did not override this run: $out"
+        [[ ! -e "$x/c/.craftkit-state/gate-director" && "$(cat "$x/c/.craftkit-state/gate-verify" 2>/dev/null)" == off ]] \
+            || _no "a CRAFTKIT_GATES_* override was saved into ~/.craftkit-state/gate-*, so it outlives its run"
+        out="$(export HOME="$x/c" CRAFTKIT_GATES_VERIFY=off; . "$lib"; craftkit_config_resolve; echo ${CK_gates_verify:-unset})"
+        [[ "$out" == off ]] || _no "CRAFTKIT_GATES_VERIFY=off did not override the config"
+        # TC-016: one warning per bad line, prior setting kept; gate files mirror explicit values only.
+        printf 'gates.verify=off\ngates.verify=maybe\nfoo=on\n# a comment\n\n' > "$x/c/.craftkit-state/config"
+        out="$(_rv)"
+        [[ "$(grep -c 'not understood' <<<"$out")" -eq 2 ]] || _no "bad config lines did not warn exactly once each: $out"
+        grep -q 'verify=off' <<<"$out" || _no "a bad value replaced the prior gates.verify setting"
+        [[ "$(cat "$x/c/.craftkit-state/gate-verify" 2>/dev/null)" == off && ! -e "$x/c/.craftkit-state/gate-director" ]] \
+            || _no "gate state files do not mirror the explicit config values"
+        out="$( ( export HOME="$x/c"; . "$lib"; craftkit_config_resolve; craftkit_config_resolve --after-checklist ) 2>&1)"
+        [[ "$(grep -c 'not understood' <<<"$out")" -eq 2 ]] || _no "the resolve after --configure repeated or hid the warnings: $out"
+        printf 'gates.verify=off\nfoo=\033[31mred\n' > "$x/c/.craftkit-state/config"
+        grep -q $'\033' <<<"$(_rv)" && _no "a bad config line reached the terminal unescaped"
+        # TC-014: no terminal means no prompt and no config change.
+        printf 'humanizer=on\n' > "$x/c/.craftkit-state/config"
+        out="$( ( export HOME="$x/c"; . "$lib"; craftkit_config_resolve; craftkit_configure ) < /dev/null 2>&1)"
+        grep -q 'needs a terminal' <<<"$out" && [[ "$(cat "$x/c/.craftkit-state/config")" == humanizer=on ]] \
+            || _no "--configure without a terminal prompted or changed the config"
+        grep -q '\[\[ -t 0 && ! -d "\$HOME/.craftkit-state" \]\]' "$r/install.sh" \
+            || _no "install.sh shows the checklist without checking for a terminal and a fresh install"
+        ;;
+    esac
+    rm -rf "$x"
+    return $bad
+}
+
+check "config toggles: no config changes nothing, off is absent everywhere, on restores"
+_tg=0
+if ! command -v node >/dev/null 2>&1; then
+    echo "    skipped (node not on PATH)"
+else
+    _tg_cv=""
+    for _part in config rules hooks routing codex extras; do
+        _out="$(_tg_suite "$REPO_DIR" "$_part")" || { fail "config toggles ($_part):"; echo "$_out" | grep -v '^CANNOT-VERIFY' | sed 's/^/      /'; _tg=1; }
+        _tg_cv="$_tg_cv$(echo "$_out" | grep '^CANNOT-VERIFY' || true)"
+    done
+fi
+# A baseline that could not be read is reported as such, never as a pass.
+if [[ -n "${_tg_cv:-}" ]]; then echo "    $_tg_cv"; elif [[ $_tg -eq 0 ]]; then pass; fi
+
+# ---------------------------------------------------------------------------
+# 42b. Check 42 fails when its guarded code is gone. A fixture can pass because the thing
+#      it checks was never exercised, so each strip or teardown is removed from a copy of
+#      the repo and the matching part of the suite must then fail.
+# ---------------------------------------------------------------------------
+check "config toggle checks fail when the strip or teardown is removed"
+_tm=0
+if ! command -v node >/dev/null 2>&1; then
+    echo "    skipped (node not on PATH)"
+else
+    _tmx="$(mktemp -d)"
+    # part%file%sed expression
+    for _m in \
+        'rules%sync.sh%s|craftkit_strip_gate_blocks "$RULES_DIR/${rule}.md" "$source_file"|cp "$RULES_DIR/${rule}.md" "$source_file"|' \
+        'hooks%adapters/claude.sh%/^    _claude_filter_gate_hooks$/d' \
+        "routing%hooks/craftkit-routing.js%s|gateOff('routing') ? directorLine + tierLine :|false ? directorLine + tierLine :|" \
+        "codex%hooks/craftkit-codex.js%s|gateValue('verify') === 'off'|false|" \
+        'extras%sync.sh%/rm -rf "${skills:?}\/$name"/d' \
+        'extras%sync.sh%s|rm -rf "\$hz_dir" \&\& ||' \
+        'extras%sync.sh%s|"skill "\* ]] \&\& _pw_skill_ok "$name" "$skills"|"skill "* ]]|' \
+        'extras%sync.sh%s| \&\& -f "$hz_owned" ]]| ]]|' \
+        'config%sync.sh%s/^    _ck_save_state$/    :/; s/^    CRAFTKIT_DASHBOARD_ON=0$/    _ck_save_state; CRAFTKIT_DASHBOARD_ON=0/'; do
+        _mp="${_m%%%*}"; _mr="${_m#*%}"; _mf="${_mr%%%*}"; _me="${_mr#*%}"
+        rm -rf "$_tmx/r"; mkdir -p "$_tmx/r/scripts"
+        cp -R "$REPO_DIR"/{sync.sh,install.sh,adapters,hooks,rules,skills,commands,agents,partials} "$_tmx/r/"
+        cp "$REPO_DIR/scripts/test-codex.py" "$_tmx/r/scripts/"
+        sed -i.bak "$_me" "$_tmx/r/$_mf"
+        if cmp -s "$_tmx/r/$_mf" "$_tmx/r/$_mf.bak"; then
+            fail "mutation '$_me' no longer matches $_mf, so 42b proves nothing for $_mp"; _tm=1
+        elif _tg_suite "$_tmx/r" "$_mp" >/dev/null 2>&1; then
+            fail "check 42 ($_mp) still passes with '$_me' applied to $_mf"; _tm=1
+        fi
+    done
+    rm -rf "$_tmx"
+fi
+[[ $_tm -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
 # 42c. Every spawn instruction asks for a task-specific Agent description. An untyped spawn
 #      otherwise shows as general-purpose in the agent list, so five parallel agents read
 #      as five identical rows and none can be told apart, stopped or messaged by sight.
@@ -2868,6 +3254,68 @@ done
 sed -n '/<!-- BEGIN CRAFTKIT-DIRECTOR -->/,/<!-- END CRAFTKIT-DIRECTOR -->/p' "$RULES_DIR/using-agent-skills.md" | grep -q 'task-specific `description`' \
     || { fail "rule 12a's contract no longer requires a task-specific \`description\`"; _sl=1; }
 [[ $_sl -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 42d. Gate prose lives only inside its markers. The strip can only drop what is marked, so
+#      a rule, skill, command or agent that names a gate elsewhere keeps teaching it to a
+#      user who turned it off. Rules are scanned outside their marker blocks; the rest has
+#      no markers, so any hit there is a leak. Hook emit text is held to its gates. branches.
+# ---------------------------------------------------------------------------
+check "gate vocabulary appears only inside CRAFTKIT-GATE and CRAFTKIT-DIRECTOR blocks"
+_gv=0
+_gv_all="$_TG_VOCAB_routing|$_TG_VOCAB_verify|$_TG_VOCAB_director"
+_gv_out="$(for _f in "$RULES_DIR"/*.md; do
+    awk -v f="${_f#$REPO_DIR/}" '/^<!-- BEGIN CRAFTKIT-(GATE-[A-Z]+|DIRECTOR) -->$/{s=1} !s{print f ": " $0} /^<!-- END CRAFTKIT-(GATE-[A-Z]+|DIRECTOR) -->$/{s=0}' "$_f"
+done | grep -E "$_gv_all"
+grep -rnE "$_gv_all" "$SKILLS_DIR" "$COMMANDS_DIR" "$AGENTS_DIR" "$PARTIALS_DIR" 2>/dev/null
+# Hook emit text: a hit in code (comments skip) must sit after a `flag: gates.<group>` comment
+# naming its own group, inside the same top-level block. gate-*.js are the gates themselves,
+# unregistered when off, so they may name what they enforce.
+for _f in "$REPO_DIR"/hooks/*.js; do
+    [[ "$(basename "$_f")" == gate-* ]] && continue
+    awk -v f="${_f#$REPO_DIR/}" -v vr="$_TG_VOCAB_routing" -v vv="$_TG_VOCAB_verify" -v vd="$_TG_VOCAB_director" '
+        /^}/ { g = "" }
+        match($0, /\/\/ flag: gates\.[a-z]+/) { g = substr($0, RSTART + 15, RLENGTH - 15) }
+        /^[[:space:]]*\/\// { next }
+        { h = ""; if ($0 ~ vr) h = "routing"; else if ($0 ~ vv) h = "verify"; else if ($0 ~ vd) h = "director"
+          if (h != "" && h != g) print f ":" FNR ": " h " gate text outside a gates." h " branch: " $0 }' "$_f"
+done)"
+if [[ -n "$_gv_out" ]]; then
+    fail "gate prose outside its markers, so turning the gate off would not remove it:"
+    echo "$_gv_out" | cut -c1-140 | sed 's/^/      /'
+    _gv=1
+fi
+[[ $_gv -eq 0 ]] && pass
+
+# ---------------------------------------------------------------------------
+# 42e. Every CRAFTKIT-GATE marker opens and closes once, unnested. An END that went missing
+#      would make the strip drop the rest of the file with the group off, so the strip
+#      refuses unbalanced input and this holds the source to the same shape.
+# ---------------------------------------------------------------------------
+check "CRAFTKIT-GATE markers are balanced and the strip refuses unbalanced input"
+_gb_out="$(for _f in "$RULES_DIR"/*.md "$SKILLS_DIR"/*/SKILL.md "$COMMANDS_DIR"/*.md "$AGENTS_DIR"/*.md "$PARTIALS_DIR"/*.md; do
+    awk -v f="${_f#$REPO_DIR/}" '
+        /^<!-- BEGIN CRAFTKIT-GATE-[A-Z]+ -->$/ { if (o != "") print f ":" FNR ": " $3 " opens inside " o; o = $3 }
+        /^<!-- END CRAFTKIT-GATE-[A-Z]+ -->$/ { if (o != $3) print f ":" FNR ": END " $3 " without its BEGIN"; o = "" }
+        END { if (o != "") print f ": " o " never ends" }' "$_f"
+done
+_gbx="$(mktemp -d)"
+sed -n '/^craftkit_strip_gate_blocks() {/,/^}/p' "$REPO_DIR/sync.sh" > "$_gbx/strip.sh"
+for _g in ROUTING VERIFY DIRECTOR; do
+    printf 'a\n<!-- BEGIN CRAFTKIT-GATE-%s -->\nb\n' "$_g" > "$_gbx/open.md"
+    printf 'a\n<!-- END CRAFTKIT-GATE-%s -->\nb\n' "$_g" > "$_gbx/close.md"
+    for _u in open close; do
+        bash -c ". '$_gbx/strip.sh'; craftkit_strip_gate_blocks '$_gbx/$_u.md' '$_gbx/out.md'" >/dev/null 2>&1 \
+            && echo "the strip accepted a lone $_u CRAFTKIT-GATE-$_g marker instead of failing"
+    done
+done
+rm -rf "$_gbx")"
+if [[ -n "$_gb_out" ]]; then
+    fail "unbalanced CRAFTKIT-GATE markers:"
+    echo "$_gb_out" | sed 's/^/      /'
+else
+    pass
+fi
 
 echo
 if [[ $FAILURES -eq 0 ]]; then

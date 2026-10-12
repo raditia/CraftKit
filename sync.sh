@@ -44,23 +44,164 @@ if [[ -n "$_ck_repo_version" && -f "$_ck_version_file" && -z "${CRAFTKIT_ALLOW_D
     fi
 fi
 
-# flag: CRAFTKIT_DASHBOARD. off: no agent-log hook, status line or ccdash installed, and a sync removes any left from when it was on, logs included. remove: if the dashboard ever becomes default-on.
-# The choice persists in a state file because the post-merge hook syncs without the
-# caller's environment, and an opt-in that a git pull silently undid would not be one.
-# Resolved after the downgrade guard, so a refused sync never flips it.
-craftkit_dashboard_resolve() {
-    local state="$STATE_DIR/dashboard"
-    case "$(printf '%s' "${CRAFTKIT_DASHBOARD:-}" | tr '[:upper:]' '[:lower:]')" in
-        "") ;;
-        1|on|true|yes) : > "$state" ;;
-        0|off|false|no) rm -f "$state" ;;
-        *) echo "Warning: CRAFTKIT_DASHBOARD='$CRAFTKIT_DASHBOARD' not understood (use 1 or 0); dashboard setting unchanged" >&2 ;;
+# User choices live in one key=value file beside the state files, because the post-merge
+# hook syncs without the caller's environment and an opt-in a git pull silently undid
+# would not be one. Precedence: env var > config file > built-in default. An empty default
+# means unset, which keeps each tool's own default (gates.director: Claude on, Codex off).
+# Resolved after the downgrade guard, so a refused sync never flips anything.
+CRAFTKIT_CONFIG="$STATE_DIR/config"
+_CK_KEYS=(
+    "humanizer%on%humanizer skill, used by /pr-message and /docs"
+    "playwright%off%Playwright CLI and its agent skill (needs npm and Node 20+)"
+    "dashboard%off%agent dashboard, logs tool calls to ~/.craftkit/agent-tree"
+    "gates.routing%%routing gates: skill-first and announce hooks, routing rule prose"
+    "gates.director%%director gate: delegate 3+ file edits (unset: Claude on, Codex off)"
+    "gates.verify%%verify gate: Stop hook blocks a turn that edited without verifying"
+)
+
+_ck_bool() {
+    case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+        1|on|true|yes) echo on ;;
+        0|off|false|no) echo off ;;
     esac
+}
+
+_ck_var() { echo "CK_${1//./_}"; }
+
+_ck_known() {
+    local e
+    for e in "${_CK_KEYS[@]}"; do [[ "${e%%\%*}" == "$1" ]] && return 0; done
+    return 1
+}
+
+# Each distinct warning prints once per run, so --configure's second resolve repeats none.
+_CK_WARNED=""
+_ck_warn() {
+    printf '%s\n' "$_CK_WARNED" | grep -qxF -- "$1" && return 0
+    _CK_WARNED="$_CK_WARNED"$'\n'"$1"
+    echo "Warning: $1" >&2
+}
+
+# Rewrites the config with key dropped, then key=value appended when a value is given.
+# Every other line, comments and unknown keys included, is kept as the user wrote it.
+# Written beside the config and moved over it, so an interrupted sync never leaves half a
+# file; mktemp creates it 0600, which the move carries over.
+craftkit_config_set() {
+    local tmp
+    tmp="$(mktemp "$STATE_DIR/config.XXXXXX")"
+    [[ -f "$CRAFTKIT_CONFIG" ]] && awk -F= -v k="$1" '{ kk=$1; gsub(/[[:space:]]/, "", kk) } kk != k' "$CRAFTKIT_CONFIG" > "$tmp"
+    [[ -n "${2:-}" ]] && echo "$1=$2" >> "$tmp"
+    mv "$tmp" "$CRAFTKIT_CONFIG"
+}
+
+# What a sync leaves on disk for later runs follows the saved config alone, so a one-run
+# CRAFTKIT_<KEY> override never outlives its run.
+_ck_save_state() {
+    local k var
+    # Hooks read gate choices at runtime from one file per gate, present only when the
+    # gate is set explicitly, so an absent file is unset and each tool keeps its default.
+    for k in routing director verify; do
+        var="$(_ck_var "gates.$k")"
+        if [[ -n "${!var}" ]]; then
+            [[ "$(cat "$STATE_DIR/gate-$k" 2>/dev/null)" == "${!var}" ]] || echo "${!var}" > "$STATE_DIR/gate-$k"
+        else
+            rm -f "$STATE_DIR/gate-$k"
+        fi
+    done
+    # ponytail: mirrors dashboard into the v1.56-v1.58 state file so a rollback to v1.58.0 keeps the dashboard. ceiling: two files hold one choice. upgrade: drop this write two releases after 1.59.0.
+    if [[ "$CK_dashboard" == on ]]; then
+        [[ -s "$STATE_DIR/dashboard" ]] || echo "mirror of dashboard=on in config" > "$STATE_DIR/dashboard"
+    else
+        rm -f "$STATE_DIR/dashboard"
+    fi
+}
+
+# After the checklist, pass --after-checklist: the env alias must not overwrite an answer.
+craftkit_config_resolve() {
+    local e key var val line k v env
+    for e in "${_CK_KEYS[@]}"; do
+        key="${e%%\%*}"; val="${e#*%}"
+        printf -v "$(_ck_var "$key")" '%s' "${val%%\%*}"
+    done
+    # flag: CRAFTKIT_DASHBOARD (env alias of dashboard). off: no agent-log hook, status line or ccdash installed, and a sync removes any left from when it was on, logs included. remove: if the dashboard ever becomes default-on.
+    # v1.56 to v1.58 recorded the opt-in as an empty state file; it becomes a config line once.
+    # The non-empty mirror _ck_save_state writes is not an opt-in to migrate.
+    if [[ -f "$STATE_DIR/dashboard" && ! -s "$STATE_DIR/dashboard" ]]; then
+        grep -Eq '^[[:space:]]*dashboard[[:space:]]*=' "$CRAFTKIT_CONFIG" 2>/dev/null || craftkit_config_set dashboard on
+    fi
+    # The legacy alias persists its value, as it always did, so a git pull keeps the opt-in.
+    if [[ -n "${CRAFTKIT_DASHBOARD:-}" && "${1:-}" != --after-checklist ]]; then
+        val="$(_ck_bool "$CRAFTKIT_DASHBOARD")"
+        if [[ -n "$val" ]]; then
+            craftkit_config_set dashboard "$val"
+        else
+            _ck_warn "CRAFTKIT_DASHBOARD=$(printf '%q' "$CRAFTKIT_DASHBOARD") not understood (use 1 or 0); dashboard setting unchanged"
+        fi
+    fi
+    if [[ -f "$CRAFTKIT_CONFIG" ]]; then
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            line="${line#"${line%%[![:space:]]*}"}"; line="${line%"${line##*[![:space:]]}"}"
+            [[ -z "$line" || "$line" == \#* ]] && continue
+            k="${line%%=*}"; v="${line#*=}"
+            k="${k//[[:space:]]/}"; v="$(_ck_bool "${v//[[:space:]]/}")"
+            if [[ "$line" != *=* ]] || ! _ck_known "$k" || [[ -z "$v" ]]; then
+                _ck_warn "~/.craftkit-state/config: $(printf '%q' "${line:0:80}") not understood (known keys take on or off); ignored, prior setting kept"
+                continue
+            fi
+            printf -v "$(_ck_var "$k")" '%s' "$v"
+        done < "$CRAFTKIT_CONFIG"
+    fi
+    _ck_save_state
+    # Per-run overrides, not saved: CRAFTKIT_HUMANIZER, CRAFTKIT_GATES_VERIFY, and so on.
+    for e in "${_CK_KEYS[@]}"; do
+        key="${e%%\%*}"
+        [[ "$key" == dashboard ]] && continue
+        env="CRAFTKIT_$(echo "$key" | tr '.[:lower:]' '_[:upper:]')"
+        [[ -n "${!env:-}" ]] || continue
+        val="$(_ck_bool "${!env}")"
+        if [[ -n "$val" ]]; then
+            printf -v "$(_ck_var "$key")" '%s' "$val"
+        else
+            _ck_warn "$env=$(printf '%q' "${!env}") not understood (use on or off); ignored"
+        fi
+    done
     CRAFTKIT_DASHBOARD_ON=0
-    [[ -f "$state" ]] && CRAFTKIT_DASHBOARD_ON=1
+    [[ "$CK_dashboard" == on ]] && CRAFTKIT_DASHBOARD_ON=1
     return 0
 }
-craftkit_dashboard_resolve
+
+# The checklist: one line per toggle with its current value. Only on a terminal, so
+# postinstall, post-merge and CI never block on a prompt nobody can see.
+craftkit_configure() {
+    if [[ ! -t 0 ]]; then
+        echo "    --configure needs a terminal; config left as is"
+        return 0
+    fi
+    local e key label var cur ans val
+    echo "Choose what craftkit installs and enforces. Enter keeps a value; type on or off (gates also take unset)."
+    for e in "${_CK_KEYS[@]}"; do
+        key="${e%%\%*}"; label="${e##*%}"; var="$(_ck_var "$key")"; cur="${!var:-unset}"
+        read -r -p "  $key [$cur] $label: " ans || ans=""
+        ans="$(printf '%s' "$ans" | tr -d '[:space:]')"
+        [[ -z "$ans" ]] && continue
+        if [[ "$ans" == unset && "$key" == gates.* ]]; then
+            craftkit_config_set "$key"
+        elif val="$(_ck_bool "$ans")" && [[ -n "$val" ]]; then
+            craftkit_config_set "$key" "$val"
+        else
+            echo "    '$ans' not understood, $key kept at $cur"
+        fi
+    done
+    [[ -f "$CRAFTKIT_CONFIG" ]] || : > "$CRAFTKIT_CONFIG"
+}
+
+craftkit_config_resolve
+_ck_configure=0
+if [[ "${1:-}" == "--configure" ]]; then
+    _ck_configure=1
+    craftkit_configure
+    craftkit_config_resolve --after-checklist
+fi
 
 source "$REPO_DIR/adapters/claude.sh"
 source "$REPO_DIR/adapters/cursor.sh"
@@ -174,6 +315,25 @@ craftkit_strip_frontmatter() {
     ' "$1"
 }
 
+# flag: gates.routing / gates.verify / gates.director. off: that group's marked prose is dropped from every tool's installed copy. remove: never, the groups are user choices.
+# On, only the CRAFTKIT-GATE-* marker lines go, so output matches a tree without them. The
+# CRAFTKIT-DIRECTOR block keeps its markers either way: Cursor and Gemini strip it themselves.
+# A dropped block that opened after a blank line takes one following blank line with it.
+craftkit_strip_gate_blocks() {
+    awk -v r="${CK_gates_routing:-}" -v v="${CK_gates_verify:-}" -v d="${CK_gates_director:-}" '
+        function off(g) { return (g == "ROUTING" && r == "off") || (g == "VERIFY" && v == "off") || (g == "DIRECTOR" && d == "off") }
+        function bad(m) { printf "Error: %s:%d: %s, so gate prose cannot be stripped safely\n", FILENAME, FNR, m > "/dev/stderr"; failed = 1; exit 1 }
+        /^<!-- BEGIN CRAFTKIT-GATE-[A-Z]+ -->$/ { if (blk != "") bad("BEGIN " $3 " inside " blk); blk = $3; g = $3; sub(/^CRAFTKIT-GATE-/, "", g); if (off(g)) { skip = 1; eat = prevblank } next }
+        /^<!-- END CRAFTKIT-GATE-[A-Z]+ -->$/ { if (blk != $3) bad("END " $3 " without its BEGIN"); blk = ""; if (skip) { skip = 0; pending = eat } next }
+        /^<!-- BEGIN CRAFTKIT-DIRECTOR -->$/ && d == "off" { skip = 1; eat = prevblank; next }
+        /^<!-- END CRAFTKIT-DIRECTOR -->$/ && d == "off" { skip = 0; pending = eat; next }
+        skip { next }
+        pending { pending = 0; if ($0 == "") next }
+        { print; prevblank = ($0 == "") }
+        END { if (!failed && blk != "") bad("BEGIN " blk " never ends") }
+    ' "$1" > "$2" || exit 1
+}
+
 # Renders a source file into $out. If it opts in via `craftkitInject: a, b`, the bodies of
 # partials/<a>.md / rules/<a>.md / skills/<a>/SKILL.md are spliced in as a managed block
 # right after its own frontmatter, so the installed copy carries the live text instead of a
@@ -185,7 +345,7 @@ craftkit_render_injected() {
     local list
     list="$(craftkit_inject_list "$src")"
     if [[ -z "$list" ]]; then
-        cp "$src" "$out"
+        craftkit_strip_gate_blocks "$src" "$out"
         return
     fi
 
@@ -220,8 +380,9 @@ craftkit_render_injected() {
         NR==1 && $0=="---" { infm=1; print; next }
         infm && $0=="---" { print; printf "\n%s", blk; infm=0; next }
         { print }
-    ' "$src" > "$out"
-    rm -f "$block"
+    ' "$src" > "$block.src"
+    craftkit_strip_gate_blocks "$block.src" "$out"
+    rm -f "$block" "$block.src"
 }
 
 sync_adapter() {
@@ -308,7 +469,10 @@ sync_rules_adapter() {
 
     # Install or update all current rules
     for rule in "${current_rules[@]+"${current_rules[@]}"}"; do
-        local source_file="$RULES_DIR/${rule}.md"
+        # Every tool installs the gate-stripped text, so an off group's prose reaches none of them.
+        local source_file
+        source_file="$(mktemp)"
+        craftkit_strip_gate_blocks "$RULES_DIR/${rule}.md" "$source_file"
         local dest cmp_src cmp_tmp=""
         dest="$("get_${adapter}_rule_dest" "$rule")"
         cmp_src="$source_file"
@@ -327,6 +491,7 @@ sync_rules_adapter() {
         # Guard: only remove a genuine temp, never the source (a future adapter whose
         # effective_ hook returns the real source path must not self-destruct).
         [[ -n "$cmp_tmp" && "$cmp_tmp" != "$source_file" ]] && rm -f "$cmp_tmp"
+        rm -f "$source_file"
     done
 
     [[ $changed -eq 0 ]] && echo "    rules: (up to date)"
@@ -494,12 +659,16 @@ ensure_tools() {
         _rtk_hook_absolutize
     fi
 
-    # Humanizer: de-AI-writing skill (used by /pr-message). Clone SKILL.md from
-    # upstream into ~/.agents/skills and symlink into ~/.claude/skills as a native
-    # Agent Skill. The vendored skills/humanizer/ copy fans out to the other 5 tools
-    # via the adapter sync; this wires only Claude's native skill path.
+    # Humanizer: de-AI-writing skill (used by /pr-message and /docs). Clone SKILL.md from
+    # upstream into ~/.agents/skills, which Codex, Cursor and Gemini read, and symlink it
+    # into ~/.claude/skills as a native Agent Skill. No adapter installs it: skills/ has no
+    # humanizer, so this is its only install path. The state file records that craftkit put
+    # it there, so humanizer=off never removes a copy the user installed.
     hz_src="$HOME/.agents/skills/humanizer"
-    if [[ ! -f "$hz_src/SKILL.md" ]]; then
+    # flag: humanizer. off: not installed here, and sync_extras removes it every sync. remove: never, it is a user choice.
+    if [[ "$CK_humanizer" == off ]]; then
+        :
+    elif [[ ! -f "$hz_src/SKILL.md" ]]; then
         echo "    + installing humanizer..."
         hz_tmp="$(mktemp -d)"
         if git clone --depth 1 https://github.com/blader/humanizer.git "$hz_tmp" 2>/dev/null; then
@@ -507,6 +676,7 @@ ensure_tools() {
             cp "$hz_tmp/SKILL.md" "$hz_src/SKILL.md"
             mkdir -p "$HOME/.claude/skills"
             ln -sfn "$hz_src" "$HOME/.claude/skills/humanizer"
+            echo "$hz_src" > "$STATE_DIR/humanizer-owned"
             echo "    humanizer (ok)"
         else
             echo "    ! humanizer install failed, clone https://github.com/blader/humanizer manually"
@@ -641,6 +811,110 @@ sync_bin() {
     return 0
 }
 sync_bin
+
+# Extras a user can turn off or on in the config. Off is enforced on every sync, not only
+# under AGENTIC_SETUP, so the choice holds after a git pull.
+_pw_note() { echo "    ! playwright: $1; skipped, the rest of the sync continues"; }
+
+# Owned skill names come back from a state file, so each is checked before rm -rf: a plain
+# folder name (never . or ..) whose path is a real directory, not a link to elsewhere.
+_pw_skill_ok() {
+    local re='^[A-Za-z0-9_-][A-Za-z0-9._-]*$'
+    [[ $1 =~ $re && -d "$2/$1" && ! -L "$2/$1" ]]
+}
+
+sync_playwright() {
+    local owned="$STATE_DIR/playwright-owned" failed="$STATE_DIR/playwright-failed" skills="$HOME/.agents/skills"
+    local line name before="" added=0 major d
+    # flag: playwright. off: nothing installed, and a sync removes what craftkit installed while it was on (the npm package only if craftkit installed it). remove: never, it is a user choice.
+    if [[ "$CK_playwright" != on ]]; then
+        rm -f "$failed"
+        [[ -f "$owned" ]] || return 0
+        while IFS= read -r line; do
+            name="${line#skill }"
+            [[ "$line" == "skill "* ]] && _pw_skill_ok "$name" "$skills" || continue
+            rm -rf "${skills:?}/$name" && echo "    - playwright skill: $name"
+        done < "$owned"
+        if grep -qx package "$owned"; then
+            if npm uninstall -g @playwright/cli >/dev/null 2>&1; then
+                echo "    - @playwright/cli"
+            else
+                echo "    ! could not npm uninstall -g @playwright/cli; remove it by hand"
+            fi
+        fi
+        rm -f "$owned"
+        return 0
+    fi
+    # A failed install needs the network, so unattended syncs leave it to an explicit retry.
+    if [[ -f "$failed" && "${AGENTIC_SETUP:-0}" != 1 && "${_ck_configure:-0}" != 1 ]]; then
+        _pw_note "the last install failed ($(cat "$failed")); bash sync.sh --configure retries it"
+        return 0
+    fi
+    rm -f "$failed"
+    command -v npm >/dev/null 2>&1 || { _pw_note "npm not found"; return 0; }
+    major="$(node -v 2>/dev/null | sed 's/^v//;s/\..*//')"
+    [[ "$major" =~ ^[0-9]+$ && "$major" -ge 20 ]] || { _pw_note "Node 20+ required (found ${major:-none})"; return 0; }
+    if ! command -v playwright-cli >/dev/null 2>&1; then
+        if ! npm install -g @playwright/cli@latest >/dev/null 2>&1; then
+            echo "npm install" > "$failed"
+            _pw_note "npm install -g @playwright/cli failed (network?)"; return 0
+        fi
+        hash -r
+        echo package >> "$owned"
+        echo "    + @playwright/cli"
+    fi
+    if [[ -f "$owned" ]] && grep -qx skills "$owned"; then
+        added=1
+        while IFS= read -r line; do
+            if [[ "$line" == "skill "* && ! -d "$skills/${line#skill }" ]]; then added=0; fi
+        done < "$owned"
+        [[ $added -eq 1 ]] && return 0
+    fi
+    # Which skill folders the CLI writes is its business, so ownership is the set it added.
+    for d in "$skills"/*/; do
+        if [[ -d "$d" ]]; then before="$before$(basename "$d")"$'\n'; fi
+    done
+    if ! playwright-cli install --skills=agents -g >/dev/null 2>&1; then
+        echo "skill install" > "$failed"
+        _pw_note "playwright-cli install --skills=agents -g failed"; return 0
+    fi
+    added=0
+    for d in "$skills"/*/; do
+        name="$(basename "$d")"
+        [[ -d "$d" ]] && _pw_skill_ok "$name" "$skills" || continue
+        printf '%s' "$before" | grep -qxF -- "$name" && continue
+        grep -qxF "skill $name" "$owned" 2>/dev/null || echo "skill $name" >> "$owned"
+        echo "    + playwright skill: $name"
+        added=1
+    done
+    if [[ $added -eq 0 ]] && ! grep -qx skills "$owned" 2>/dev/null; then
+        echo "no skill folder in ~/.agents/skills" > "$failed"
+        _pw_note "playwright-cli added no skill folder under ~/.agents/skills, so craftkit owns none"
+        return 0
+    fi
+    grep -qx skills "$owned" 2>/dev/null || echo skills >> "$owned"
+}
+
+sync_extras() {
+    local out hz_dir="$HOME/.agents/skills/humanizer" hz_link="$HOME/.claude/skills/humanizer" hz_owned="$STATE_DIR/humanizer-owned"
+    echo ""
+    echo "[extras]"
+    out="$(
+        # Only what ensure_tools recorded installing goes; a humanizer the user installed stays.
+        if [[ "$CK_humanizer" == off && -f "$hz_owned" ]]; then
+            if [[ -L "$hz_link" && "$(readlink "$hz_link")" == "$hz_dir" ]]; then
+                rm -f "$hz_link" && echo "    - humanizer link"
+            fi
+            if [[ -d "$hz_dir" && ! -L "$hz_dir" ]]; then
+                rm -rf "$hz_dir" && echo "    - humanizer"
+            fi
+            rm -f "$hz_owned"
+        fi
+        sync_playwright
+    )"
+    if [[ -n "$out" ]]; then printf '%s\n' "$out"; else echo "    extras: (up to date)"; fi
+}
+sync_extras
 
 echo ""
 [[ -n "$_ck_repo_version" ]] && printf '%s\n' "$_ck_repo_version" > "$_ck_version_file"

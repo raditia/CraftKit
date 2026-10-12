@@ -34,7 +34,9 @@ investigation, review, or testing goes to a read-only subagent; parallel edits u
 worktrees. Give each delegated unit a goal, output, and verify command, then review its result
 before integrating; the human decides anything hard to reverse.
 
+<!-- BEGIN CRAFTKIT-GATE-DIRECTOR -->
 Keep quick, coupled work (up to two files, about 2 minutes) direct; delegate when useful.
+<!-- END CRAFTKIT-GATE-DIRECTOR -->
 Steer via `send_message`/`followup_task` and `interrupt_agent`, or `send_input`/`close_agent`
 when available. Collect results with `wait_agent` before replying. Reuse verification for
 an unchanged tree; report "not verified" if it is missing or failing.
@@ -64,7 +66,9 @@ Output compression (caveman) is delivered by the caveman plugin's hooks, not a s
 A cold specialist or cross-review panelist follows its assigned read-only prompt and skips skill
 routing; the host handles synthesis and verification.
 
+<!-- BEGIN CRAFTKIT-GATE-ROUTING -->
 **Intent-first routing is a BLOCKING REQUIREMENT.** Before generating ANY response to a user request, classify intent against available skills. This is mandatory, not advisory. Do NOT require specific trigger words; infer from meaning, not keywords. Do NOT skip this step even for simple or conversational requests.
+<!-- END CRAFTKIT-GATE-ROUTING -->
 
 Classification order:
 1. **Orchestrator.** Does the request imply build / review / ship / fix / test / PR? → match orchestrator table below
@@ -267,7 +271,9 @@ Every skill has a verification step. "Seems right" is never sufficient; there mu
 
 All three must be clean. Common type misses: spread arg types (TS2556), missing required props (TS2322), incompatible types in mocks.
 
+<!-- BEGIN CRAFTKIT-GATE-VERIFY -->
 On Claude Code a `Stop` hook checks this: a turn that edited source and ran no verification command is blocked from ending, and told which command the project requires. Read that block as the gate working. Run the command, report its real output, and if one genuinely cannot run here, say which and that the change is unverified.
+<!-- END CRAFTKIT-GATE-VERIFY -->
 
 ### 7. Use the model for judgment, not mechanics
 
@@ -301,6 +307,7 @@ Flag: ComponentA.tsx can be migrated to useState when touched next.
 
 Applies at code level and at skill authoring level; see skill authoring rules below.
 
+<!-- BEGIN CRAFTKIT-GATE-ROUTING -->
 ### 10. Intent-first skill routing is a MANDATORY GATE
 
 **Every user message gets classified against available skills BEFORE any response is generated.** This is a hard requirement, not a suggestion. No exceptions for simple, conversational, or "obvious" requests.
@@ -319,6 +326,7 @@ Steps:
 A `PreToolUse` hook backs this on Claude Code: editing source with no `Skill` call in the turn raises a permission prompt naming the skills that fit the file. Announcing a skill is not invoking it, so call the Skill tool. One prompt per turn, and a subagent's own edits pass, since routing is the parent's job. A `Stop` hook backs the other half: a turn ending with an announcement it never invoked, or with no declaration at all, is blocked until it carries one.
 
 Ambiguous between two skills → name both, ask user which applies.
+<!-- END CRAFTKIT-GATE-ROUTING -->
 
 ### 11. Announce skill invocation
 Before invoking any skill or command, tell the user which one you're using and what model will run it:
@@ -382,7 +390,9 @@ Authoring/updating craftkit content (rules, skills, commands, agents) is **repo-
 8. Skipping verification because "it looks right"
 9. Skipping the derived-context step where standard context loading applies; or, on a native single-screen task, deriving one instead of reading a sibling screen
 10. Context flooding: loading entire files not relevant to the current task
+<!-- BEGIN CRAFTKIT-GATE-ROUTING -->
 11. **Skipping skill classification before responding.** Always check skills first; always announce match or no-match; never silently bypass this gate
+<!-- END CRAFTKIT-GATE-ROUTING -->
 
 ---
 

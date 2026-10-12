@@ -296,7 +296,10 @@ class CodexGatewayTests(unittest.TestCase):
     def test_codex_rule_bridge_omits_claude_routing(self):
         rules = self.home / '.craftkit/codex/rules'
         rules.mkdir(parents=True)
-        (rules / 'using-agent-skills.md').write_text((REPO / 'rules/using-agent-skills.md').read_text())
+        # As installed: sync.sh drops the CRAFTKIT-GATE-* marker lines while every gate is on.
+        source = (REPO / 'rules/using-agent-skills.md').read_text().splitlines(True)
+        (rules / 'using-agent-skills.md').write_text(''.join(
+            line for line in source if not line.startswith(('<!-- BEGIN CRAFTKIT-GATE-', '<!-- END CRAFTKIT-GATE-'))))
         context = self.hook('SessionStart')['hookSpecificOutput']['additionalContext']
         self.assertIn('native Codex agents', context)
         self.assertNotIn('~/.claude.json', context)
@@ -372,6 +375,35 @@ class CodexGatewayTests(unittest.TestCase):
         self.env['CRAFTKIT_DELEGATE'] = 'on'
         self.env['CRAFTKIT_GATE'] = 'off'
         self.assertEqual(self.patch('c.js'), {})
+
+    def gate_file(self, name, value):
+        state = self.home / '.craftkit-state'
+        state.mkdir(exist_ok=True)
+        (state / ('gate-' + name)).write_text(value + '\n')
+
+    def test_director_config_overrides_delegate_env(self):
+        self.env['CRAFTKIT_DELEGATE'] = ''
+        self.gate_file('director', 'on')
+        self.patch('a.js')
+        self.patch('b.js')
+        self.denied(self.patch('c.js'))
+        self.env['CRAFTKIT_DELEGATE'] = 'on'
+        self.gate_file('director', 'off')
+        self.assertEqual(self.patch('d.js', turn='t2'), {})
+        self.assertEqual(self.patch('e.js', turn='t2'), {})
+        self.assertEqual(self.patch('f.js', turn='t2'), {})
+
+    def test_verify_gate_off_never_blocks(self):
+        self.gate_file('verify', 'off')
+        self.start()
+        self.edit()
+        self.assertEqual(self.hook('Stop'), {})
+        self.assertEqual(self.hook('PreToolUse', tool_name='Bash', tool_input={'command': 'bash check.sh'},
+                                   tool_use_id='v'), {})
+        self.gate_file('verify', 'on')
+        self.start()
+        self.edit('newer\n')
+        self.blocked()
 
     def test_delegate_rename_counts_the_destination_once(self):
         self.assertEqual(self.patch(body='*** Update File: /fixture/a.ts\n*** Move to: /fixture/b.ts\n@@\n-x\n+y\n'), {})
@@ -466,7 +498,8 @@ class CodexGatewayTests(unittest.TestCase):
         lib = self.root / 'render.sh'
         constants = '\n'.join(line for line in source.splitlines() if line.startswith('_CRAFTKIT_INJECTED_'))
         functions = '\n'.join(re.search(r'^' + name + r'\(\) \{\n.*?^\}', source, re.M | re.S).group()
-                              for name in ('craftkit_inject_list', 'craftkit_strip_frontmatter', 'craftkit_render_injected'))
+                              for name in ('craftkit_inject_list', 'craftkit_strip_frontmatter', 'craftkit_strip_gate_blocks',
+                                           'craftkit_render_injected'))
         lib.write_text(constants + '\n' + functions)
         env = dict(self.env, REPO_DIR=str(REPO), RULES_DIR=str(REPO / 'rules'),
                    SKILLS_DIR=str(REPO / 'skills'), PARTIALS_DIR=str(REPO / 'partials'))
