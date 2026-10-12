@@ -2854,6 +2854,21 @@ else
     pass
 fi
 
+# ---------------------------------------------------------------------------
+# 42c. Every spawn instruction asks for a task-specific Agent description. An untyped spawn
+#      otherwise shows as general-purpose in the agent list, so five parallel agents read
+#      as five identical rows and none can be told apart, stopped or messaged by sight.
+# ---------------------------------------------------------------------------
+check "spawn instructions require a task-specific agent description"
+_sl=0
+for _f in rules/using-agent-skills.md hooks/craftkit-routing.js partials/parallel-classifier.md \
+          skills/ideate/SKILL.md skills/research/SKILL.md skills/plan/SKILL.md skills/eval/SKILL.md commands/define.md; do
+    grep -q 'task-specific `description`' "$REPO_DIR/$_f" || { fail "$_f spawns agents without requiring a task-specific \`description\`"; _sl=1; }
+done
+sed -n '/<!-- BEGIN CRAFTKIT-DIRECTOR -->/,/<!-- END CRAFTKIT-DIRECTOR -->/p' "$RULES_DIR/using-agent-skills.md" | grep -q 'task-specific `description`' \
+    || { fail "rule 12a's contract no longer requires a task-specific \`description\`"; _sl=1; }
+[[ $_sl -eq 0 ]] && pass
+
 echo
 if [[ $FAILURES -eq 0 ]]; then
     echo "All checks passed."

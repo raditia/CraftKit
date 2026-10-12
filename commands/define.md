@@ -67,7 +67,7 @@ Run `/plan` against the spec. Writes the `## Task Plan` section of that same fil
 
 ## Phase 3.5: Stress-test (`plan-roaster`, offered)
 
-Offer to spawn the `plan-roaster` agent (`subagent_type: "plan-roaster"`, pass the task table). Recommended for hard-to-reverse work. Fold its weakest-assumption finding back into the plan before handing off. Skip on user decline.
+Offer to spawn the `plan-roaster` agent (`subagent_type: "plan-roaster"`, a task-specific `description` such as `Roast <slug> plan`, pass the task table). Recommended for hard-to-reverse work. Fold its weakest-assumption finding back into the plan before handing off. Skip on user decline.
 
 ---
 

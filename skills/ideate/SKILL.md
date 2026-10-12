@@ -58,7 +58,7 @@ Frame choice is judgment, so match frames to the problem. Adversary + Radical-si
 
 | Tool | Parallel isolated spawn | Support |
 |------|------------------------|---------|
-| Claude Code | `Agent` tool, 5 blocks in one message, `subagent_type: general-purpose` | ✅ full |
+| Claude Code | `Agent` tool, 5 blocks in one message, `subagent_type: general-purpose`, each with a task-specific `description` naming its frame (e.g. `Ideate adversary frame`) | ✅ full |
 | Gemini CLI | shell `&` fan-out + `wait` (5× `gemini -p "<frame prompt>"`), then read outputs | ✅ full |
 | Codex CLI | native isolated subagents, collect each with notifications or the wait tool; queue excess work at the concurrency limit | ✅ full |
 | Cursor | background agent tabs opened together | ⚠️ manual |
