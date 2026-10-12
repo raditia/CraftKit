@@ -289,11 +289,15 @@ process.stdin.on('end', () => {
     save(file, state);
     const platform = detectPlatform(cwd).label;
     const selected = requestedSkill(p.prompt);
-    return output({ hookSpecificOutput: { hookEventName: event, additionalContext:
-      'CraftKit: classify this request against installed skills and workflows before work. ' +
+    // flag: gates.routing / gates.verify. off: omit that group's prompt instructions. remove: never, the groups are user choices.
+    const routing = gateValue('routing') !== 'off' ?
+      'classify this request against installed skills and workflows before work. ' +
       'For a match, activate its native $skill and follow its full SKILL.md. ' +
       'Use parallel-build, parallel-review, or parallel-ship for their respective workflows when native subagents are available; otherwise use the sequential twin. ' +
-      'If none matches, state that briefly. After edits, run the project verification command and report its result.' +
+      'If none matches, state that briefly.' : '';
+    const verify = gateValue('verify') !== 'off' ? 'After edits, run the project verification command and report its result.' : '';
+    return output({ hookSpecificOutput: { hookEventName: event, additionalContext:
+      'CraftKit: ' + [routing, verify].filter(Boolean).join(' ') +
       (platform ? '\nDetected platform: ' + platform + '.' : '') +
       (selected ? '\n\nExplicitly requested CraftKit skills:\n' + selected : '') } });
   }

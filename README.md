@@ -170,10 +170,10 @@ Every sync reads `~/.craftkit-state/config`, one `key=value` per line, so a choi
 ```bash
 printf 'gates.verify=off\nplaywright=on\n' >> ~/.craftkit-state/config
 bash sync.sh                        # applies it; a second run reports no work
-CRAFTKIT_GATES_VERIFY=on bash sync.sh   # one run only: CRAFTKIT_<KEY> (dots as _) beats the file
+CRAFTKIT_GATES_VERIFY=on bash sync.sh   # CRAFTKIT_<KEY> (dots as _) beats the file until the next sync
 ```
 
-An env var beats the file for that run's install and is never saved: the `~/.craftkit-state/gate-*` files the hooks read at runtime follow the config file alone. `CRAFTKIT_DASHBOARD` is the exception and saves its value, as it always has; `~/.craftkit-state/dashboard` mirrors `dashboard=on` so a rollback to v1.58.0 keeps the dashboard. An unknown key or a value other than on/off warns once and keeps the prior setting. Gate prose lives in `<!-- BEGIN CRAFTKIT-GATE-<GROUP> -->` blocks that every tool's install strips when the group is off. A gate's Codex hook stays registered (one script serves every event) and reads the choice at runtime, so a change needs no new `/hooks` trust. A hook matcher you narrowed is saved when its gate goes off and put back when it returns.
+An env var beats the file for the rendered install and the `~/.craftkit-state/gate-*` files the hooks read at runtime. It leaves the config file unchanged; the next sync without the override restores the saved choices. `CRAFTKIT_DASHBOARD` is the exception and saves its value, as it always has; `~/.craftkit-state/dashboard` mirrors `dashboard=on` so a rollback to v1.58.0 keeps the dashboard. An unknown key or a value other than on/off warns once and keeps the prior setting. Gate prose lives in `<!-- BEGIN CRAFTKIT-GATE-<GROUP> -->` blocks that every tool's install strips when the group is off. A gate's Codex hook stays registered (one script serves every event) and reads the choice at runtime, so a change needs no new `/hooks` trust. A hook matcher you narrowed is saved when its gate goes off and put back when it returns.
 
 **Contributing to craftkit itself:** see **[CONTRIBUTING.md](CONTRIBUTING.md)**. Short version:
 there is no application build (the product is instructions); behavioral fixtures run through `check.sh`, so `check.sh` is the gate and a second

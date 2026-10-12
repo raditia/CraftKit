@@ -13,16 +13,20 @@ description: Skill routing, model selection, core operating behaviors, and failu
 <!-- BEGIN CRAFTKIT-CODEX -->
 ## Codex runtime
 
+<!-- BEGIN CRAFTKIT-GATE-ROUTING -->
 Classify task intent against installed skill descriptions before work. Announce the selected
 skill and read its native `SKILL.md`; Codex does not require a Claude `Skill` tool call. If no
 skill matches, state that briefly and proceed directly. User instructions take precedence.
+<!-- END CRAFTKIT-GATE-ROUTING -->
 Use `rtk` for supported shell commands and run project verification from the project root.
 
+<!-- BEGIN CRAFTKIT-GATE-ROUTING -->
 Build, review, and ship use `parallel-build`, `parallel-review`, and `parallel-ship` when native
 spawning is available; otherwise use `build`, `review`, and `ship`. Broken behavior uses `fix`;
 planning uses `define`; test authoring uses the platform's test skill; PR descriptions use
 `pr-message`. Use the actual project's architecture and verification commands. Generic Node
 or tooling repositories do not inherit React/EVPMR merely from a `package.json`.
+<!-- END CRAFTKIT-GATE-ROUTING -->
 
 Use native Codex agents and respect the available concurrency. Select the installed custom
 profile, or read its TOML and pass `developer_instructions` with the task in isolated context.

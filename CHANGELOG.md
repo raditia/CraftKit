@@ -29,7 +29,7 @@ env vars that a `git pull` sync never sees, so customizing craftkit meant forkin
   off removes only that, and a failed install waits for `--configure` instead of retrying every sync. `humanizer=off` removes the skill and its link on every sync, when craftkit installed them.
 - `CRAFTKIT_DASHBOARD` stays as an alias that saves its value, and the old
   `~/.craftkit-state/dashboard` file migrates into the config and stays as a mirror, so a
-  rollback to v1.58.0 keeps the dashboard. Other env overrides apply to one run and are never saved.
+  rollback to v1.58.0 keeps the dashboard. Other env overrides leave the config unchanged and apply to the install and runtime gates until the next sync.
 - Every spawn instruction (rule 12a, the routing hook's director line, the parallel classifier,
   `/ideate`, `/research`, `/define`, `/plan`, `/eval`) asks for a task-specific Agent
   `description`, so the agent list shows the work instead of `general-purpose`.

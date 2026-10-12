@@ -2877,7 +2877,7 @@ fi
 # ---------------------------------------------------------------------------
 # Gate vocabulary per group: the words an installed rule may only carry while that group
 # is on. A rule edit that mentions a gate outside its CRAFTKIT-GATE-* markers fails here.
-_TG_VOCAB_routing='MANDATORY GATE|BLOCKING REQUIREMENT|gate-skill-first|gate-announce-honored|never silently bypass this gate|skill-first gate'
+_TG_VOCAB_routing='MANDATORY GATE|BLOCKING REQUIREMENT|gate-skill-first|gate-announce-honored|never silently bypass this gate|skill-first gate|Classify task intent'
 _TG_VOCAB_verify='`Stop` hook checks this|Stop hook checks project verification|gate-verify-on-stop'
 _TG_VOCAB_director='Director mode|ListAgents|TaskStop|Keep quick, coupled work|gate-delegate'
 _TG_HOOKS_routing='gate-skill-first.js gate-announce-honored.js'
@@ -3070,8 +3070,14 @@ NPMEOF
         [[ -x "$x/bin/playwright-cli" && -f "$x/p/.agents/skills/playwright-cli/SKILL.md" ]] || _no "playwright=on did not install the CLI and its skill: $out"
         grep -qx package "$x/p/.craftkit-state/playwright-owned" 2>/dev/null || _no "playwright=on did not record that craftkit owns the package"
         _ex "$x/p" "$x/bin" playwright=on | grep -q 'extras: (up to date)' || _no "a repeat playwright=on sync reported work"
+        touch "$x/p/npm-fail"
+        out="$(_ex "$x/p" "$x/bin" playwright=off)"
+        grep -q 'could not npm uninstall' <<<"$out" || _no "a failed uninstall printed no warning"
+        grep -qx package "$x/p/.craftkit-state/playwright-owned" 2>/dev/null || _no "a failed uninstall discarded package ownership"
+        rm -f "$x/p/npm-fail"
         _ex "$x/p" "$x/bin" playwright=off >/dev/null
         [[ -e "$x/bin/playwright-cli" || -e "$x/p/.agents/skills/playwright-cli" ]] && _no "playwright=off left the craftkit-installed CLI or skill"
+        [[ -e "$x/p/.craftkit-state/playwright-owned" ]] && _no "a successful uninstall retained package ownership"
         _ex "$x/p" "$x/bin" playwright=off | grep -q 'extras: (up to date)' || _no "a repeat playwright=off sync reported work"
         # TC-009: a CLI the user installed first is never uninstalled.
         cp "$x/pwcli" "$x/bin/playwright-cli"; chmod +x "$x/bin/playwright-cli"; rm -f "$x/q.log"
@@ -3157,14 +3163,20 @@ NPMEOF
         printf 'dashboard=off\n' > "$x/c/.craftkit-state/config"
         ( export HOME="$x/c" CRAFTKIT_DASHBOARD=1; . "$lib"; craftkit_config_resolve --after-checklist ) >/dev/null 2>&1
         grep -qx 'dashboard=off' "$x/c/.craftkit-state/config" || _no "the resolve after --configure saved CRAFTKIT_DASHBOARD over the checklist answer"
-        # E2: a one-run override reaches this run's install, never the gate files later runs read.
+        # E2: runtime gates match the rendered install; the next sync restores the saved config.
         printf 'gates.verify=off\n' > "$x/c/.craftkit-state/config"
         out="$(export HOME="$x/c" CRAFTKIT_GATES_DIRECTOR=on CRAFTKIT_GATES_VERIFY=on; . "$lib"; craftkit_config_resolve; echo "$CK_gates_director $CK_gates_verify")"
         [[ "$out" == "on on" ]] || _no "CRAFTKIT_GATES_* did not override this run: $out"
+        [[ "$(cat "$x/c/.craftkit-state/gate-director" 2>/dev/null)" == on && "$(cat "$x/c/.craftkit-state/gate-verify" 2>/dev/null)" == on ]] \
+            || _no "a CRAFTKIT_GATES_* override did not reach runtime gate state"
+        [[ "$(cat "$x/c/.craftkit-state/config")" == gates.verify=off ]] || _no "a gate env override changed the saved config"
+        _rv >/dev/null
         [[ ! -e "$x/c/.craftkit-state/gate-director" && "$(cat "$x/c/.craftkit-state/gate-verify" 2>/dev/null)" == off ]] \
-            || _no "a CRAFTKIT_GATES_* override was saved into ~/.craftkit-state/gate-*, so it outlives its run"
+            || _no "a sync without env overrides did not restore the saved gate choices"
+        printf 'gates.verify=on\n' > "$x/c/.craftkit-state/config"
         out="$(export HOME="$x/c" CRAFTKIT_GATES_VERIFY=off; . "$lib"; craftkit_config_resolve; echo ${CK_gates_verify:-unset})"
         [[ "$out" == off ]] || _no "CRAFTKIT_GATES_VERIFY=off did not override the config"
+        [[ "$(cat "$x/c/.craftkit-state/gate-verify" 2>/dev/null)" == off ]] || _no "CRAFTKIT_GATES_VERIFY=off did not disable the runtime gate"
         # TC-016: one warning per bad line, prior setting kept; gate files mirror explicit values only.
         printf 'gates.verify=off\ngates.verify=maybe\nfoo=on\n# a comment\n\n' > "$x/c/.craftkit-state/config"
         out="$(_rv)"
@@ -3224,7 +3236,7 @@ else
         'extras%sync.sh%s|rm -rf "\$hz_dir" \&\& ||' \
         'extras%sync.sh%s|"skill "\* ]] \&\& _pw_skill_ok "$name" "$skills"|"skill "* ]]|' \
         'extras%sync.sh%s| \&\& -f "$hz_owned" ]]| ]]|' \
-        'config%sync.sh%s/^    _ck_save_state$/    :/; s/^    CRAFTKIT_DASHBOARD_ON=0$/    _ck_save_state; CRAFTKIT_DASHBOARD_ON=0/'; do
+        'config%sync.sh%s/^    _ck_save_state$/    :/; s/^    # Overrides affect/    _ck_save_state; # Overrides affect/'; do
         _mp="${_m%%%*}"; _mr="${_m#*%}"; _mf="${_mr%%%*}"; _me="${_mr#*%}"
         rm -rf "$_tmx/r"; mkdir -p "$_tmx/r/scripts"
         cp -R "$REPO_DIR"/{sync.sh,install.sh,adapters,hooks,rules,skills,commands,agents,partials} "$_tmx/r/"

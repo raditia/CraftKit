@@ -405,6 +405,35 @@ class CodexGatewayTests(unittest.TestCase):
         self.edit('newer\n')
         self.blocked()
 
+    def test_prompt_context_respects_gate_states(self):
+        for routing in ('on', 'off'):
+            for verify in ('on', 'off'):
+                with self.subTest(routing=routing, verify=verify):
+                    self.gate_file('routing', routing)
+                    self.gate_file('verify', verify)
+                    context = self.hook('UserPromptSubmit')['hookSpecificOutput']['additionalContext']
+                    self.assertEqual('classify this request' in context, routing == 'on')
+                    self.assertEqual('After edits, run' in context, verify == 'on')
+
+    def test_default_prompt_context_is_unchanged(self):
+        expected = (
+            'CraftKit: classify this request against installed skills and workflows before work. '
+            'For a match, activate its native $skill and follow its full SKILL.md. '
+            'Use parallel-build, parallel-review, or parallel-ship for their respective workflows when native subagents are available; otherwise use the sequential twin. '
+            'If none matches, state that briefly. After edits, run the project verification command and report its result.'
+        )
+        self.assertEqual(self.hook('UserPromptSubmit')['hookSpecificOutput']['additionalContext'], expected)
+
+    def test_explicit_skill_pointer_survives_disabled_routing(self):
+        self.gate_file('routing', 'off')
+        self.gate_file('verify', 'off')
+        skill = self.home / '.agents/skills/fixture-command/SKILL.md'
+        skill.parent.mkdir(parents=True)
+        skill.write_text('fixture command')
+        context = self.hook('UserPromptSubmit', prompt='$fixture-command')['hookSpecificOutput']['additionalContext']
+        self.assertIn(str(skill), context)
+        self.assertNotIn('classify this request', context)
+
     def test_delegate_rename_counts_the_destination_once(self):
         self.assertEqual(self.patch(body='*** Update File: /fixture/a.ts\n*** Move to: /fixture/b.ts\n@@\n-x\n+y\n'), {})
         self.assertEqual(self.patch('b.ts'), {})

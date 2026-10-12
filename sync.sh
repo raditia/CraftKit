@@ -94,8 +94,7 @@ craftkit_config_set() {
     mv "$tmp" "$CRAFTKIT_CONFIG"
 }
 
-# What a sync leaves on disk for later runs follows the saved config alone, so a one-run
-# CRAFTKIT_<KEY> override never outlives its run.
+# Runtime gate choices match the rendered install until the next sync resolves them again.
 _ck_save_state() {
     local k var
     # Hooks read gate choices at runtime from one file per gate, present only when the
@@ -151,8 +150,7 @@ craftkit_config_resolve() {
             printf -v "$(_ck_var "$k")" '%s' "$v"
         done < "$CRAFTKIT_CONFIG"
     fi
-    _ck_save_state
-    # Per-run overrides, not saved: CRAFTKIT_HUMANIZER, CRAFTKIT_GATES_VERIFY, and so on.
+    # Overrides affect the install and runtime gates, but leave the saved config unchanged.
     for e in "${_CK_KEYS[@]}"; do
         key="${e%%\%*}"
         [[ "$key" == dashboard ]] && continue
@@ -165,6 +163,7 @@ craftkit_config_resolve() {
             _ck_warn "$env=$(printf '%q' "${!env}") not understood (use on or off); ignored"
         fi
     done
+    _ck_save_state
     CRAFTKIT_DASHBOARD_ON=0
     [[ "$CK_dashboard" == on ]] && CRAFTKIT_DASHBOARD_ON=1
     return 0
@@ -839,7 +838,8 @@ sync_playwright() {
             if npm uninstall -g @playwright/cli >/dev/null 2>&1; then
                 echo "    - @playwright/cli"
             else
-                echo "    ! could not npm uninstall -g @playwright/cli; remove it by hand"
+                echo "    ! could not npm uninstall -g @playwright/cli; the next sync will retry"
+                return 0
             fi
         fi
         rm -f "$owned"
