@@ -3141,7 +3141,7 @@ NPMEOF
         grep -qx 'dashboard=on' "$x/c/.craftkit-state/config" || _no "the legacy dashboard file was not migrated into the config"
         # E3: the legacy file mirrors dashboard=on, so a rollback to v1.58.0 keeps the dashboard.
         [[ -f "$x/c/.craftkit-state/dashboard" ]] || _no "dashboard=on left no ~/.craftkit-state/dashboard, so a rollback to v1.58.0 loses the dashboard"
-        [[ "$(stat -f %Lp "$x/c/.craftkit-state/config" 2>/dev/null || stat -c %a "$x/c/.craftkit-state/config")" == 600 ]] \
+        [[ "$(stat -c %a "$x/c/.craftkit-state/config" 2>/dev/null || stat -f %Lp "$x/c/.craftkit-state/config")" == 600 ]] \
             || _no "craftkit_config_set left the config readable by others"
         ls "$x/c/.craftkit-state" | grep -q '^config\.' && _no "craftkit_config_set left a temp file beside the config"
         # TC-002: the saved choice holds for a sync that sees an empty environment.
@@ -3316,6 +3316,16 @@ if [[ -n "$_gb_out" ]]; then
 else
     pass
 fi
+
+# ---------------------------------------------------------------------------
+# 42f. File-mode probes try GNU stat first. On Linux `stat -f` is filesystem status: it
+#      prints filesystem info and exits 1, so a BSD-first `stat -f %Lp F || stat -c %a F`
+#      captures that text plus the mode and never equals it. v1.59.0 shipped one and only
+#      the Ubuntu CI leg caught it.
+# ---------------------------------------------------------------------------
+check "file-mode probes try GNU stat before BSD stat"
+_sf="$(grep -nE '\$\(stat -f' "$REPO_DIR/check.sh" "$REPO_DIR/sync.sh" "$REPO_DIR"/adapters/*.sh "$REPO_DIR/install.sh" | grep -v '_sf=' || true)"
+if [[ -n "$_sf" ]]; then fail "BSD-first stat probe, which breaks on Linux: $_sf"; else pass; fi
 
 echo
 if [[ $FAILURES -eq 0 ]]; then
