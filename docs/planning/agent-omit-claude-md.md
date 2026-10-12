@@ -1,6 +1,6 @@
 ---
 slug: agent-omit-claude-md
-status: active
+status: shipped
 created: 2026-09-30
 ---
 
