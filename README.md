@@ -1,6 +1,7 @@
 # craftkit `v1.59.0`
 
 [![npm](https://img.shields.io/npm/v/@raditia/craftkit)](https://www.npmjs.com/package/@raditia/craftkit)
+[![npm downloads](https://img.shields.io/npm/dw/@raditia/craftkit)](https://www.npmjs.com/package/@raditia/craftkit)
 [![Content integrity](https://github.com/raditia/CraftKit/actions/workflows/check.yml/badge.svg)](https://github.com/raditia/CraftKit/actions/workflows/check.yml)
 [![Release](https://img.shields.io/github/v/release/raditia/CraftKit)](https://github.com/raditia/CraftKit/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
