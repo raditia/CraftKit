@@ -22,6 +22,8 @@ const save = (file, state) => {
   try { fs.writeFileSync(file, JSON.stringify(state), { mode: 0o600 }); } catch (_) { /* fail open */ }
 };
 const load = file => { try { return JSON.parse(read(file)); } catch (_) { return null; } };
+// sync.sh writes one file per gate the config sets explicitly; absent means unset.
+const gateValue = name => read(path.join(os.homedir(), '.craftkit-state', 'gate-' + name)).trim();
 
 function rules(cwd) {
   const dir = path.join(os.homedir(), '.craftkit', 'codex', 'rules');
@@ -207,7 +209,9 @@ function patchFiles(text, cwd) {
 }
 
 function delegate(p, file, cwd) {
-  if (process.env.CRAFTKIT_DELEGATE !== 'on' || p.agent_id || !p.turn_id) return null;
+  // flag: gates.director. off or unset: no delegate gate, unless unset with CRAFTKIT_DELEGATE=on. remove: never, it is a user choice.
+  const director = gateValue('director');
+  if ((director ? director !== 'on' : process.env.CRAFTKIT_DELEGATE !== 'on') || p.agent_id || !p.turn_id) return null;
   const ti = p.tool_input || {};
   const text = String(ti.command || ti.cmd || '');
   const log = file + '.delegate';
@@ -238,7 +242,7 @@ function delegate(p, file, cwd) {
     'This is source file ' + files.size + ' edited this turn (' + mine[0] + '). Director mode wants work ' +
     'touching 3+ files delegated: spawn_agent with a contract that includes the verify command, then wait_agent and ' +
     'integrate its result. Re-plan the work as a delegation instead of editing directly. ' +
-    'Unset CRAFTKIT_DELEGATE or set it to off to disable this gate.' } };
+    'Set gates.director=off in ~/.craftkit-state/config, or unset CRAFTKIT_DELEGATE when it is not set there, to disable this gate.' } };
 }
 
 function clear(file) {
@@ -285,15 +289,24 @@ process.stdin.on('end', () => {
     save(file, state);
     const platform = detectPlatform(cwd).label;
     const selected = requestedSkill(p.prompt);
-    return output({ hookSpecificOutput: { hookEventName: event, additionalContext:
-      'CraftKit: classify this request against installed skills and workflows before work. ' +
+    // flag: gates.routing / gates.verify. off: omit that group's prompt instructions. remove: never, the groups are user choices.
+    const routing = gateValue('routing') !== 'off' ?
+      'classify this request against installed skills and workflows before work. ' +
       'For a match, activate its native $skill and follow its full SKILL.md. ' +
       'Use parallel-build, parallel-review, or parallel-ship for their respective workflows when native subagents are available; otherwise use the sequential twin. ' +
-      'If none matches, state that briefly. After edits, run the project verification command and report its result.' +
+      'If none matches, state that briefly.' : '';
+    const verify = gateValue('verify') !== 'off' ? 'After edits, run the project verification command and report its result.' : '';
+    return output({ hookSpecificOutput: { hookEventName: event, additionalContext:
+      'CraftKit: ' + [routing, verify].filter(Boolean).join(' ') +
       (platform ? '\nDetected platform: ' + platform + '.' : '') +
       (selected ? '\n\nExplicitly requested CraftKit skills:\n' + selected : '') } });
   }
   if (!state) return output({});
+  // flag: gates.verify. off: no verification bookkeeping and no Stop block. remove: never, it is a user choice.
+  if (gateValue('verify') === 'off') {
+    if (event === 'Stop') clear(file);
+    return output({});
+  }
   if (event === 'PreToolUse' || event === 'PostToolUse') {
     const ti = p.tool_input || {};
     if (p.tool_name === 'Bash') {

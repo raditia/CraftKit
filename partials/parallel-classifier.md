@@ -9,8 +9,8 @@ Used by `/parallel-review`, `/parallel-ship`, `/parallel-build`. Run this classi
 
 ### Runtime execution
 
-Use the host's native agent tools. On Claude Code, select the named `subagent_type` and put
-every selected agent's `Agent` block, plus the background test run, in **one** message, never in
+Use the host's native agent tools. On Claude Code, select the named `subagent_type`, give each a task-specific `description`
+(3-5 words, e.g. `Review EVPMR layers`), and put every selected agent's `Agent` block, plus the background test run, in **one** message, never in
 sequential waves: the agents are independent, so splitting them across turns serializes the slow
 ones behind the fast ones and is a defect. The harness wakes the main thread when all of them
 come to rest. On Codex,

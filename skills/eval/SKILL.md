@@ -36,7 +36,7 @@ Gate results come from the run being scored: the `PHASE 1` block of a `/parallel
 
 ## Step 2: Spawn the judge
 
-One `eval-judge` agent, with this user message:
+One `eval-judge` agent, with a task-specific `description` (e.g. `Score parallel-build run`) and this user message:
 
 ```
 RUN: <parallel-build | parallel-ship | standalone>

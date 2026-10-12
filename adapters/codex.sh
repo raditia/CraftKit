@@ -23,7 +23,10 @@ _rebuild_codex_agents_md() {
 
 Use the installed CraftKit skills when their descriptions match the task. Invoke one explicitly with `$skill-name` when useful. Build, review, and ship workflows are skills too. Read only relevant skills.
 Use native Codex subagents for parallel workflows. CraftKit agent profiles are installed in the Codex agents directory. If the spawn tool cannot select a custom profile, read its TOML and pass its developer_instructions explicitly with an isolated context. Respect available concurrency and collect every result. Use the sequential twin only when spawning is unavailable: `parallel-build` to `build`, `parallel-review` to `review`, or `parallel-ship` to `ship`.
-The Codex SessionStart hook loads the full applicable rule bodies. Follow those instructions and the activated skill or command body. The Stop hook checks project verification after edits.
+EOF
+        # flag: gates.verify. off: the guide stops naming a Stop-hook check that no longer runs. remove: never, it is a user choice.
+        echo "The Codex SessionStart hook loads the full applicable rule bodies. Follow those instructions and the activated skill or command body.$([[ "${CK_gates_verify:-}" == off ]] || echo " The Stop hook checks project verification after edits.")"
+        cat <<'EOF'
 
 Working agreements:
 - Ground findings and edits in files or command output checked during this task.

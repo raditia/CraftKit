@@ -62,7 +62,7 @@ Update the `## Task Plan` section of the resolved intent file (leave Spec and De
 Print the same table to the user, then:
 ```
 PLAN: <feature>  ·  <N> tasks, critical path <M> deep, <K> parallelizable
-→ Stress-test before building? Spawn plan-roaster (Agent: subagent_type "plan-roaster") on this plan. (recommended for hard-to-reverse work)
+→ Stress-test before building? Spawn plan-roaster (Agent: subagent_type "plan-roaster", a task-specific `description` such as `Roast <slug> plan`) on this plan. (recommended for hard-to-reverse work)
 → Then: /parallel-build to execute.
 ```
 

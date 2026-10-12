@@ -37,6 +37,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          # check 42 diffs a no-config render against the v1.58.0 tag; a shallow clone reports CANNOT-VERIFY.
+          fetch-depth: 0
 
       # Named so a failure reads as "wrong bash" rather than "mysterious syntax error".
       - name: Report interpreter

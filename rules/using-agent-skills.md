@@ -13,16 +13,20 @@ description: Skill routing, model selection, core operating behaviors, and failu
 <!-- BEGIN CRAFTKIT-CODEX -->
 ## Codex runtime
 
+<!-- BEGIN CRAFTKIT-GATE-ROUTING -->
 Classify task intent against installed skill descriptions before work. Announce the selected
 skill and read its native `SKILL.md`; Codex does not require a Claude `Skill` tool call. If no
 skill matches, state that briefly and proceed directly. User instructions take precedence.
+<!-- END CRAFTKIT-GATE-ROUTING -->
 Use `rtk` for supported shell commands and run project verification from the project root.
 
+<!-- BEGIN CRAFTKIT-GATE-ROUTING -->
 Build, review, and ship use `parallel-build`, `parallel-review`, and `parallel-ship` when native
 spawning is available; otherwise use `build`, `review`, and `ship`. Broken behavior uses `fix`;
 planning uses `define`; test authoring uses the platform's test skill; PR descriptions use
 `pr-message`. Use the actual project's architecture and verification commands. Generic Node
 or tooling repositories do not inherit React/EVPMR merely from a `package.json`.
+<!-- END CRAFTKIT-GATE-ROUTING -->
 
 Use native Codex agents and respect the available concurrency. Select the installed custom
 profile, or read its TOML and pass `developer_instructions` with the task in isolated context.
@@ -34,7 +38,9 @@ investigation, review, or testing goes to a read-only subagent; parallel edits u
 worktrees. Give each delegated unit a goal, output, and verify command, then review its result
 before integrating; the human decides anything hard to reverse.
 
+<!-- BEGIN CRAFTKIT-GATE-DIRECTOR -->
 Keep quick, coupled work (up to two files, about 2 minutes) direct; delegate when useful.
+<!-- END CRAFTKIT-GATE-DIRECTOR -->
 Steer via `send_message`/`followup_task` and `interrupt_agent`, or `send_input`/`close_agent`
 when available. Collect results with `wait_agent` before replying. Reuse verification for
 an unchanged tree; report "not verified" if it is missing or failing.
@@ -64,7 +70,9 @@ Output compression (caveman) is delivered by the caveman plugin's hooks, not a s
 A cold specialist or cross-review panelist follows its assigned read-only prompt and skips skill
 routing; the host handles synthesis and verification.
 
+<!-- BEGIN CRAFTKIT-GATE-ROUTING -->
 **Intent-first routing is a BLOCKING REQUIREMENT.** Before generating ANY response to a user request, classify intent against available skills. This is mandatory, not advisory. Do NOT require specific trigger words; infer from meaning, not keywords. Do NOT skip this step even for simple or conversational requests.
+<!-- END CRAFTKIT-GATE-ROUTING -->
 
 Classification order:
 1. **Orchestrator.** Does the request imply build / review / ship / fix / test / PR? → match orchestrator table below
@@ -267,7 +275,9 @@ Every skill has a verification step. "Seems right" is never sufficient; there mu
 
 All three must be clean. Common type misses: spread arg types (TS2556), missing required props (TS2322), incompatible types in mocks.
 
+<!-- BEGIN CRAFTKIT-GATE-VERIFY -->
 On Claude Code a `Stop` hook checks this: a turn that edited source and ran no verification command is blocked from ending, and told which command the project requires. Read that block as the gate working. Run the command, report its real output, and if one genuinely cannot run here, say which and that the change is unverified.
+<!-- END CRAFTKIT-GATE-VERIFY -->
 
 ### 7. Use the model for judgment, not mechanics
 
@@ -301,6 +311,7 @@ Flag: ComponentA.tsx can be migrated to useState when touched next.
 
 Applies at code level and at skill authoring level; see skill authoring rules below.
 
+<!-- BEGIN CRAFTKIT-GATE-ROUTING -->
 ### 10. Intent-first skill routing is a MANDATORY GATE
 
 **Every user message gets classified against available skills BEFORE any response is generated.** This is a hard requirement, not a suggestion. No exceptions for simple, conversational, or "obvious" requests.
@@ -319,6 +330,7 @@ Steps:
 A `PreToolUse` hook backs this on Claude Code: editing source with no `Skill` call in the turn raises a permission prompt naming the skills that fit the file. Announcing a skill is not invoking it, so call the Skill tool. One prompt per turn, and a subagent's own edits pass, since routing is the parent's job. A `Stop` hook backs the other half: a turn ending with an announcement it never invoked, or with no declaration at all, is blocked until it carries one.
 
 Ambiguous between two skills → name both, ask user which applies.
+<!-- END CRAFTKIT-GATE-ROUTING -->
 
 ### 11. Announce skill invocation
 Before invoking any skill or command, tell the user which one you're using and what model will run it:
@@ -354,7 +366,7 @@ Supersedes rule 12's "Main task" row: the main session thinks, routes, delegates
 
 State the call in one line ("doing this directly: 2 files" / "delegating: full test suite, ~5 min"). The user's explicit "do it here" or "in background" overrides. After spawning, end the turn with a one-line status so the user can keep talking.
 
-- **Contract.** Rule 12's four fields plus the project's verify command; the agent runs it in the foreground and reports that command's actual result only after it finishes. Agents do not reliably inherit CLAUDE.md, so the contract always carries it. It ends with: "Your last message is the final report; stop after sending it and wait for no reply."
+- **Contract.** Rule 12's four fields plus the project's verify command; the agent runs it in the foreground and reports that command's actual result only after it finishes. Agents do not reliably inherit CLAUDE.md, so the contract always carries it. It ends with: "Your last message is the final report; stop after sending it and wait for no reply." Label the spawn so the agent list shows the work, not `general-purpose`: a named craftkit `subagent_type` where one fits, a `name` when the Agent tool offers one, and always a task-specific `description` (3-5 words, `<verb> <object>`, e.g. `Review EVPMR layers`).
 - **Isolation.** One editing agent in the main checkout; every concurrent editor gets `isolation: "worktree"`; read-only agents run freely.
 - **Refinement.** A tweak that keeps the agent's work valid goes to it via `SendMessage`; a pivot that invalidates it means `TaskStop`, then respawn with the merged contract. Name which in one line.
 - **Lifecycle.** A finished agent can sit idle instead of exiting, and an idle agent reads as work in progress. So at every turn boundary (each user prompt and each completion notification) run `ListAgents` and act on every agent you spawned: result received → `TaskStop` it; still listed past its estimate with no notification → `SendMessage` asking for its status or final report, and `TaskStop` it once the report lands or when it is still silent at the next boundary (its work reports "not verified"; respawn if work remains); visibly progressing → leave it. The end-of-turn status names every agent still running.
@@ -382,7 +394,9 @@ Authoring/updating craftkit content (rules, skills, commands, agents) is **repo-
 8. Skipping verification because "it looks right"
 9. Skipping the derived-context step where standard context loading applies; or, on a native single-screen task, deriving one instead of reading a sibling screen
 10. Context flooding: loading entire files not relevant to the current task
+<!-- BEGIN CRAFTKIT-GATE-ROUTING -->
 11. **Skipping skill classification before responding.** Always check skills first; always announce match or no-match; never silently bypass this gate
+<!-- END CRAFTKIT-GATE-ROUTING -->
 
 ---
 

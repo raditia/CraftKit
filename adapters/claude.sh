@@ -529,8 +529,66 @@ if not on: drop_saved()
 PYEOF
 }
 
+# The gate group a hook script belongs to, empty for hooks no group gates. A group set off in
+# the config leaves _CRAFTKIT_HOOKS, so _claude_prune_hooks unregisters it. Director stays on
+# when unset; that is Claude's default.
+_claude_gate_group() {
+    case "$1" in
+        gate-skill-first.js|gate-announce-honored.js) echo routing ;;
+        gate-delegate.js) echo director ;;
+        gate-verify-on-stop.js) echo verify ;;
+    esac
+}
+
+# The matcher a hook is registered with in settings.json, empty when it is not registered.
+_claude_hook_matcher() {
+    [[ -f "$CLAUDE_SETTINGS" ]] || return 0
+    python3 - "$CLAUDE_SETTINGS" "$1" << 'PYEOF'
+import json, sys
+try:
+    hooks = json.load(open(sys.argv[1])).get('hooks') or {}
+except Exception:
+    sys.exit(0)
+for groups in hooks.values():
+    for g in groups:
+        if any(sys.argv[2] in h.get('command', '') for h in g.get('hooks', [])):
+            print(g.get('matcher', ''))
+            sys.exit(0)
+PYEOF
+}
+
+# flag: gates.routing / gates.director / gates.verify (resolved in sync.sh). off: the group's rows leave the table and prune unregisters them. remove: never, the groups are user choices.
+# A matcher the user narrowed is saved when its gate goes off and put back when it returns,
+# so turning a gate off and on again never widens it behind their back.
+_claude_filter_gate_hooks() {
+    local saved="$STATE_DIR/claude-hook-matchers" kept=() h script g var row shipped m
+    for h in "${_CRAFTKIT_HOOKS[@]}"; do
+        script="${h%%\%*}"; row="$h"
+        g="$(_claude_gate_group "$script")"
+        var="CK_gates_$g"
+        if [[ -n "$g" && "${!var:-}" == off ]]; then
+            shipped="$(echo "$h" | cut -d'%' -f3)"
+            m="$(_claude_hook_matcher "$script")"
+            if [[ -n "$m" && "$m" != "$shipped" ]] && ! printf '%s\n' "${_CRAFTKIT_RETIRED_MATCHERS[@]}" | grep -qxF "$script%$m"; then
+                grep -q "^$script%" "$saved" 2>/dev/null || echo "$script%$m" >> "$saved"
+            fi
+            continue
+        fi
+        m=""
+        [[ -f "$saved" ]] && m="$(awk -F'%' -v s="$script" '$1 == s { sub(/^[^%]*%/, ""); print; exit }' "$saved")"
+        if [[ -n "$m" && -z "$(_claude_hook_matcher "$script")" ]]; then
+            row="$(echo "$h" | awk -F'%' -v OFS='%' -v m="$m" '{ $3 = m; print }')"
+            echo "    $script keeps its custom matcher $m (restored after its gate came back on)"
+            awk -F'%' -v s="$script" '$1 != s' "$saved" > "$saved.tmp" && mv "$saved.tmp" "$saved"
+        fi
+        kept+=("$row")
+    done
+    _CRAFTKIT_HOOKS=("${kept[@]}")
+}
+
 install_claude_craftkit_hook() {
     mkdir -p "$CLAUDE_HOOKS_DIR"
+    _claude_filter_gate_hooks
     # flag: CRAFTKIT_DASHBOARD (resolved in sync.sh). off: the table stays as before and prune drops the dashboard rows. remove: if the dashboard ever becomes default-on.
     if [[ "${CRAFTKIT_DASHBOARD_ON:-0}" == 1 ]] && ! printf '%s\n' "${_CRAFTKIT_HOOKS[@]}" | grep -q '^craftkit-agent-log.js%'; then
         _CRAFTKIT_HOOKS+=("${_CRAFTKIT_DASHBOARD_HOOKS[@]}")

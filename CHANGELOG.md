@@ -7,6 +7,38 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.59.0 — 2026-10-12
+
+### Config toggles: pick extras and gate groups once
+
+Every optional tool and every enforcement gate reached every teammate, and the only escape was
+env vars that a `git pull` sync never sees, so customizing craftkit meant forking it.
+
+- `~/.craftkit-state/config` holds `key=value` choices every sync honors: `humanizer`,
+  `playwright` and `dashboard`, plus the gate groups `gates.routing`, `gates.director` and
+  `gates.verify`. Precedence is env var, then file, then default. With no file, installed output
+  is unchanged. Bad lines warn once and keep the prior setting.
+- A fresh `install.sh` on a terminal shows a checklist; `bash sync.sh --configure` shows it
+  again and syncs. Without a terminal nothing prompts.
+- A gate group off unregisters its Claude hooks, drops its rule prose from all four tools
+  (new `CRAFTKIT-GATE-ROUTING/VERIFY/DIRECTOR` blocks, plus the existing `CRAFTKIT-DIRECTOR`), and
+  the hooks read it at runtime: routing off leaves only the tier, director and local-skills lines,
+  director off drops the director line, and Codex skips its verify or delegate gate. An explicit
+  `gates.director` beats `CRAFTKIT_DELEGATE` on Codex. A narrowed matcher survives off and on.
+- `playwright=on` installs `@playwright/cli` and its agent skill, recording what craftkit added;
+  off removes only that, and a failed install waits for `--configure` instead of retrying every sync. `humanizer=off` removes the skill and its link on every sync, when craftkit installed them.
+- `CRAFTKIT_DASHBOARD` stays as an alias that saves its value, and the old
+  `~/.craftkit-state/dashboard` file migrates into the config and stays as a mirror, so a
+  rollback to v1.58.0 keeps the dashboard. Other env overrides leave the config unchanged and apply to the install and runtime gates until the next sync.
+- Every spawn instruction (rule 12a, the routing hook's director line, the parallel classifier,
+  `/ideate`, `/research`, `/define`, `/plan`, `/eval`) asks for a task-specific Agent
+  `description`, so the agent list shows the work instead of `general-purpose`.
+- `check.sh` checks 42 to 42e: each toggle off, on again, the no-config baseline diffed against
+  v1.58.0 and the extras with stubbed npm; a mutation pass that removes each strip, teardown and
+  ownership guard and expects 42 to fail; the spawn-label requirement; gate vocabulary outside its
+  markers, hook emit text included; and balanced gate markers, which the strip now refuses
+  to process otherwise.
+
 ## v1.58.0 — 2026-10-07
 
 ### Director mode reaps finished and stalled subagents

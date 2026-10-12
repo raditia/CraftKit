@@ -1,4 +1,4 @@
-# craftkit `v1.58.0`
+# craftkit `v1.59.0`
 
 [![npm](https://img.shields.io/npm/v/@raditia/craftkit)](https://www.npmjs.com/package/@raditia/craftkit)
 [![Content integrity](https://github.com/raditia/CraftKit/actions/workflows/check.yml/badge.svg)](https://github.com/raditia/CraftKit/actions/workflows/check.yml)
@@ -15,6 +15,7 @@ Site: [raditia.github.io/CraftKit](https://raditia.github.io/CraftKit/)
 
 - [Why bother?](#why-bother) · token savings with RTK + Caveman + Ponytail
 - [Install](#install)
+  - [Configuration](#configuration-extras-and-gate-groups) · pick extras and gate groups once, kept across updates
 - [How it works](#how-it-works)
 - [Using the workflows](#using-the-workflows)
   - [Just say what you want](#just-say-what-you-want)
@@ -152,6 +153,27 @@ bash install.sh
 **Requirements:** bash 3.2+, curl. macOS ships bash 3.2 by default.
 
 **Upgrading from ≤ v1.23.0:** the next sync uninstalls the retired Copilot and Crush integrations automatically. Copilot `@` agents it wrote into your other repos may be committed there, so sync prints those paths and leaves them for you.
+
+### Configuration: extras and gate groups
+
+Every sync reads `~/.craftkit-state/config`, one `key=value` per line, so a choice made once holds through every `git pull` and npm upgrade. With no file, nothing changes from the defaults below. A fresh `bash install.sh` (no `~/.craftkit-state` yet) on a terminal shows the checklist, and an upgrade never prompts; `bash sync.sh --configure` shows it again and then syncs. Without a terminal (npm postinstall, post-merge, CI) nothing prompts and the saved file or the defaults apply.
+
+| Key | Default | On | Off |
+|-----|---------|----|-----|
+| `humanizer` | on | Installs the humanizer skill on an explicit install | Removes `~/.agents/skills/humanizer` and the `~/.claude/skills/humanizer` link pointing at it, only when craftkit installed them; `/pr-message` and `/docs` report it skipped |
+| `playwright` | off | `npm i -g @playwright/cli@latest`, then `playwright-cli install --skills=agents -g`. Needs npm and Node 20+, and network. Ownership is the skill folders that appear under `~/.agents/skills`, where the CLI is assumed to write them. A failed install warns, the sync completes, and later syncs skip it until `bash sync.sh --configure` or `bash install.sh` retries | Removes the skill folders craftkit's install added, and the npm package only if craftkit installed it |
+| `dashboard` | off | The [agent dashboard](#agent-dashboard-opt-in) | Removes it, logs included |
+| `gates.routing` | on | Skill-first and announce gates, the routing rule prose, the full routing hook | Unregisters `gate-skill-first.js` and `gate-announce-honored.js`, drops their rule prose, and the routing hook injects only the model-tier and local-skills lines, plus the director line while `gates.director` is on |
+| `gates.director` | unset: Claude on, Codex off | Delegate gate and rule 12a on Claude and Codex | Unregisters `gate-delegate.js`, drops rule 12a and the hook's director line everywhere, and keeps the Codex gate off |
+| `gates.verify` | on | Stop-hook verify gate on Claude and Codex | Unregisters `gate-verify-on-stop.js`, skips the Codex Stop check, drops their rule prose |
+
+```bash
+printf 'gates.verify=off\nplaywright=on\n' >> ~/.craftkit-state/config
+bash sync.sh                        # applies it; a second run reports no work
+CRAFTKIT_GATES_VERIFY=on bash sync.sh   # CRAFTKIT_<KEY> (dots as _) beats the file until the next sync
+```
+
+An env var beats the file for the rendered install and the `~/.craftkit-state/gate-*` files the hooks read at runtime. It leaves the config file unchanged; the next sync without the override restores the saved choices. `CRAFTKIT_DASHBOARD` is the exception and saves its value, as it always has; `~/.craftkit-state/dashboard` mirrors `dashboard=on` so a rollback to v1.58.0 keeps the dashboard. An unknown key or a value other than on/off warns once and keeps the prior setting. Gate prose lives in `<!-- BEGIN CRAFTKIT-GATE-<GROUP> -->` blocks that every tool's install strips when the group is off. A gate's Codex hook stays registered (one script serves every event) and reads the choice at runtime, so a change needs no new `/hooks` trust. A hook matcher you narrowed is saved when its gate goes off and put back when it returns.
 
 **Contributing to craftkit itself:** see **[CONTRIBUTING.md](CONTRIBUTING.md)**. Short version:
 there is no application build (the product is instructions); behavioral fixtures run through `check.sh`, so `check.sh` is the gate and a second
@@ -428,8 +450,9 @@ How the gates behave:
 
 | Escape hatch | Turns off |
 |--------------|-----------|
+| `gates.routing` / `gates.director` / `gates.verify` = `off` in `~/.craftkit-state/config` | That group's hooks and rule prose, for good. See [Configuration](#configuration-extras-and-gate-groups) |
 | `CRAFTKIT_GATE=off` | The four edit/Stop gates and platform-rules injection |
-| `CRAFTKIT_DELEGATE=off` | `gate-delegate.js` only. Unattended `claude -p` runs already skip it; set this for any other automation that cannot answer an ask. On Codex the gate is off unless `CRAFTKIT_DELEGATE=on` |
+| `CRAFTKIT_DELEGATE=off` | `gate-delegate.js` only. Unattended `claude -p` runs already skip it; set this for any other automation that cannot answer an ask. On Codex the gate is off unless `CRAFTKIT_DELEGATE=on`; an explicit `gates.director` in the config wins over it |
 | `CRAFTKIT_READ_GATE=off` | `gate-read-size.js` |
 | `CRAFTKIT_READ_CAP=off` | `craftkit-read-cap.js` |
 | `CRAFTKIT_ALLOW_DOWNGRADE=1` | The sync downgrade guard |
@@ -480,7 +503,7 @@ CLAUDE CODE AGENT TREE  ·  agentic-skills  ·  a91c4f  ·  live  ·  pinned
 ```
 
 ```bash
-CRAFTKIT_DASHBOARD=1 bash sync.sh   # turn on; the choice persists across later syncs
+CRAFTKIT_DASHBOARD=1 bash sync.sh   # turn on; saved as dashboard=on in ~/.craftkit-state/config
 ccdash                              # open it, following the newest session; esc or q closes it
 ccdash 2                            # open pinned to session 2 (one window per session: ccdash 1, ccdash 2, ...)
 CRAFTKIT_DASHBOARD=0 bash sync.sh   # turn off; removes everything it installed

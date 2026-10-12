@@ -21,9 +21,15 @@ else
     echo "    git hooks skipped (not a git repo)"
 fi
 
-# sync.sh handles tool installation (rtk, caveman) + skill sync
+# sync.sh handles tool installation (rtk, humanizer) + skill sync
 # AGENTIC_SETUP=1 tells sync.sh this is an explicit install, so run ensure_tools
-AGENTIC_SETUP=1 "$REPO_DIR/sync.sh"
+# Only a fresh install on a terminal shows the config checklist (no state dir means craftkit
+# never synced here); an upgrade, npm postinstall and CI sync the saved config or the defaults.
+if [[ -t 0 && ! -d "$HOME/.craftkit-state" ]]; then
+    AGENTIC_SETUP=1 "$REPO_DIR/sync.sh" --configure
+else
+    AGENTIC_SETUP=1 "$REPO_DIR/sync.sh"
+fi
 
 echo ""
 if [[ -d "$REPO_DIR/.git" ]]; then
