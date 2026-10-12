@@ -1,6 +1,6 @@
 ---
 slug: context-source
-status: active
+status: shipped
 created: 2026-10-05
 ---
 

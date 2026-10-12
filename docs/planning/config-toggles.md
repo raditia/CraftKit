@@ -1,6 +1,6 @@
 ---
 slug: config-toggles
-status: active
+status: shipped
 created: 2026-10-12
 ---
 

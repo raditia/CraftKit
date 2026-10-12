@@ -1,6 +1,6 @@
 ---
 slug: director-mode
-status: active
+status: shipped
 created: 2026-10-06
 ---
 
