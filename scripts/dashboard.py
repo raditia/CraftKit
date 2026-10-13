@@ -99,15 +99,59 @@ def mtime(path):
     try: return os.path.getmtime(path)
     except OSError: return 0
 
+CODEX_SESSIONS = os.path.join(os.environ.get("CODEX_HOME", os.path.expanduser("~/.codex")), "sessions")
+CODEX_TASKS = {}
+
+def codex_completion(aid, now):
+    task = CODEX_TASKS.setdefault(aid, {"path": None, "retry": 0, "stamp": None, "end": None})
+    if not task["path"]:
+        if now < task["retry"]: return None
+        task["retry"] = now + 5
+        hits = glob.glob(f"{CODEX_SESSIONS}/**/rollout-*-{glob.escape(aid)}.jsonl", recursive=True)
+        if len(hits) != 1: return None
+        task["path"] = hits[0]
+    try:
+        st = os.stat(task["path"])
+        stamp = (st.st_ino, st.st_size, st.st_mtime_ns)
+        if stamp == task["stamp"]: return task["end"]
+        with open(task["path"], "rb") as f:
+            # Only explicit terminal events count; unreadable or unfamiliar transcripts keep the box.
+            start = max(0, st.st_size - 65536)
+            f.seek(start)
+            if start: f.readline()
+            chunk = f.read(65536)
+        task["end"] = None
+        for line in chunk[:chunk.rfind(b"\n") + 1].splitlines():
+            try: e = json.loads(line)
+            except (ValueError, RecursionError): continue
+            if not isinstance(e, dict) or e.get("type") != "event_msg": continue
+            payload = e.get("payload")
+            if not isinstance(payload, dict): continue
+            if payload.get("type") == "task_started": task["end"] = None
+            elif payload.get("type") == "task_complete":
+                end = payload.get("completed_at")
+                if isinstance(end, (int, float)): task["end"] = end
+        task["stamp"] = stamp
+        return task["end"]
+    except OSError:
+        return None
+
 def live_agents(sid, now, count_only=False):
-    """The logger keeps one file per running subagent and deletes it on SubagentStop, so a box exists exactly while its file does."""
+    """Live hook markers, excluding Codex tasks whose transcripts confirm completion."""
     d = f"{DIR}/{sid}.agents"
     try: names = os.listdir(d)
     except OSError: return {}
     out = {}
+    log = f"{DIR}/{sid}.jsonl"
+    codex = meta(log)[1] == "Codex"
     for n in names:
         m = mtime(f"{d}/{n}")
         if now - m >= HIDE: continue
+        if codex:
+            end = codex_completion(n, now)
+            a = load(log)["agents"].get(n)
+            if a: a["end"] = end
+            if end is not None: continue
         if count_only: out[n] = None; continue
         try:
             with open(f"{d}/{n}") as f: out[n] = (clean(f.read(40)) or "agent", m)

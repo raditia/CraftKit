@@ -330,6 +330,46 @@ class CodexGatewayTests(unittest.TestCase):
         self.assertNotIn('old guide', content)
         self.assertIn('parallel', content)
 
+    def test_dashboard_recovers_missing_codex_subagent_stop(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('dashboard', REPO / 'scripts/dashboard.py')
+        dashboard = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(dashboard)
+        dashboard.DIR = str(self.home / 'events')
+        dashboard.CODEX_SESSIONS = str(self.home / 'sessions')
+        events = Path(dashboard.DIR)
+        events.mkdir()
+        log = events / 'parent.jsonl'
+        log.write_text(json.dumps(dict(ts=time.time(), src='codex', e='SubagentStart',
+                                       aid='child', type='worker')) + '\n')
+        agents = events / 'parent.agents'
+        agents.mkdir()
+        (agents / 'child').write_text('worker')
+        sessions = Path(dashboard.CODEX_SESSIONS) / '2026' / '10' / '13'
+        sessions.mkdir(parents=True)
+        transcript = sessions / 'rollout-date-child.jsonl'
+        def record(kind):
+            return json.dumps(dict(type='event_msg', payload=dict(type=kind, completed_at=time.time()))) + '\n'
+        self.assertIn('child', dashboard.live_agents('parent', time.time()))
+        dashboard.CODEX_TASKS.clear()
+        transcript.write_text(record('task_started'))
+        self.assertIn('child', dashboard.live_agents('parent', time.time()))
+        with transcript.open('a') as f:
+            f.write(record('task_complete'))
+        self.assertNotIn('child', dashboard.live_agents('parent', time.time(), count_only=True))
+        self.assertTrue(dashboard.load(str(log))['agents']['child']['end'])
+        with transcript.open('a') as f:
+            f.write(record('task_started'))
+        self.assertIn('child', dashboard.live_agents('parent', time.time()))
+        transcript.unlink()
+        self.assertIn('child', dashboard.live_agents('parent', time.time()))
+        transcript.write_text('malformed\n')
+        self.assertIn('child', dashboard.live_agents('parent', time.time()))
+        log.write_text(log.read_text().replace('codex', 'claude'))
+        dashboard.META.clear()
+        transcript.write_text(record('task_complete'))
+        self.assertIn('child', dashboard.live_agents('parent', time.time()))
+
     def test_dashboard_session_end_timeout_is_capped_and_migrated(self):
         config = self.home / '.codex/hooks.json'
         script = 'source adapters/claude.sh\nsource adapters/codex.sh\ninstall_codex_dashboard_hook'
