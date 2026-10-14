@@ -2,7 +2,27 @@
 
 [Back to README](../../README.md) · [Detailed guide](../guide.md)
 
-All documentation and site diagrams use **Diagram Design**, with its default editorial style selected for this repository. Each `.html` file is the editable source; its `.svg` sibling is the diagram-only export used in Markdown and the site. SVGs embed their styles and use system font fallbacks without network requests. HTML sources request Instrument Serif, Geist and Geist Mono through Google Fonts and fall back to system fonts when offline.
+All documentation and site diagrams use **Diagram Design** with CraftKit's color palette and Diagram Design's editorial typography. Each `.html` file is the editable source; its `.svg` sibling is the diagram-only export used in Markdown and the site. SVGs embed their styles and use system font fallbacks without network requests. HTML sources request Instrument Serif, Geist and Geist Mono through Google Fonts and fall back to system fonts when offline.
+
+## CraftKit palette
+
+Colors come from [the site stylesheet](../../site/src/styles.css) and [site design notes](../../site/README.md#design). Typography stays Instrument Serif, Geist and Geist Mono; this update matches the brand colors. The site's Inter typography is unchanged.
+
+### Semantic roles
+
+| Role | Color | Use |
+|---|---|---|
+| `paper` | `#FAFBFC` | Page background and arrow-label masks |
+| `ink` | `#0C1118` | Primary text and node outlines |
+| `muted` | `#63717B` | Arrows, labels and captions on paper |
+| `soft` | `#5C6973` | Subtitles; derived from muted to preserve AA contrast on tinted nodes |
+| `rule-solid` | `#E0E5E8` | Decorative footer dividers |
+| `accent` | `#287D78` | One or two focal nodes |
+| `accent-tint` | `rgba(40,125,120,0.08)` | Focal node fill |
+| `link` | `#287D78` | External-call markers |
+| `node-surface` | `#FFFFFF` | Regular node fill |
+
+The palette is local to these figures; it does not change the installed plugin's shared style guide or other projects. Body and technical labels retain the font families and weights in their HTML sources; exported SVGs disclose system fallbacks above.
 
 ## Inventory and fidelity notes
 
@@ -48,8 +68,8 @@ Their replacements were authored from `commands/parallel-review.md`, `commands/p
 
 ## Maintain a diagram
 
-1. Read the relevant command, rule or adapter before changing its diagram. Update the HTML through Diagram Design; keep the default palette, meaningful branches and accessible title/description.
-2. Run Diagram Design's `scripts/self_check.py` on the HTML. From the plugin root, also run `scripts/verify-geometry.py` and `scripts/lint-skin.py`.
+1. Read the relevant command, rule or adapter before changing its diagram. Update the HTML through Diagram Design; use the CraftKit palette above and preserve meaningful branches and accessible title/description.
+2. Run Diagram Design's `scripts/self_check.py` on the HTML. From the plugin root, also run `scripts/verify-geometry.py`. Use `scripts/lint-skin.py`'s `lint_text` with the semantic palette above rather than its installed default palette; verify text contrast on both paper and tinted nodes.
 3. Export the HTML through `scripts/export_svg.py <source.html> <output.svg> --system-fonts`. Edit the HTML source first; regenerate its SVG sibling.
 4. Inspect the rendered HTML and SVG. Check that small screens scroll each diagram locally, labels stay inside the canvas and connectors do not cross unrelated nodes.
 5. For a distribution change, update `site/src/repo.js` and the shared sync figure. For a workflow change, update its guide text and site explanations. Regenerate `site/public/og.png` after a hero change.
