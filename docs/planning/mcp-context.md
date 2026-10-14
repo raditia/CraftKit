@@ -166,35 +166,11 @@ created: 2026-09-24
 
 ### Runtime map (source for T10)
 
-The diagram names every component. Beyond it: Cursor, Gemini and Codex have no Gateway, so they get the routing rule as text, advisory not enforced. The Gateway does not see MCP calls today; a PreToolUse Guard on Lark write tools is the candidate confirm-enforcer for v1.47.
+This is the historical proposal, not the current tool-support map. See the [current runtime map](../guide.md#at-runtime-gateway-orchestrators-state). The diagram names every component. Beyond it: Cursor, Gemini and Codex have no Gateway, so they get the routing rule as text, advisory not enforced. The Gateway does not see MCP calls today; a PreToolUse Guard on Lark write tools is the candidate confirm-enforcer for v1.47.
 
-```mermaid
-flowchart TD
-    subgraph INSTALL["Install time"]
-        D["Distributor<br/>sync.sh + adapters/"]
-    end
-    subgraph GW["CraftKit Gateway · hooks/ · Claude Code only"]
-        R["Router<br/>craftkit-routing.js<br/>UserPromptSubmit"]
-        L["Loader<br/>craftkit-platform-rules.js<br/>SessionStart"]
-        G["Guards<br/>gate-skill-first · gate-read-size · read-cap<br/>PreToolUse"]
-        X["Exit gates<br/>gate-verify-on-stop · gate-announce-honored<br/>Stop"]
-    end
-    O["Orchestrators · commands/*.md<br/>/define · /parallel-build · /build · /team-build<br/>/parallel-review · /parallel-ship · /fix · /ship<br/>Phase 0: resolve slug once + approved test cases, pass down"]
-    S["Skills · skills/*<br/>/spec · /test-cases · /plan · /fe-test · /eval · context skills"]
-    A["Agents · agents/*.md<br/>cold reviewers · Claude only"]
-    M["MCP servers via the host's client<br/>Figma · Lark<br/>(external-sources)"]
-    ST[("Repo state, per feature<br/>docs/planning/&lt;slug&gt;.md: intent + sources<br/>docs/planning/&lt;slug&gt;.tests.md: test cases")]
-    V["Published view<br/>Excel export"]
+![The original proposal connected a Claude-only Gateway to workers, MCP and repository state.](../diagrams/historical-runtime.svg)
 
-    D -- sync --> GW
-    R -- routes each prompt --> O
-    O --> S
-    O --> A
-    S --> M
-    S <--> ST
-    A -. reads .-> ST
-    S --> V
-```
+[Diagram source](../diagrams/historical-runtime.html).
 
 ## Decisions
 _(pointers appended by /adr)_

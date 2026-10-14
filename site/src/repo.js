@@ -2,7 +2,7 @@ export const { version: VERSION, repo: REPO } = __CRAFTKIT__;
 export const INSTALL = `npm install -g ${__CRAFTKIT__.name}`;
 
 // One display name per sync.sh ADAPTERS entry, its first word being the adapter id; check.sh holds
-// the two together. The hero illustration draws these four, so a new tool also needs a new sync-engine.png.
+// the two together. The hero illustration draws these four, so a new tool also needs a redraw of docs/diagrams/sync-engine.html and its SVG export.
 export const TOOLS = ['Claude Code', 'Cursor', 'Gemini CLI', 'Codex CLI'];
 export const TOOL_LIST = new Intl.ListFormat('en', { type: 'conjunction' }).format(TOOLS);
 

@@ -179,7 +179,7 @@ Adapted from [mattpocock/skills](https://github.com/mattpocock/skills) `writing-
 | Agent removed / renamed | Remove row / update name + all `subagent_type:` references in commands |
 | Skill discovery tree changed | Update the tree in `using-agent-skills.md` AND README |
 | README heading, linked file, or command the site uses renamed | Update its `readme()` / `repoFile()` / `command:` in `site/src` (check 41 fails otherwise) |
-| Adapter added / removed | Update `TOOLS` in `site/src/repo.js` and regenerate `site/src/assets/sync-engine.png` (check 41 fails on `TOOLS`) |
+| Adapter added / removed | Update `TOOLS` in `site/src/repo.js` and redraw `docs/diagrams/sync-engine.html` with Diagram Design and export its SVG (check 41 fails on `TOOLS`) |
 | A workflow the site describes changes behavior | Update its copy in `site/src/App.jsx` or `Walkthrough.jsx` by hand; no check can read prose |
 | Version bumped | Update `# craftkit \`vX.Y.Z\`` header + add a `## vX.Y.Z — date` section atop `CHANGELOG.md` (GH Action creates the release on push) |
 

@@ -22,13 +22,20 @@ The build prerenders the page into `dist/index.html` (`scripts/prerender.mjs`) a
 
 Write every link to the repo through the helpers in `src/repo.js`; check 41 fails on a hardcoded `github.com` URL because the gate can't see it.
 
-`public/og.png` is the social preview card, a 1200x630 capture of the hero. After a hero change, regenerate it with `npm run preview` running:
+`public/og.png` is a 1200×630 capture of the updated hero in a compact layout. After a hero change, rebuild the site and run `npm run preview`. Capture it at 1200×630 with these temporary preview styles (do not add them to the application stylesheet):
 
-```sh
-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars --force-device-scale-factor=1 \
-  --window-size=1200,760 --screenshot=/tmp/og.png http://localhost:4173/CraftKit/
-sips --cropToHeightWidth 630 1200 --cropOffset 78 0 /tmp/og.png --out public/og.png
+```css
+.header { height: 44px; }
+.hero { padding-top: 8px; }
+.hero-copy .badge, .hero-actions, .hero-copy .copy-wrap { display: none; }
+.hero-copy h1 { font-size: 40px; letter-spacing: -1.5px; margin: 12px 0; }
+.hero-description { font-size: 14px; }
+.sync-figure { width: 680px; margin: 12px auto 0; }
+.sync-figure img { min-width: 0; width: 680px; }
+.workflow-section { display: none; }
 ```
+
+Wait for the bundled fonts and images to load before capture. The full distribution diagram must fit inside the preview, including all four tool destinations.
 
 There is no `robots.txt` or sitemap here: crawlers read those only at the domain root, which is the `raditia.github.io` user site.
 
@@ -37,6 +44,6 @@ There is no `robots.txt` or sitemap here: crawlers read those only at the domain
 - Clean cool-white background `#FAFBFC`, muted turquoise `#287D78` accents, neutral gray dividers. No warm paper tones, glow, or concentric rings.
 - Minimal: plain eyebrow text, fine dividers, soft palette. Inter is bundled; Phosphor supplies icons.
 - "AI-gnostic" is a tagline under the wordmark, not a product rename.
-- `src/assets/sync-engine.png` is an AI-generated concept illustration that draws the four tools. Adding a tool means regenerating it.
+- The hero and walkthrough reuse the Diagram Design SVGs in `../docs/diagrams/`. Their editable HTML sources, style choice and redraw notes are listed in [the diagram inventory](../docs/diagrams/README.md). Adding a tool means updating the distribution diagram and exporting it again.
 - The walkthrough follows the stage order in `commands/parallel-build.md` (context, scaffold and implement, fast gates, classifier, parallel read-only reviews alongside test authoring, synthesize and fix, run tests, handoff), with natural-language example requests rather than slash-command snippets.
 - Product facts come from this repo. No invented adoption metrics or guaranteed savings.

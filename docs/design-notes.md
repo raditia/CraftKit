@@ -14,10 +14,10 @@ A hook dropped from `_CRAFTKIT_HOOKS` is uninstalled on the next sync, both the 
 
 | Helper | Shared by | What it holds | Why one copy |
 |---|---|---|---|
-| [`craftkit-drift.js`](hooks/craftkit-drift.js) | every staleness question | one `git diff --name-only <baseline> -- <paths>` per question: honors `.gitattributes` clean filters, covers staged and worktree states together, reports a rename instead of dying on the old path. Returns clean, drifted, or cannot-verify | cannot-verify is never clean, because this repo squash-merges and a context doc's baseline commit leaves reachable history the moment its branch lands |
-| [`craftkit-filesize.js`](hooks/craftkit-filesize.js) | both read-path hooks | `BIG_LINES` and the line probe | two copies of "how big is big" would let one path truncate a file the other waved through, surfacing only as a read budget nobody could explain |
-| [`craftkit-transcript.js`](hooks/craftkit-transcript.js) | all three gates | the scanner that reads the current turn | the gates can never disagree about where the turn started |
-| [`craftkit-platform.js`](hooks/craftkit-platform.js) | routing hook, platform-rules hook | platform detection | two copies drifting would route the prompt to one platform's skills while loading another's rules |
+| [`craftkit-drift.js`](../hooks/craftkit-drift.js) | every staleness question | one `git diff --name-only <baseline> -- <paths>` per question: honors `.gitattributes` clean filters, covers staged and worktree states together, reports a rename instead of dying on the old path. Returns clean, drifted, or cannot-verify | cannot-verify is never clean, because this repo squash-merges and a context doc's baseline commit leaves reachable history the moment its branch lands |
+| [`craftkit-filesize.js`](../hooks/craftkit-filesize.js) | both read-path hooks | `BIG_LINES` and the line probe | two copies of "how big is big" would let one path truncate a file the other waved through, surfacing only as a read budget nobody could explain |
+| [`craftkit-transcript.js`](../hooks/craftkit-transcript.js) | all three gates | the scanner that reads the current turn | the gates can never disagree about where the turn started |
+| [`craftkit-platform.js`](../hooks/craftkit-platform.js) | routing hook, platform-rules hook | platform detection | two copies drifting would route the prompt to one platform's skills while loading another's rules |
 
 - **Escape hatch:** `CRAFTKIT_GATE=off` disables all three gates and the platform-rules injection for the session.
 
@@ -48,24 +48,9 @@ The plan gate is load-bearing, not decoration. An earlier cut derived the window
 The other three tools reach the same self-updating property by their own means; only the Claude
 path is entitlement-driven:
 
-```mermaid
-flowchart TD
-    T["tier needed<br/>cheapest · everyday · escalate"] --> V{"which tool?"}
-    V --> CC["Claude Code"]
-    V --> G["Gemini CLI"]
-    V --> X["Codex CLI"]
-    V --> CU["Cursor"]
-    CC --> CC1["resolve from account entitlements<br/>every prompt"]
-    G --> G1["the CLI's own aliases<br/>pro · flash · flash-lite<br/>entitlement-aware, like Claude's"]
-    X --> X1["name no model at all<br/>server-refreshed catalog picks the default<br/>tier rides model_reasoning_effort"]
-    CU --> CU1["no committable selector exists<br/>picker or account default chain"]
-    CC1 --> OK["self-updating, nothing to edit"]
-    G1 --> OK
-    X1 --> OK
-    CU1 --> NO["not repo-configurable<br/>that row is a note, not a setting"]
-    OK --> GATE["check.sh 17: build fails on a<br/>versioned id from any of the four vendors"]
-    NO --> GATE
-```
+![Each tool has its own self-updating model selector; Cursor remains picker-controlled.](diagrams/tool-models.svg)
+
+[Diagram source](diagrams/tool-models.html).
 
 That last node earns its place: check 17 was Claude-scoped at first, which is exactly how `codex-mini-latest` sat in the table for six months after OpenAI retired it on **2026-02-12**. Working sources, and the independent re-verification pass behind them, are in `docs/research/self-updating-model-ids.md`.
 

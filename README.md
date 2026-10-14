@@ -6,425 +6,123 @@
 [![Release](https://img.shields.io/github/v/release/raditia/CraftKit)](https://github.com/raditia/CraftKit/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-One repo of AI coding skills that auto-syncs across **Claude Code**, **Cursor**, **Gemini CLI**, and **Codex CLI**. Pull once and every AI tool gets the same workflows, rules, and commands.
+**One install. A shared way to build across Claude Code, Cursor, Gemini CLI and Codex CLI.**
 
-Site: [raditia.github.io/CraftKit](https://raditia.github.io/CraftKit/)
+CraftKit distributes coding rules, skills, workflows and specialist agents from one repository. Git installs sync updates automatically when you pull.
 
----
+[Website](https://raditia.github.io/CraftKit/) · [Detailed guide](docs/guide.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
-## Table of contents
+## Start here
 
-- [Why bother?](#why-bother) · token savings with RTK + Caveman + Ponytail
-- [Install](#install)
-  - [Configuration](#configuration-extras-and-gate-groups) · pick extras and gate groups once, kept across updates
-- [How it works](#how-it-works)
-- [Using the workflows](#using-the-workflows)
-  - [Just say what you want](#just-say-what-you-want)
-  - [Enforcement gates](#enforcement-gates-hooks-that-refuse) · the hooks that stop an unrouted edit
-  - [Agent dashboard](#agent-dashboard-opt-in) · live view of running agents, opt-in
-  - [Dynamic workflows](#dynamic-workflows-default) · `/parallel-review`, `/parallel-ship`, `/parallel-build`
-  - [How the classifier picks agents](#how-the-classifier-picks-agents)
-  - [Sequential fallback](#sequential-fallback) · `/review`, `/ship`, `/build`
-  - [Planning pipeline: /define](#planning-pipeline-define-before-you-build) · `/interview` → `/spec` → `/test-cases` → `/plan`
-  - [Experimental: /team-build](#experimental-team-build-agent-teams) · agent-teams build
-  - [Cross-model: /cross-review](#cross-model-cross-review) · Claude and Codex review, then check each other
-  - [Fix, tests, and PR message](#fix-tests-and-pr-message)
-  - [Grill, research, and handoff](#grill-research-and-handoff) · stress-test plans, delegate reading, hand off sessions
-  - [Scoring a run: /eval](#scoring-a-run-eval) · weighted correctness %, judged and ledgered
-- [Skills reference](#skills-reference)
-- [Agents reference](#agents-reference)
-- [Architecture (EVPMR)](#architecture-evpmr)
-- [Model routing](#model-routing)
-- [Managing skills](#managing-skills)
-- [Tooling](#tooling) · RTK, Caveman, Ponytail, Karpathy Guidelines
-- [Design notes](docs/design-notes.md) · why things work the way they do
-- [Changelog](CHANGELOG.md)
-
----
-
-## Why bother?
-
-AI coding sessions are expensive. Two things drain tokens fast: **verbose shell output** the AI has to read, and **verbose AI responses** you have to read. This repo ships two compression layers that cut both.
-
-### RTK: compresses what the AI reads (shell output)
-
-Shell commands like `git diff` and `jest` dump noise before the signal. RTK filters it out before it reaches the AI.
-
-```
-── WITHOUT RTK (38 tokens) ──────────────────────────────────────────
-On branch feature/checkout-flow
-Your branch is ahead of 'origin/feature/checkout-flow' by 3 commits.
-  (use "git push" to publish your local commits)
-
-Changes not staged for commit:
-  (use "git add <file>..." to update staging area)
-
-        modified:   src/checkout/ViewCheckout.tsx
-        modified:   src/checkout/PresenterCheckout.ts
-
-Untracked files:
-        src/checkout/__tests__/ViewCheckout.test.tsx
-
-── WITH RTK (6 tokens) ──────────────────────────────────────────────
-M src/checkout/ViewCheckout.tsx
-M src/checkout/PresenterCheckout.ts
-? src/checkout/__tests__/ViewCheckout.test.tsx
-```
-
-**~84% reduction** on a single call. Across a full session (`git diff`, `tsc`, `jest`, `lint`) it compounds to **60-90% savings on AI input tokens**.
-
-### Caveman: compresses what you read (AI output)
-
-The caveman plugin strips filler, hedging, and pleasantries from every response. Same findings, fewer words.
-
-```
-── WITHOUT CAVEMAN (~65 tokens) ─────────────────────────────────────
-Sure! After carefully reviewing the code, I can see that there's
-actually an issue in the ViewCheckout component. It looks like
-there's a useState hook being used directly in the View layer,
-which basically violates the EVPMR architecture pattern. You'll
-want to move that state logic into the Presenter layer instead.
-
-── WITH CAVEMAN (~18 tokens) ────────────────────────────────────────
-[ERROR] ViewCheckout.tsx:14: useState in View layer.
-  Why: violates EVPMR.
-  Fix: move to PresenterCheckout.ts.
-```
-
-**~72% reduction** per response. Full review sessions with reasoning and multi-step output: **40-60% output savings**.
-
-### Ponytail: compresses what the AI generates (code output)
-
-The `ponytail` decision ladder enforces YAGNI before any code is written. Before generating code, the AI stops at the first rung that holds: does this need to exist? is it in stdlib? is it a native feature? is an installed dep enough? can it be one line? Only then: minimal code. Deliberate shortcuts are marked with `ponytail:` comments naming their ceiling and upgrade path.
-
-```
-── WITHOUT PONYTAIL ─────────────────────────────────────────────────
-// custom retry logic with exponential backoff + jitter
-class RetryManager {
-  private attempts = 0;
-  async execute<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> { ... }
-  private calcDelay(attempt: number): number { ... }
-}
-
-── WITH PONYTAIL ────────────────────────────────────────────────────
-// ponytail: no retry lib, inline for now. ceiling: >3 callers → extract.
-const withRetry = (fn, n = 3) => fn().catch(e => n > 0 ? withRetry(fn, n-1) : Promise.reject(e));
-```
-
-The six-tag **ponytail rubric** (`delete:` `stdlib:` `native:` `yagni:` `shrink:` `narrate:`) lives in `karpathy-guidelines`, so code is written against the same list review scores it by. Every code-writing turn checks its own diff before reporting done, and findings are applied as deletions at the named `file:line`, never as rewrites.
-
-**80-94% code reduction** on over-engineered solutions. Pairs with `/ponytail-review` (a diff), `/ponytail-audit` (the whole repo) and `/ponytail-debt` (deferred shortcuts and removable flags).
-
-`flag-safety` applies the same marker idea to feature flags: with the flag OFF, behavior must match the pre-change code across code paths, persisted state, API contracts and analytics. Each flag branch carries a `flag:` comment with the key, the OFF behavior and when to remove it. `/build` and `/parallel-build` check it while writing; the review agents and `/parallel-ship` check it again.
-
-### Combined impact
-
-| Layer | Compresses | Typical savings |
-|-------|------------|-----------------|
-| RTK | Shell output → AI input | 60-90% on dev operations |
-| Caveman | AI output → your reading | 40-60% on prose responses |
-| Ponytail | Code generated | 80-94% on over-engineered solutions |
-| **Together** | All directions | **50-80% total session cost** |
-
-Typical feature review session without compression: ~40,000 tokens. With RTK + Caveman + Ponytail: ~8,000-20,000 tokens.
-
----
+| I want to… | Go to |
+|---|---|
+| Get CraftKit running | [Install](#install) |
+| Build, review or ship a change | [Using the workflows](#using-the-workflows) |
+| Understand the system | [How it works](#how-it-works) |
+| Find a specific skill or agent | [Skills](#skills-reference) · [Agents](#agents-reference) |
+| Configure gates or optional tools | [Configuration](#configuration-extras-and-gate-groups) |
+| Maintain CraftKit itself | [Managing skills](#managing-skills) |
 
 ## Install
 
-**Option A, npm** (version pinning + rollback):
+**npm**, with version pinning and rollback:
+
 ```bash
 npm install -g @raditia/craftkit
 ```
 
-Pin a version or roll back:
-```bash
-npm install -g @raditia/craftkit@1.5.0
-```
+**Git**, with automatic sync on pull:
 
-**Option B, git** (auto-update on `git pull`):
 ```bash
 git clone git@github.com:raditia/craftkit.git ~/craftkit
 cd ~/craftkit
 bash install.sh
 ```
 
-`install.sh` wires up the post-merge and post-rewrite hooks and runs the first sync. Merge and rebase pulls then add, update, and remove installed skills automatically. Existing git installations should rerun `bash install.sh` once to add the rebase hook.
-
-**Requirements:** bash 3.2+, curl. macOS ships bash 3.2 by default.
-
-**Upgrading from ≤ v1.23.0:** the next sync uninstalls the retired Copilot and Crush integrations automatically. Copilot `@` agents it wrote into your other repos may be committed there, so sync prints those paths and leaves them for you.
+Requires Bash 3.2+ and curl, plus npm or Git for your chosen method. In Codex, review and trust the installed hooks with `/hooks`.
 
 ### Configuration: extras and gate groups
 
-Every sync reads `~/.craftkit-state/config`, one `key=value` per line, so a choice made once holds through every `git pull` and npm upgrade. With no file, nothing changes from the defaults below. A fresh `bash install.sh` (no `~/.craftkit-state` yet) on a terminal shows the checklist, and an upgrade never prompts; `bash sync.sh --configure` shows it again and then syncs. Without a terminal (npm postinstall, post-merge, CI) nothing prompts and the saved file or the defaults apply.
+Run `bash sync.sh --configure` from a Git checkout to select optional extras and gate groups. Choices live in `~/.craftkit-state/config` and survive updates.
 
-| Key | Default | On | Off |
-|-----|---------|----|-----|
-| `humanizer` | on | Installs the humanizer skill on an explicit install | Removes `~/.agents/skills/humanizer` and the `~/.claude/skills/humanizer` link pointing at it, only when craftkit installed them; `/pr-message` and `/docs` report it skipped |
-| `playwright` | off | `npm i -g @playwright/cli@latest`, then `playwright-cli install --skills=agents -g`. Needs npm and Node 20+, and network. Ownership is the skill folders that appear under `~/.agents/skills`, where the CLI is assumed to write them. A failed install warns, the sync completes, and later syncs skip it until `bash sync.sh --configure` or `bash install.sh` retries | Removes the skill folders craftkit's install added, and the npm package only if craftkit installed it |
-| `dashboard` | off | The [agent dashboard](#agent-dashboard-opt-in) | Removes it, logs included |
-| `gates.routing` | on | Skill-first and announce gates, the routing rule prose, the full routing hook | Unregisters `gate-skill-first.js` and `gate-announce-honored.js`, drops their rule prose, and the routing hook injects only the model-tier and local-skills lines, plus the director line while `gates.director` is on |
-| `gates.director` | unset: Claude on, Codex off | Delegate gate and rule 12a on Claude and Codex | Unregisters `gate-delegate.js`, drops rule 12a and the hook's director line everywhere, and keeps the Codex gate off |
-| `gates.verify` | on | Stop-hook verify gate on Claude and Codex | Unregisters `gate-verify-on-stop.js`, skips the Codex Stop check, drops their rule prose |
+| Setting | Default | Purpose |
+|---|---|---|
+| `humanizer` | on | Natural writing for docs and PR messages |
+| `playwright` | off | Browser automation CLI and skills |
+| `dashboard` | off | Live Claude and Codex agent dashboard |
+| `gates.routing` | on | Skill routing and announcement gates |
+| `gates.director` | Claude on, Codex off | Delegate larger source edits |
+| `gates.verify` | on | Require verification before completion |
 
-```bash
-printf 'gates.verify=off\nplaywright=on\n' >> ~/.craftkit-state/config
-bash sync.sh                        # applies it; a second run reports no work
-CRAFTKIT_GATES_VERIFY=on bash sync.sh   # CRAFTKIT_<KEY> (dots as _) beats the file until the next sync
-```
-
-An env var beats the file for the rendered install and the `~/.craftkit-state/gate-*` files the hooks read at runtime. It leaves the config file unchanged; the next sync without the override restores the saved choices. `CRAFTKIT_DASHBOARD` is the exception and saves its value, as it always has; `~/.craftkit-state/dashboard` mirrors `dashboard=on` so a rollback to v1.58.0 keeps the dashboard. An unknown key or a value other than on/off warns once and keeps the prior setting. Gate prose lives in `<!-- BEGIN CRAFTKIT-GATE-<GROUP> -->` blocks that every tool's install strips when the group is off. A gate's Codex hook stays registered (one script serves every event) and reads the choice at runtime, so a change needs no new `/hooks` trust. A hook matcher you narrowed is saved when its gate goes off and put back when it returns.
-
-**Contributing to craftkit itself:** see **[CONTRIBUTING.md](CONTRIBUTING.md)**. Short version:
-there is no application build (the product is instructions); behavioral fixtures run through `check.sh`, so `check.sh` is the gate and a second
-consecutive `sync.sh` must report no work.
-```bash
-bash check.sh   # content integrity, exit 0 required before commit
-bash sync.sh    # distribute; a second consecutive run must report no work
-```
-
----
+For environment overrides, ownership and removal behavior, see the [configuration reference](docs/guide.md#configuration-extras-and-gate-groups).
 
 ## How it works
 
-Every `git pull` triggers a sync that installs rules, skills, commands, and agents into each AI tool:
+![Repository content passes through sync.sh to Claude Code, Cursor, Gemini CLI and Codex CLI through independent adapters.](docs/diagrams/sync-engine.svg)
 
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
----
-flowchart TB
-    subgraph S1["STAGE 1 · CONTENT"]
-        c1("rules/")
-        c2("skills/")
-        c3("commands/")
-        c4("agents/")
-        c5("partials/<br/>spliced in, never alone")
-    end
-    subgraph S2["STAGE 2 · DISTRIBUTE"]
-        pull("git pull<br/>post-merge / post-rewrite hooks") --> sync("sync.sh<br/>idempotent · check.sh gates every change")
-    end
-    subgraph S3["STAGE 3 · TOOLS · one adapter each"]
-        t1("Claude Code")
-        t2("Cursor")
-        t3("Gemini CLI")
-        t4("Codex CLI")
-    end
-    subgraph S4["STAGE 4 · SESSION GATES"]
-        gates("Claude Code: routing and enforcement hooks<br/>Codex: rule loader + routing + verify-on-stop hooks<br/>Cursor/Gemini: advisory rules")
-    end
-    subgraph S5["STAGE 5 · OUTPUT"]
-        out("Verified change, shipped")
-    end
-    c1 & c2 & c3 & c4 & c5 --> pull
-    sync --> t1 & t2 & t3 & t4
-    t1 & t2 & t3 & t4 --> gates
-    gates --> out
-
-    classDef n fill:#FFFFFF,stroke:#C1C4C6,color:#242628
-    classDef key fill:#D1F0FF,stroke:#0A9AF2,color:#242628
-    classDef ok fill:#FFFFFF,stroke:#029D24,color:#029D24
-    class c1,c2,c3,c4,c5,pull,t1,t2,t3,t4 n
-    class sync,gates key
-    class out ok
-    style S1 fill:transparent,stroke:transparent
-    style S2 fill:transparent,stroke:transparent
-    style S3 fill:transparent,stroke:transparent
-    style S4 fill:transparent,stroke:transparent
-    style S5 fill:transparent,stroke:transparent
-```
-
-Five namespaces, one source of truth:
-
-| Directory | Loaded | Invoked |
-|-----------|--------|---------|
-| `rules/` | Every session, automatically | Never, since they are always present |
-| `skills/` | On demand | Slash command or natural language |
-| `commands/` | On demand | Slash command or natural language |
-| `agents/` | Spawned by an orchestrator | native spawning with the named profile (Claude and Codex) |
-| `partials/` | Only as a splice into a skill, command or agent | Never, since it ships inside its host file (every tool for a skill or command, Claude and Codex for an agent) |
+| Source | Purpose |
+|---|---|
+| `rules/` | Standards loaded every session |
+| `skills/` | One job, invoked on demand |
+| `commands/` | Workflows that coordinate skills and agents |
+| `agents/` | Specialist profiles for Claude and Codex |
+| `partials/` | Shared instructions injected into their hosts |
 
 ### At runtime: Gateway, Orchestrators, state
 
-`sync.sh` is the **Distributor**: it runs at install time and never while you work. At runtime three
-layers act inside each AI tool:
+Claude and Codex use hooks for routing and verification. Cursor and Gemini receive advisory rules. Workflows coordinate skills and agents; per-feature intent and test cases stay in the repository.
 
-| Role | What | Where |
-|------|------|-------|
-| **CraftKit Gateway** | Claude uses the [routing, loader, guard, and exit hooks](#enforcement-gates-hooks-that-refuse). Codex loads applicable rule bodies at SessionStart, injects routing guidance on each prompt, and checks verification at Stop. | `hooks/`; Claude and Codex use native hooks. Cursor and Gemini get advisory text. Codex and Cursor discover skills from `~/.agents/skills/` |
-| **Orchestrators** | Run a workflow: resolve the feature once in Phase 0, pass the slug down, spawn skills and agents | `commands/*.md` |
-| **Skills and agents** | Do one job; skills reach Figma and Lark through the host's MCP client | `skills/`, `agents/` (Claude and Codex) |
-
-The Gateway does not see MCP calls. Per-feature state lives in the repo, never in a tool:
-
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
----
-flowchart TB
-    subgraph R1["INSTALL TIME"]
-        D("Distributor<br/>sync.sh + adapters/")
-    end
-    subgraph GW["GATEWAY · hooks/ · Claude Code and Codex"]
-        direction LR
-        L("Loader<br/>SessionStart") ~~~ R("Router<br/>UserPromptSubmit") ~~~ G("Guards<br/>PreToolUse") ~~~ X("Exit gates<br/>Stop")
-    end
-    subgraph R3["ORCHESTRATORS · commands/*.md"]
-        O("/define · /parallel-build<br/>/build · /team-build<br/>/parallel-review · /parallel-ship<br/>/fix · /ship<br/>Phase 0: resolve slug once<br/>+ approved test cases, pass down")
-    end
-    subgraph R4["WORKERS"]
-        direction LR
-        S("Skills · skills/*<br/>/spec · /test-cases · /plan<br/>/fe-test · /eval") ~~~ A("Agents · agents/*.md<br/>cold reviewers<br/>Claude and Codex") ~~~ M("MCP via the host's client<br/>Figma · Lark")
-    end
-    subgraph R5["STATE · in the repo, per feature"]
-        direction LR
-        ST1("docs/planning/&lt;slug&gt;.md<br/>intent + sources: pointers") ~~~ ST2("docs/planning/&lt;slug&gt;.tests.md<br/>test cases · repo is master") ~~~ V("Published view<br/>Excel export")
-    end
-    R1 -->|sync| GW
-    GW -->|routes each prompt| R3
-    R3 --> R4
-    R4 --> R5
-
-    classDef n fill:#FFFFFF,stroke:#C1C4C6,color:#242628
-    classDef key fill:#D1F0FF,stroke:#0A9AF2,color:#242628
-    classDef ok fill:#FFFFFF,stroke:#029D24,color:#029D24
-    class D,O,S,A,M,V n
-    class R,L,G,X key
-    class ST1,ST2 ok
-    style R1 fill:transparent,stroke:transparent
-    style GW fill:#D1F0FF,stroke:#C1C4C6
-    style R3 fill:transparent,stroke:transparent
-    style R4 fill:transparent,stroke:transparent
-    style R5 fill:transparent,stroke:transparent
-```
+[Runtime map](docs/guide.md#at-runtime-gateway-orchestrators-state) · [Editable diagram source](docs/diagrams/runtime.html)
 
 ### Where files land per AI tool
 
-| Tool | Always-on (`rules/`) | On-demand (`skills/` + `commands/`) | Agents (`agents/`) |
-|------|----------------------|--------------------------------------|--------------------|
-| Claude Code | `~/.claude/CLAUDE.md` (managed block) | `~/.claude/commands/<name>.md` → `/<name>` | `~/.claude/agents/<name>.md` |
-| Cursor | `~/.cursor/rules/*.mdc` (alwaysApply) | `~/.agents/skills/<name>/SKILL.md` (shared native skills, local only) | n/a |
-| Gemini CLI | `~/GEMINI.md` (managed block) | `~/GEMINI.md` (managed block), and also lists the shared `~/.agents/skills/` | n/a |
-| Codex CLI | `~/.codex/AGENTS.md` (short managed block); `~/.codex/hooks.json` loads applicable full rules from `~/.craftkit/codex/rules/` at session start | `~/.agents/skills/<name>/SKILL.md` (shared native skills, including workflows) | `${CODEX_HOME:-~/.codex}/agents/<name>.toml` |
+| Tool | Rules | Skills and workflows | Specialist agents |
+|---|---|---|---|
+| Claude Code | `~/.claude/CLAUDE.md` | `~/.claude/commands/` and shared skills | `~/.claude/agents/*.md` |
+| Cursor | `~/.cursor/rules/` | `~/.agents/skills/`, local sessions | None installed |
+| Gemini CLI | `~/GEMINI.md` | Managed block and shared skills | None installed |
+| Codex CLI | SessionStart loads `~/.craftkit/codex/rules/` | `~/.agents/skills/` | `${CODEX_HOME:-~/.codex}/agents/*.toml` |
 
-Codex and Cursor read skills from `~/.agents/skills/`, so they share one install there. Cursor does not copy that folder to Cloud Agents, so CraftKit skills reach local Cursor sessions only. Gemini CLI reads it too, but keeps its full `~/GEMINI.md` block: as native skills, workflows would load only on demand, behind a consent prompt on every activation. CraftKit's named specialists install for both Claude and Codex. Codex profiles carry the live injected instructions, use a read-only sandbox, and inherit the configured model with medium reasoning effort. Parallel workflows use native spawning up to the available concurrency, queue excess workers, and collect every result. Sequential fallback applies when spawning is unavailable. Unowned or symlinked Codex profiles are preserved and reported as collisions.
-
-If a skill name already belongs to another install in `~/.agents/skills/`, sync leaves that directory untouched, warns with its path, and continues installing the other skills. Remove or rename the conflicting directory if you want CraftKit's version of that skill.
-
-**Retired:** GitHub Copilot and Crush (supported through v1.23.0). Neither has a headless entry point, so neither can join cross-tool agent fan-out ([more](docs/design-notes.md#retired-tools)).
-
----
+See [installation details and collision handling](docs/guide.md#where-files-land-per-ai-tool).
 
 ## Using the workflows
 
 ### Just say what you want
 
-Natural language routes to the right command automatically. No slash commands required.
+| Ask | Workflow | Result |
+|---|---|---|
+| “Plan this feature” | `/define` | Reviewed spec, approved test cases and task plan |
+| “Build this feature” | `/parallel-build` | Implementation, specialist review and checks |
+| “Review my changes” | `/parallel-review` | Findings ranked by evidence and severity |
+| “Prepare this for PR” | `/parallel-ship` | Verification and a readiness verdict |
+| “Fix this bug” | `/fix` | Reproduction, fix and regression check |
+| “Write tests” | `/fe-test`, `/android-test`, `/ios-test` | Tests for the detected platform |
+| “Generate a PR message” | `/pr-message` | Description grounded in the branch changes |
 
-```
-"plan this feature"     →  /define   (interview → spec → test-cases → plan, checkpoint-gated)
-"review this"           →  /parallel-review
-"build this feature"    →  /parallel-build
-"ship this"             →  /parallel-ship
-"fix this bug"          →  /fix
-"write tests for this"  →  /fe-test · /android-test · /ios-test  (by platform)
-"generate PR message"   →  /pr-message
-"poke holes in my plan" →  /grill     (also: "grill this", "stress-test my design")
-"research X for me"     →  /research  (background agent, primary sources)
-"hand this session off" →  /handoff   (also: "summarize for the next agent")
-"connect our docs repo"  →  /context-source  (also: "which docs repos are connected", "disconnect the old docs repo")
-```
+The routing hook uses the nearest project markers to detect RN/web, Android, iOS or Node/tooling. [Routing diagram](docs/diagrams/platform-routing.svg)
 
-Platform is not inferred. On every prompt `hooks/craftkit-routing.js` resolves it from `cwd` and injects the answer:
+### Dynamic workflows (default)
 
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
----
-flowchart TD
-    S["every prompt"] --> W["walk up from cwd"]
-    W --> C{"marker at this level?"}
-    C -->|"none"| U["parent directory"]
-    U --> W
-    C -->|"settings.gradle"| A["Android<br/>MVP"]
-    C -->|"Podfile · Package.swift<br/>*.xcodeproj"| I["iOS<br/>MVVM-C"]
-    C -->|"package.json + React dependency"| R["RN / web<br/>EVPMR"]
-    C -->|"other package.json"| N["Node / tooling<br/>project conventions"]
-    C -->|"two or more<br/>at one level"| M["mixed<br/>union both<br/>agent sets"]
-    A --> INJ["inject platform into the prompt"]
-    I --> INJ
-    R --> INJ
-    N --> INJ
-    M --> INJ
-```
+![Fast checks pass before read-only specialists review alongside test authoring; the main agent combines findings, fixes errors and runs tests before reporting.](docs/diagrams/parallel-build.svg)
 
-Nearest ancestor wins, so `"write tests for this"` in an Android repo resolves to `/android-test`, never `/fe-test`.
+The classifier selects specialists from the actual change. Reviews run independently; the main agent collects every result and reports missing reviews as coverage gaps.
 
----
+[Build](docs/guide.md#parallel-build) · [Review](docs/guide.md#parallel-review) · [Ship](docs/guide.md#parallel-ship) · [How findings become one verdict](docs/guide.md#how-findings-become-one-verdict)
+
+### Planning pipeline: /define, before you build
+
+![Interview, spec, approved test cases and task planning lead to a separate build request, with approval checkpoints between phases.](docs/diagrams/planning.svg)
+
+At each checkpoint you can continue, edit or stop. `/define` stops at the plan. Ideation and a plan roast are optional.
+
+[Planning reference](docs/guide.md#planning-pipeline-define-before-you-build)
 
 ### Enforcement gates: hooks that refuse
 
-Routing context is only text: an agent can read it, announce the right skill, and hand-roll the work anyway. These hooks close that gap. The five gates can stop a call; the other four only inject context, rewrite a command, or notify.
+Claude and Codex can require verification before a task ends. Some gates are configurable; Cursor and Gemini rely on advisory guidance. Codex verification enforces successful checks against unchanged snapshots, but cannot prove native skill activation.
 
-Codex installs [`craftkit-codex.js`](hooks/craftkit-codex.js) into `~/.codex/hooks/` and registers `SessionStart`, `UserPromptSubmit`, `PreToolUse` on `Bash|apply_patch|spawn_agent`, `PostToolUse` on Bash, and `Stop` in `~/.codex/hooks.json`. It loads applicable rule bodies, using a concise Codex routing section instead of the full Claude-oriented rule. An explicit `$skill` or leading `/command` request points to the native skill file without injecting a second body. Verification requires a completed successful command against an unchanged snapshot from start to finish and the latest edited state, including committed edits; parallel hook results append without overwriting peers. Unknown or unfinished results do not count. A PreToolUse rewrite runs verification through the Codex hook runner, which records the real process exit and matching snapshots even when execution yields and is collected with `write_stdin`; raw stdout never proves success. Direct foreground commands and `&&` chains are supported; commands that mask failures with pipelines or semicolons require a separate check invocation. The gate covers `check.sh`, Node type/lint checks, Gradle lint/tests, and iOS tests/SwiftLint. Codex requires a one-time **`/hooks` review and trust** of the new definitions before they run. Native skill activation is not exposed as a stable hook event, so the gateway cannot prove that a skill body was followed; verification is the enforced part. With `CRAFTKIT_DELEGATE=on` it also carries the `gate-delegate.js` rule for Codex: from the 3rd distinct source file a main-session turn edits (`apply_patch` paths, a rename counted once at its destination, plus shell writes parsed the same way), each edit is denied with a reason to delegate through `spawn_agent` with a verify contract, then `wait_agent` and integrate, until the turn spawns an agent that can edit (a CraftKit read-only profile named in `agent_type` does not count). It is opt-in because Codex rejects a PreToolUse `ask` as unsupported, so it can only deny, and no hook payload tells a `codex exec` run from an interactive one. Subagent calls (payload `agent_id`) pass. `CRAFTKIT_GATE=off` disables it all.
+<details>
+<summary>Hook reference and enforcement details</summary>
 
 | Hook | Event | What it does |
 |------|-------|--------------|
@@ -438,88 +136,18 @@ Codex installs [`craftkit-codex.js`](hooks/craftkit-codex.js) into `~/.codex/hoo
 | [`craftkit-update-check.js`](hooks/craftkit-update-check.js) | `SessionStart` | Tells you when a newer craftkit is on npm. Asks the registry at most once a day (1.5s timeout, cached in `~/.craftkit-state/update-check`) and stays silent on any failure |
 | [`craftkit-read-cap.js`](hooks/craftkit-read-cap.js) | `PreToolUse` on `Bash` | Rewrites a bare `cat F` / `rtk read F` over 800 lines to `rtk read -m 800`. Leaves piped commands alone |
 
-Shared helpers (not registered as hooks): [`craftkit-transcript.js`](hooks/craftkit-transcript.js) finds the current turn for every gate, [`craftkit-platform.js`](hooks/craftkit-platform.js) detects the platform, [`craftkit-filesize.js`](hooks/craftkit-filesize.js) holds the 800-line threshold, and [`craftkit-drift.js`](hooks/craftkit-drift.js) answers "has this changed since baseline" as clean, drifted, or cannot-verify.
+[Shared helpers](hooks/craftkit-transcript.js): `craftkit-transcript.js`, `craftkit-platform.js`, `craftkit-filesize.js` and `craftkit-drift.js`.
 
-How the gates behave:
+[Codex hook runner](hooks/craftkit-codex.js) · [Gate behavior, trust and escape hatches](docs/guide.md#enforcement-gates-hooks-that-refuse)
 
-- **Fail open.** Unreadable transcript, bad stdin, or no gate command in the project: the call passes.
-- **`ask`, not `deny`,** so you keep the override. The Read gate is the exception, because an `ask` is silently approved under auto-accept.
-- **Subagents are checked at the parent.** Their edits pass inside the agent; the parent's Stop gate picks them up from `git status`, the same way it catches edits made with `sed -i` or a heredoc.
-- **Skill gate is per session, Stop gates are per turn.** A turn continuing already-routed work ("apply the fixes") isn't asked again.
-- **A downgrade refuses to sync.** `sync.sh` won't run from a checkout older than the installed version.
-- **Plugin skills** (`<plugin>:<name>`) aren't enumerated by the announce gate and pass.
-
-| Escape hatch | Turns off |
-|--------------|-----------|
-| `gates.routing` / `gates.director` / `gates.verify` = `off` in `~/.craftkit-state/config` | That group's hooks and rule prose, for good. See [Configuration](#configuration-extras-and-gate-groups) |
-| `CRAFTKIT_GATE=off` | The four edit/Stop gates and platform-rules injection |
-| `CRAFTKIT_DELEGATE=off` | `gate-delegate.js` only. Unattended `claude -p` runs already skip it; set this for any other automation that cannot answer an ask. On Codex the gate is off unless `CRAFTKIT_DELEGATE=on`; an explicit `gates.director` in the config wins over it |
-| `CRAFTKIT_READ_GATE=off` | `gate-read-size.js` |
-| `CRAFTKIT_READ_CAP=off` | `craftkit-read-cap.js` |
-| `CRAFTKIT_ALLOW_DOWNGRADE=1` | The sync downgrade guard |
-| `CRAFTKIT_UPDATE_CHECK=off` | `craftkit-update-check.js` |
-
-Removing a Claude hook from `_CRAFTKIT_HOOKS` uninstalls it on the next sync. The reasoning behind each behavior above, with the measurements: [design notes](docs/design-notes.md#enforcement-gates).
+</details>
 
 ### Agent dashboard (opt-in)
 
-A live terminal view of what your agents are doing: the main session (model, effort, context, cost), a box for each running subagent that appears when it starts and disappears when it finishes (model, tokens used, elapsed time, tool calls, current action), a total of the tokens all its subagents used, and a session log. Model and tokens come from Claude Code's own subagent transcripts; Codex boxes show the model its events carry, and no tokens, because its transcript format is not a stable interface. It covers Claude Code and Codex sessions, several at once: a strip at the top lists every session active in the last 30 minutes and not ended (tool, project folder name, a short session id so two sessions in one project differ, running subagents, last event), numbered in the order they started. `←`/`→` or `1`-`9` switch and pin the view, `a` goes back to following the newest, and `ccdash <n>` opens a window pinned to session `n`: the number is turned into that session's id before the window opens, so it keeps watching that session when the strip renumbers. Inside tmux a pinned view opens as a side-by-side pane; on macOS each is its own window. A session with no tool call yet, or none in 30 minutes, is not listed.
+Enable `dashboard=on` through configuration, then run `ccdash` to watch Claude and Codex sessions and their agents.
 
-Example, from sample data (two sessions, the second pinned, three subagents running and one finished):
-
-```text
-CLAUDE CODE AGENT TREE  ·  agentic-skills  ·  a91c4f  ·  live  ·  pinned
-   1 ○ Codex  booking-web            b7e210  idle       live
-▸  2 ● Claude agentic-skills         a91c4f  3 running  live
-  ←/→ or 1-9 switch · a follow newest
-
-╭──────────────────────────────────────────────────────────╮
-│ Opus 5.5 · main session                                  │
-│ effort high   ctx ███░░░░░░░ 38%   $2.41                 │
-│ last: Read scripts/dashboard.py                          │
-╰──────────────────────────────────────────────────────────╯
-      │
-      ├─ 3 subagent(s) running · 1 done · subagents used 169.1k tokens
-╭────────────────────────────╮  ╭────────────────────────────╮  ╭────────────────────────────╮
-│ code-quality               │  │ adversarial                │  │ ponytail-review            │
-│ ◐ running  2m14s           │  │ ◐ running  1m58s           │  │ ◐ running  1m31s           │
-│ sonnet-5-5                 │  │ opus-5-5                   │  │ sonnet-5-5                 │
-│ 41.8k tok · 1.6k out       │  │ 98.7k tok · 2.4k out       │  │ 19.1k tok · 700 out        │
-│ 1 tool call(s)             │  │ 1 tool call(s)             │  │ 1 tool call(s)             │
-│ Read sync.sh               │  │ Read ccdash                │  │ Grep agent_usage           │
-╰────────────────────────────╯  ╰────────────────────────────╯  ╰────────────────────────────╯
-
-── session log ───────────────────────────────────────────────────────────────────────────
-22:40:02  main            Read scripts/dashboard.py
-22:40:09  code-quality    started
-22:40:14  code-quality    Read sync.sh
-22:40:21  ponytail-revi…  started
-22:40:30  ponytail-revi…  Grep agent_usage
-22:40:36  adversarial     started
-22:40:44  adversarial     Read ccdash
-22:41:03  bulk-read       started
-22:41:40  bulk-read       finished
-
-9 events  ·  esc / q to close
-```
-
-```bash
-CRAFTKIT_DASHBOARD=1 bash sync.sh   # turn on; saved as dashboard=on in ~/.craftkit-state/config
-ccdash                              # open it, following the newest session; esc or q closes it
-ccdash 2                            # open pinned to session 2 (one window per session: ccdash 1, ccdash 2, ...)
-CRAFTKIT_DASHBOARD=0 bash sync.sh   # turn off; removes everything it installed
-```
-
-Installed with npm, set the same variable on the install; later upgrades keep the choice:
-
-```bash
-CRAFTKIT_DASHBOARD=1 npm install -g @raditia/craftkit   # turn on
-CRAFTKIT_DASHBOARD=0 npm install -g @raditia/craftkit   # turn off
-```
-
-Then start a new Claude session so the hooks load, and in Codex run `/hooks` once to trust the new one.
-
-It is off by default because the logger writes the first 60 characters of every tool call's file path or command to `~/.craftkit/agent-tree/events/`. Those files are private to you (`0600`), common credential shapes (auth headers, `--password x`, `token=`, `*_SECRET_*=`, `-u user:pass`, `https://user:pw@`, `sk-`/`ghp_`/`xoxb-`/`AKIA` tokens) are masked before writing (shape-based, so it narrows exposure rather than guaranteeing none), the logger deletes files older than 7 days, and turning the dashboard off deletes the directory. Off installs nothing. `CRAFTKIT_DASHBOARD` also takes `on`/`off`, `true`/`false`, `yes`/`no`; anything else is warned about and ignored.
+<details>
+<summary>Dashboard components</summary>
 
 | Piece | Where | What it does |
 |-------|-------|--------------|
@@ -527,704 +155,42 @@ It is off by default because the logger writes the first 60 characters of every 
 | [`craftkit-statusline.js`](hooks/craftkit-statusline.js) | Claude `statusLine` | Shows model, effort, context, cost and running subagents, and saves them for the dashboard. If you already have a status line it is kept: saved to `~/.craftkit-state/statusline.json`, run first with the same input, and this is appended after it. Turning the dashboard off puts yours back exactly |
 | [`scripts/dashboard.py`](scripts/dashboard.py), [`scripts/ccdash`](scripts/ccdash) | `~/.craftkit/bin`, linked into `~/.local/bin` when that exists | The viewer and its launcher. `ccdash` opens a tmux popup inside tmux (a side pane before tmux 3.2), a separate iTerm or Terminal window when run from a chat (`! ccdash`, macOS), or full screen in a plain terminal. Without a terminal it prints one snapshot |
 
-Cost, measured on a 20,000-event log: the logger and status line each finish in under 0.1s, but they are a `node` start per tool call and per status refresh (5s) while the dashboard is on. The open dashboard idles near 0% CPU and ~20 MB, because it keeps one state per session and reads only the lines added since its last frame. A subagent quiet for 30 minutes (one long build or test run looks the same) is labelled `quiet` rather than dropped. If Codex misses a stop hook, the dashboard also checks the last 64 KB of its worker transcript for an explicit task completion, including failures; a resumed task appears again. Missing or unfamiliar transcripts keep the box visible. One killed before its `SubagentStop` fires is cleared when its session ends, or hidden after a day if the session was killed too. Turning the dashboard off while a session is open makes that session report a missing hook on each tool call until it restarts.
+[Setup, controls and runtime limitations](docs/guide.md#agent-dashboard-opt-in)
 
----
-
-### Dynamic workflows (default)
-
-Build, review, and ship use **dynamic parallel execution**: a classifier detects the platform (RN/web, Android, iOS), reads your actual diff, selects only the agents that matter, and runs them concurrently. Test-only diffs skip deep review entirely. Every command below works on all three platforms; only the gates and the agent set change.
-
-Each workflow is drawn in five lanes (You, Hooks, Main agent, Sub-agents, Result). Box styles:
-
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
----
-flowchart LR
-    y("You<br/>your prompt") ~~~ h("Hook<br/>runs automatically") ~~~ m("Skill<br/>on the main agent") ~~~ a("Sub-agent<br/>read-only, parallel") ~~~ v("Verdict")
-
-    classDef you fill:#FFFFFF,stroke:#707577,color:#242628
-    classDef hook fill:#D1F0FF,stroke:#0A9AF2,color:#242628,stroke-dasharray:4 3
-    classDef main fill:#FFFFFF,stroke:#0A9AF2,color:#242628
-    classDef sub fill:#FFFFFF,stroke:#029D24,color:#242628
-    classDef verdict fill:#0A5C2C,stroke:#0A5C2C,color:#8BE200
-    class y you
-    class h hook
-    class m main
-    class a sub
-    class v verdict
-```
-
-#### /parallel-review
-
-> Triggered by: `"review this"` / `"help me review"` / `"code review"` / `"LGTM check"`
-
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 18px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    wrappingWidth: 260
----
-swimlane-beta LR
-    subgraph you["YOU"]
-        ask("review my changes")
-    end
-    subgraph hooks["HOOKS"]
-        route("routing hook<br/>platform detected")
-    end
-    subgraph main["MAIN AGENT"]
-        gates("fast gates<br/>classify diff")
-        tst("tests<br/>in background")
-        syn("synthesis<br/>dedupe · rank")
-    end
-    subgraph subs["SUB-AGENTS"]
-        rev("reviewers in parallel<br/>read-only")
-    end
-    subgraph result["RESULT"]
-        v("READY TO MERGE<br/>BLOCKED · INCOMPLETE")
-    end
-    ask --> route --> gates
-    gates --> rev
-    gates --> tst
-    rev --> syn
-    tst --> syn
-    syn --> v
-    gates -.->|gate fails| v
-
-    classDef you fill:#FFFFFF,stroke:#707577,color:#242628
-    classDef hook fill:#D1F0FF,stroke:#0A9AF2,color:#242628,stroke-dasharray:4 3
-    classDef main fill:#FFFFFF,stroke:#0A9AF2,color:#242628
-    classDef sub fill:#FFFFFF,stroke:#029D24,color:#242628
-    classDef verdict fill:#0A5C2C,stroke:#0A5C2C,color:#8BE200
-    class ask you
-    class route hook
-    class gates,tst,syn main
-    class rev sub
-    class v verdict
-```
-
-#### /parallel-ship
-
-> Triggered by: `"ship this"` / `"prepare for PR"` / `"is this ready?"` / `"get this ready to merge"`
-
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 18px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    wrappingWidth: 260
----
-swimlane-beta LR
-    subgraph you["YOU"]
-        ask("ship this")
-    end
-    subgraph hooks["HOOKS"]
-        route("routing hook<br/>platform detected")
-    end
-    subgraph main["MAIN AGENT"]
-        gates("fast gates<br/>classify diff")
-        tst("tests + coverage<br/>RN/web ≥ 93%")
-        syn("synthesis<br/>test-case trace")
-    end
-    subgraph subs["SUB-AGENTS"]
-        rev("reviewers + ponytail<br/>perf · a11y · adversarial")
-    end
-    subgraph result["RESULT"]
-        v("READY TO MERGE<br/>BLOCKED · INCOMPLETE")
-    end
-    ask --> route --> gates
-    gates --> rev
-    gates --> tst
-    rev --> syn
-    tst --> syn
-    syn --> v
-    gates -.->|gate fails| v
-
-    classDef you fill:#FFFFFF,stroke:#707577,color:#242628
-    classDef hook fill:#D1F0FF,stroke:#0A9AF2,color:#242628,stroke-dasharray:4 3
-    classDef main fill:#FFFFFF,stroke:#0A9AF2,color:#242628
-    classDef sub fill:#FFFFFF,stroke:#029D24,color:#242628
-    classDef verdict fill:#0A5C2C,stroke:#0A5C2C,color:#8BE200
-    class ask you
-    class route hook
-    class gates,tst,syn main
-    class rev sub
-    class v verdict
-```
-
-#### /parallel-build
-
-> Triggered by: `"build feature X"` / `"implement X"` / `"create a new screen"`
-
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 18px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    wrappingWidth: 260
----
-swimlane-beta LR
-    subgraph you["YOU"]
-        ask("build feature X")
-    end
-    subgraph hooks["HOOKS"]
-        route("routing hook<br/>platform detected")
-    end
-    subgraph main["MAIN AGENT"]
-        impl("context · scaffold<br/>implement · gates")
-        tst("write tests<br/>while agents run")
-        syn("synthesis<br/>consensus · unique")
-    end
-    subgraph subs["SUB-AGENTS"]
-        rev("reviewers in parallel<br/>picked by classifier")
-    end
-    subgraph result["RESULT"]
-        done("DONE · BLOCKED<br/>INCOMPLETE")
-    end
-    ask --> route --> impl
-    impl --> rev
-    impl --> tst
-    rev --> syn
-    tst --> syn
-    syn --> done
-    impl -.->|gate fails| done
-
-    classDef you fill:#FFFFFF,stroke:#707577,color:#242628
-    classDef hook fill:#D1F0FF,stroke:#0A9AF2,color:#242628,stroke-dasharray:4 3
-    classDef main fill:#FFFFFF,stroke:#0A9AF2,color:#242628
-    classDef sub fill:#FFFFFF,stroke:#029D24,color:#242628
-    classDef verdict fill:#0A5C2C,stroke:#0A5C2C,color:#8BE200
-    class ask you
-    class route hook
-    class impl,tst,syn main
-    class rev sub
-    class done verdict
-```
-
-#### How findings become one verdict
-
-Every review agent reads the same files in the same message and shares nothing, so agreement between them is evidence:
-
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
----
-flowchart LR
-    h1["1 · INDEPENDENT REVIEW<br/>same files · one message<br/>no shared state"] ~~~ h2["2 · MERGE"] ~~~ h3["3 · RANK BY AGREEMENT"] ~~~ h4["4 · VERDICT"]
-        a1("code-quality")
-        a2("platform review")
-        a3("platform a11y")
-        a4("ponytail · performance")
-        adv("adversarial<br/>argues against<br/>shipping")
-        dd("Deduplicate<br/>by file:line<br/>skipped agent →<br/>coverage-gap<br/>warning")
-        k1("CONSENSUS<br/>2+ agents<br/>independently · fix first")
-        k2("Standard<br/>one agent<br/>normal confidence")
-        k3("UNIQUE<br/>uncorroborated<br/>kept, lower confidence")
-        k4("Contradiction<br/>state both<br/>judge by evidence<br/>never average")
-        k5("BLIND SPOTS<br/>what the whole<br/>panel missed")
-        v1("READY TO MERGE<br/>no errors, gates pass")
-        v2("BLOCKED (list)<br/>an error, a failed gate<br/>or a missing test case")
-        v3("INCOMPLETE<br/>an agent failed to run<br/>never ready")
-        note["UNVERIFIED claims<br/>cannot back an ERROR,<br/>so an unproven finding<br/>cannot block a merge"]
-    a1 & a2 & a3 & a4 --> dd
-    dd --> k1 & k2 & k3 & k4
-    adv -.-> k5
-    k1 & k2 & k3 & k4 & k5 --> v2
-    k1 ~~~ v1
-    k4 ~~~ v3
-    k5 ~~~ note
-
-    classDef n fill:#FFFFFF,stroke:#C1C4C6,color:#242628
-    classDef key fill:#D1F0FF,stroke:#0A9AF2,color:#242628
-    classDef ok fill:#FFFFFF,stroke:#029D24,color:#029D24
-    classDef done fill:#0A5C2C,stroke:#0A5C2C,color:#8BE200
-    classDef warn fill:#FEF5FC,stroke:#FA9EB4,color:#8B1842
-    classDef warnline fill:#FFFFFF,stroke:#FA9EB4,color:#242628
-    classDef info fill:#D1F0FF,stroke:#D1F0FF,color:#024590
-    classDef dash fill:#FFFFFF,stroke:#C1C4C6,color:#242628,stroke-dasharray:4 3
-    classDef quiet fill:transparent,stroke:transparent,color:#707577
-    class a1,a2,a3,a4 ok
-    class adv,k5 warnline
-    class dd key
-    class k1,v1 done
-    class k2 n
-    class k3 dash
-    class k4,v2 warn
-    class v3 info
-    class note,h1,h2,h3,h4 quiet
-```
-
----
+</details>
 
 ### How the classifier picks agents
 
-The classifier reads your actual changed files, not just filenames, and selects only the agents that apply. Irrelevant agents are skipped entirely.
+Views add accessibility review; state and fetching can add performance review; larger changes can add adversarial review. Test-only changes run gates without deep review.
 
-```
-RN / web (EVPMR)                         agents selected:
-──────────────────────────────────────────────────────────
-View*.tsx                           →   code-quality + fe-review + fe-a11y
-Presenter*.ts                       →   code-quality + fe-review
-Model*.ts                           →   code-quality (type/correctness focus)
-Entry*.tsx or Resource*.ts          →   fe-review
-View or Presenter + /parallel-ship  →   + fe-performance
-
-Android (MVP)
-──────────────────────────────────────────────────────────
-*Activity/Fragment/Widget.kt, layout →  code-quality + android-review + android-a11y
-*Presenter.kt, *ViewModel.kt         →  code-quality + android-review
-*Repository/Interactor/UseCase.kt    →  code-quality
-Dagger *Module/*Component.kt         →  android-review
-Presenter/VM/adapter + /parallel-ship → + android-performance
-
-iOS (MVVM-C)
-──────────────────────────────────────────────────────────
-*ViewController/View/Cell.swift      →  code-quality + ios-review + ios-a11y
-*ViewModel.swift                     →  code-quality + ios-review
-*Fetcher.swift                       →  code-quality + ios-performance
-*Contract/Factory/Coordinator.swift  →  ios-review
-
-All platforms
-──────────────────────────────────────────────────────────
-any non-test src + build/ship       →   + ponytail-review (over-engineering)
-3+ architecture layers changed      →   + adversarial (devil's advocate)
-auth / payment / credential paths   →   code-quality (security emphasis)
-intent file resolves under docs/planning/  →   code-quality (spec conformance: diff vs planned acceptance criteria)
-test files only                     →   agents skipped, gates only
-```
-
-Five example diffs and what the classifier picks for `/parallel-review`:
-
-| Example diff | Agents picked | Why |
-|---|---|---|
-| `ViewCheckout.tsx` + `PresenterCheckout.ts` | code-quality · fe-review · fe-a11y | a View changed, so a11y joins |
-| `ModelCheckout.ts` only | code-quality (type-safety focus) | targeted findings, no EVPMR or a11y noise |
-| `__tests__/ViewCheckout.test.tsx` only | none: gates only (tsc + lint + test) | tests only, so Phase 2 is skipped and costs no agents |
-| Entry + View + Presenter + Model | code-quality · fe-review · fe-a11y · adversarial | 3+ layers changed, so adversarial argues against merging |
-| `CheckoutFragment.kt` + `CheckoutPresenter.kt` (Android) | code-quality · android-review · android-a11y · android-performance | same command, native agents; gates are `gradlew lint` + `testGeneralDebugUnitTest` |
-
----
+[Selection rules and examples](docs/guide.md#how-the-classifier-picks-agents)
 
 ### Sequential fallback
 
-When you want a lightweight, single-pass run, use the explicit slash command.
-
-| Command | When to prefer |
-|---------|---------------|
-| [`/review`](commands/review.md) | Quick sanity check, small diff |
-| [`/ship`](commands/ship.md) | Simple pre-merge gate, tests already passing |
-| [`/build`](commands/build.md) | Scaffold-only, no parallel validation needed |
-
-They are also the automatic substitute wherever subagents can't be spawned:
-
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
----
-flowchart TD
-    N["build / review / ship intent"] --> Q{"can this context<br/>spawn subagents?"}
-    Q -->|"yes"| P["/parallel-build<br/>/parallel-review<br/>/parallel-ship"]
-    Q -->|"no: you are a subagent<br/>(no Agent tool), or a session<br/>instruction disables spawning"| T["twin<br/>/build · /review · /ship<br/>/team-build also to /build"]
-    T --> S2["announce the command actually run;<br/>name the lost validation axis once"]
-    P --> RUN["execute"]
-    S2 --> RUN
-```
-
-`check.sh` verifies each twin exists and is mapped in both the rule and the routing hook.
-
----
-
-### Planning pipeline: /define, before you build
-
-`/define` runs `/interview` (de-fuzz the ask) → `/spec` (PRD) → `/test-cases` (QA cases from Figma/Lark, approved by you) → `/plan` (tasks), pausing for your approval after each, so a bad spec can't quietly turn into bad tasks. It offers `/ideate` when the approach is open and `plan-roaster` before build. The result goes into `docs/planning/<slug>.md`, which every execution skill reads.
-
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
----
-flowchart TB
-    subgraph ROW[" "]
-        direction LR
-        subgraph DEF[" "]
-            direction TB
-            hd("Define<br/>/define") --- d1("interview") --- d2("spec") --- d3("test-cases") --- d4("plan")
-        end
-        subgraph BLD[" "]
-            direction TB
-            hb("Build<br/>/parallel-build") --- b1("platform routing") --- b2("scaffold + implement") --- b3("type + lint gates") --- b4("parallel agents + tests")
-        end
-        subgraph REV["in parallel · read-only"]
-            direction TB
-            hr("Review<br/>/parallel-review") ~~~ r1("code-quality") ~~~ r2("platform reviewers") ~~~ r3("a11y reviewers") ~~~ r4("adversarial (3+ layers)")
-        end
-        subgraph SHP[" "]
-            direction TB
-            hs("Ship<br/>/parallel-ship · pre-merge") --- s1("coverage gate<br/>RN/web ≥ 93%") --- s2("perf + ponytail agents") --- s3("feature-flag rollback") --- s4("test-case trace<br/>cases approved in Define<br/>missing one = BLOCKED")
-        end
-        DEF --> BLD --> REV --> SHP
-    end
-    subgraph CHK["YOUR CHECKPOINTS"]
-        direction LR
-        k1("approve every phase<br/>continue · edit · stop") ~~~ k2("read the verdict<br/>DONE · READY TO MERGE<br/>BLOCKED · INCOMPLETE") ~~~ k3("act on the findings<br/>review agents are read-only") ~~~ k4("open the PR, merge<br/>opt-in /adr · /docs · /eval")
-    end
-    subgraph FIX["SEPARATE PATH FOR BUGS · /fix"]
-        direction LR
-        f1("failing test first") --- f2("isolate") --- f3("hypothesize") --- f4("fix") --- f5("regression test")
-    end
-    ROW ~~~ CHK ~~~ FIX
-
-    classDef n fill:#FFFFFF,stroke:#C1C4C6,color:#242628
-    classDef key fill:#D1F0FF,stroke:#0A9AF2,color:#242628
-    classDef ok fill:#FFFFFF,stroke:#029D24,color:#029D24
-    classDef quiet fill:transparent,stroke:transparent,color:#707577
-    class d1,d2,d4,b1,b2,b3,b4,r1,r2,r3,r4,s1,s2,s3,f2,f3,f4 n
-    class hd,hb,hr,hs key
-    class d3,s4,f5 ok
-    class k1,k2,k3,k4 quiet
-    style f1 fill:#FFFFFF,stroke:#0071CE,color:#242628
-    style ROW fill:transparent,stroke:transparent
-    style DEF fill:transparent,stroke:transparent
-    style BLD fill:transparent,stroke:transparent
-    style REV fill:transparent,stroke:transparent,color:#029D24
-    style SHP fill:transparent,stroke:transparent
-    style CHK fill:transparent,stroke:#C1C4C6,stroke-dasharray:3 3
-    style FIX fill:transparent,stroke:transparent,color:#0071CE
-```
-
-It stops at a reviewed plan. `/adr` and `/docs` come later, offered at the end of `/parallel-ship` once the code is final. Each planning skill also runs on its own. To challenge a plan you already have, use `/grill` (interactive) or the `plan-roaster` agent (one shot).
-
----
+When spawning is unavailable, workflows use `/build`, `/review` or `/ship` and name the lost validation axis. [Fallback diagram](docs/diagrams/fallback.svg)
 
 ### Experimental: /team-build, agent teams
 
-> Built on Claude Code's experimental [agent teams](https://code.claude.com/docs/en/agent-teams). Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Explicit `/team-build` only, since saying "build feature X" still routes to `/parallel-build`.
-
-Your session becomes a **team lead**: it plans the work, then spawns teammates that build different files at the same time and message each other directly, working off a shared task board.
-
-| | `/parallel-build` (default) | `/team-build` (experimental) |
-|---|---|---|
-| Who writes the code | The main session, one file at a time | Two implementer teammates, in parallel |
-| Helpers | One-shot reviewers that report back once | Persistent teammates that claim tasks and message each other |
-| Coordination | None needed | Shared task board; finishing one task unblocks the next |
-| Model split | One session model | Lead on escalated (`opus`), teammates on everyday (`sonnet`) |
-| Token cost | ~1× | ~5× |
-| Best for | Most features | Larger multi-file features where parallel implementation pays for the overhead |
-
-- **One file, one owner** for the whole build, so nobody overwrites anyone. Teammates ask each other directly (the Presenter owner asks the Model owner about a type) instead of going through the lead.
-- **Staged spawn.** The reviewer and tester start only once there is something to review or test.
-
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 18px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    wrappingWidth: 260
----
-swimlane-beta LR
-    subgraph you["YOU"]
-        ask("/team-build<br/>explicit only")
-    end
-    subgraph lead["LEAD · escalated model"]
-        pre("preflight<br/>teams on · lead model")
-        plan("plan + scaffold<br/>one file, one owner")
-        ver("verify integration<br/>typecheck · lint · tests")
-    end
-    subgraph team["TEAMMATES · everyday model"]
-        impl("impl-a ‖ impl-b<br/>message each other")
-        rt("reviewer, then tester<br/>staged spawn")
-    end
-    subgraph result["RESULT"]
-        rep("report<br/>+ verdict")
-    end
-    ask --> pre --> plan --> impl --> rt --> ver --> rep
-
-    classDef you fill:#FFFFFF,stroke:#707577,color:#242628
-    classDef hook fill:#D1F0FF,stroke:#0A9AF2,color:#242628,stroke-dasharray:4 3
-    classDef main fill:#FFFFFF,stroke:#0A9AF2,color:#242628
-    classDef sub fill:#FFFFFF,stroke:#029D24,color:#242628
-    classDef verdict fill:#0A5C2C,stroke:#0A5C2C,color:#8BE200
-    class ask you
-    class pre,plan,ver main
-    class impl,rt sub
-    class rep verdict
-```
-
-Works on RN/web, Android and iOS; the task board follows each platform's file layout.
-
-- **Claude Code only.** Teams are a harness feature, so on other tools the preflight falls back to `/parallel-build` or `/build`.
-- **~5× the tokens** of a solo build.
-- **Teammates don't survive `/resume`.** An interrupted build restarts coordination from the task board.
-
-Full workflow: [`commands/team-build.md`](commands/team-build.md).
-
----
+Explicit opt-in for Claude Code's experimental teams. Implementers own separate files, then a reviewer and tester start in stages. [Requirements and tradeoffs](docs/guide.md#experimental-team-build-agent-teams)
 
 ### Cross-model: /cross-review
 
-Claude and Codex review the same diff without seeing each other's work, then each answers the other's findings once. Your session reads both rounds and keeps what the evidence supports. Explicit `/cross-review` only.
-
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 18px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    wrappingWidth: 260
----
-swimlane-beta LR
-    subgraph you["YOU"]
-        ask("/cross-review<br/>explicit only")
-    end
-    subgraph script["cross-review.sh · fail closed"]
-        pre("preflight<br/>both CLIs · auth allowlist<br/>tracked diff ≤ 256 KiB")
-        chk("validate replies<br/>every peer finding answered<br/>tree unchanged")
-        stop("could not run<br/>no same-model fallback")
-    end
-    subgraph panel["PANEL · read-only, repo only"]
-        r1("round 1, blind<br/>claude -p ‖ codex exec")
-        r2("round 2, once<br/>AGREE · DISPUTE · CANNOT-VERIFY")
-    end
-    subgraph host["HOST · your session"]
-        adj("adjudicate by evidence<br/>read the cited lines")
-    end
-    subgraph result["RESULT"]
-        rep("findings + provenance<br/>then /eval")
-    end
-    ask --> pre --> r1 --> r2 --> chk --> adj --> rep
-    pre -->|"any check fails"| stop
-    chk -->|"bad format · tree changed"| stop
-
-    classDef you fill:#FFFFFF,stroke:#707577,color:#242628
-    classDef main fill:#FFFFFF,stroke:#0A9AF2,color:#242628
-    classDef sub fill:#FFFFFF,stroke:#029D24,color:#242628
-    classDef stop fill:#FFFFFF,stroke:#D1292E,color:#242628,stroke-dasharray:4 3
-    classDef verdict fill:#0A5C2C,stroke:#0A5C2C,color:#8BE200
-    class ask you
-    class pre,chk,adj main
-    class r1,r2 sub
-    class stop stop
-    class rep verdict
-```
-
-| Step | What happens |
-|---|---|
-| Preflight | Both CLIs present, both auth methods on the allowlist for this project, tracked diff captured and under 256 KiB. Any miss stops the run before anything is sent |
-| Round 1 | Both CLIs get the same prompt and diff, blind to each other (`claude -p --restricted --strict-mcp-config` with Read/Grep/Glob, `codex exec --ignore-user-config -s read-only`) |
-| Round 2 | Each marks every one of the other's findings AGREE, DISPUTE or CANNOT-VERIFY, and may withdraw its own |
-| Validate | Replies must parse and answer every peer finding; the tracked diff and untracked path list must be unchanged since the start |
-| Synthesis | The host keeps consensus, settles disputes by reading the cited lines, labels the rest |
-
-- **Both CLIs are required.** If either is missing or fails, the run stops with `cross-review could not run: …` instead of quietly becoming a same-model review.
-- **Only one critique round.** More rounds make the models drift toward agreement rather than evidence.
-- **Account safety.** Before any diff is sent, `~/.craftkit/cross-review-allowed-auth` must hold a `project=/absolute/path` line for this repository (one line per approved project) plus the exact methods allowed for both CLIs, for example `claude=claude.ai` and `codex=Logged in using ChatGPT`. `CRAFTKIT_CROSS_REVIEW_POLICY` points at a different file. The CLIs expose the login method, not the account, so confirm the signed-in accounts are approved. Auth checks and panelist calls clear API keys, alternate endpoints and provider override variables; Codex also ignores user configuration.
-- **Scope.** Tracked changes since the merge base, including working-tree edits. Untracked files are never sent, only counted, since an unignored `.env` is exactly the file nobody meant to share. Binary diffs name the file without reviewable contents.
-- **Layout-tolerant, content-strict.** Code fences, a preamble, wrapped lines and lowercase severities are accepted; a line that does not parse, or a critique that skips a peer finding, stops the run with the raw replies kept for inspection.
-- **Reproducible.** Each run keeps the diff, the exact prompts, both CLI versions and the commit in a unique owner-only directory under `~/.craftkit-state/cross-review/`.
-- Panelists run with `CRAFTKIT_PANELIST=1` (the script refuses to start inside one, and the routing hook stays silent) and `CRAFTKIT_GATE=off`, so the Stop gates cannot block a headless reviewer.
-
-Script: [`scripts/cross-review.sh`](scripts/cross-review.sh), installed to `~/.craftkit/bin/`. Workflow: [`commands/cross-review.md`](commands/cross-review.md).
-
----
+An explicit Claude + Codex panel: independent reviews, one peer critique and evidence-based synthesis. Both CLIs and a project auth allowlist are required. [Panel workflow and coverage limits](docs/guide.md#cross-model-cross-review)
 
 ### Fix, tests, and PR message
 
-```
-"something is broken" / "fix this bug" / "this crashes"
-  /fix  →  fe-context → reproduce → isolate → fix → regression test
-
-"write tests" / "add tests" / "coverage is low"     → resolves platform first
-  /fe-test       →  RN/web: write tests for all changed paths, enforce ≥93% coverage
-  /android-test  →  JUnit + MockK Presenter tests (no fixed coverage bar)
-  /ios-test      →  Quick + Nimble ViewModel specs (no fixed coverage bar)
-
-"generate PR message" / "draft a PR" / "what should my PR say"
-  /pr-message  →  read diff → write title + summary + goal + changes + coverage → humanize (if installed) → copy to clipboard
-```
-
----
+Use `/fix` for broken behavior, the platform test skill for test authoring, and `/pr-message` for a branch-based PR description. [Reference](docs/guide.md#fix-tests-and-pr-message)
 
 ### Grill, research, and handoff
 
-Three general-purpose skills adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). All natural-language routed; none auto-run.
-
-```
-"poke holes in my plan" / "grill this" / "stress-test my design"   → needs an EXISTING plan
-  /grill  →  map plan as design tree → ask whole frontier per round (each ❓ with ➡️ recommended
-             answer) → sub-agents fetch facts, you only decide → done when frontier empty.
-             Side effects: resolved terms → docs/glossary.md · hard-to-reverse decisions → offers /adr
-
-"research X for me" / "find out how the Y API works" / "dig into the docs"
-  /research  →  background agent reads PRIMARY sources only (official docs, source code, specs)
-                → cited Markdown note in the repo → you keep working meanwhile
-
-"hand this off" / "summarize this session for the next agent" / "wrapping up for today"
-  /handoff  →  handoff doc in OS temp dir: goal, verified state, decisions + why, ordered next
-               steps, suggested skills. Links existing artifacts by path, never duplicates. Secrets redacted.
-```
-
-Picking the right interrogator:
-
-| You have | You want | Use |
-|----------|----------|-----|
-| A fuzzy new ask, no plan | Requirements extracted | `/interview` (one question at a time) |
-| An existing plan/decision | It challenged, interactively | `/grill` (frontier rounds) |
-| A finished plan doc | A cold second opinion, one shot | `plan-roaster` agent |
-
----
+Use `/grill` to challenge an existing plan, `/research` for a cited investigation, `/handoff` to preserve session state, and `/context-source` to connect team docs. [Choosing the right tool](docs/guide.md#grill-research-and-handoff)
 
 ### Scoring a run: /eval
 
-Reviews say what is wrong. `/eval` says how much was right, as one number you can track across runs.
+`/eval` judges the finished result, recomputes its weighted score and records it in `docs/evals/ledger.md`. Missing evidence is reported as a gap; a high total cannot hide a failed criterion.
 
-```
-"score this run" / "how correct was that" / "what is our success rate"
-  /eval  →  gathers diff + PLANNING acceptance criteria + gate results
-         →  spawns eval-judge (cold) → five criteria, each 0-5, each weighted
-         →  recomputes the weighted sum in awk (judgment is the model's, arithmetic is not)
-         →  appends a row to docs/evals/ledger.md → derives the running success rate
-```
+<details>
+<summary>Scoring weights and verdict rules</summary>
 
 | Criterion | Weight | Scored on |
 |---|---:|---|
@@ -1234,18 +200,14 @@ Reviews say what is wrong. `/eval` says how much was right, as one number you ca
 | Verification | 15 | Tests cover changed paths and pass; type + lint clean |
 | Simplicity | 5 | Ponytail rubric: nothing to delete |
 
-`Correctness % = Σ (score / 5 × weight)`, so `5·4·4·3·5` is 85.0%. Bands: `≥90 PASS` · `75-89 PASS WITH GAPS` · `<75 BLOCKED`.
+[Score calculation, floors and thresholds](docs/guide.md#scoring-a-run-eval)
 
-The scorer is built so a number can't hide a failure:
-
-- **Floors beat the band.** Any criterion at 0, or Spec conformance / Correctness at 2 or below, is `BLOCKED` whatever the total. Otherwise "perfect except it doesn't do what was asked" still scores 85%.
-- **Unscorable is a gap.** With no intent file, Spec conformance is `n/a` and the verdict is `INCOMPLETE`, reported out of the remaining 65 points instead of reweighted upward.
-- **The success rate is computed from the ledger** each time, never stored.
-- **Optional hard gate:** put a `**Threshold:**` line in the ledger header and `/eval` uses it instead of 90, which is the shape for CI. `/eval` itself only reports; it never blocks a merge or reverts.
-
----
+</details>
 
 ## Skills reference
+
+<details>
+<summary>Browse rules and skills by platform and purpose</summary>
 
 ### Always-active rules
 
@@ -1334,11 +296,14 @@ All opt-in, never auto-run from `/parallel-build`. `/spec`, `/plan` and `/adr` w
 | [`grill`](skills/grill/SKILL.md) | Stress-test an existing plan/decision: frontier-round interview until nothing is silently assumed; parks ungrillable questions, captures `docs/glossary.md` terms, offers `/adr` | n/a |
 | [`docs`](skills/docs/SKILL.md) | Dual-audience docs: technical (engineers) + non-technical (stakeholders), Confluence-paste-ready markdown, run through `/humanizer` | Accuracy depends on subtle system behavior, so escalate to everyday |
 
----
+</details>
 
 ## Agents reference
 
-Cold, read-only sub-agents (`Read, Grep, Glob`) with a fixed system prompt and model. Orchestrators spawn them and pass the diff or files as the message. They sync to `~/.claude/agents/` as Markdown and `${CODEX_HOME:-~/.codex}/agents/` as TOML. Codex inherits its configured model with medium reasoning effort. Platform agents are picked by the detected platform; `code-quality`, `ponytail-review` and `adversarial` run on all three.
+Read-only specialists install for Claude Code and Codex. Codex profiles inherit the configured model with medium reasoning effort.
+
+<details>
+<summary>Browse specialist agents</summary>
 
 | Agent | Platform | Role | Spawned by | Model |
 |-------|----------|------|-----------|-------|
@@ -1359,265 +324,49 @@ Cold, read-only sub-agents (`Read, Grep, Glob`) with a fixed system prompt and m
 | [`plan-roaster`](agents/plan-roaster.md) | all | Stress-test a plan before implementation: weakest assumption + failure modes | On demand | sonnet |
 | [`eval-judge`](agents/eval-judge.md) | all | Weighted correctness scoring of a finished deliverable: five criteria at 0-5, floors, verdict | `/eval`, offered by `parallel-build` + `parallel-ship` | sonnet |
 
+</details>
+
 ### Skill vs agent: when to add which
 
-| Question | Answer → add |
-|----------|-------------|
-| Will you invoke it yourself (`/name`)? | **skill** |
-| Does it need conversation history or prior context? | **skill** |
-| Will it ever run in parallel with another instance? | **agent** |
-| Is it purely internal, only spawned by a command, never invoked by you? | **agent only** (no skill needed) |
-| Needs to work both ways? | **both**: skill for manual invocation, agent for parallel spawn |
-
-`fe-review` is both: `/fe-review` for manual use, the `fe-review` agent for parallel workflows. `adversarial` is agent-only.
-
-Things to know when writing agents:
-
-- **Agents are cold copies.** They don't inherit rules, skills, or session context, so everything they need goes in `agents/<name>.md`.
-- **Agents skip CLAUDE.md.** Every agent sets `omitClaudeMd: true` (Claude Code v2.1.271+), which drops the ~11k-token global managed block from each spawn. The project's `CLAUDE.md` is dropped with it, so the parallel orchestrators pass it in the payload under `PROJECT CONVENTIONS:`. `check.sh` fails an agent without the field.
-- **Use `craftkitInject` instead of copying text.** Put `craftkitInject: <name>` in a skill's, agent's or command's frontmatter and sync splices in `partials/<name>.md`, `rules/<name>.md` or `skills/<name>/SKILL.md` (first match), fresh on every pull. Skills and commands render on all four tools; agents on Claude Code only.
-- **`partials/` is shared text that loads nowhere by itself.** It only arrives spliced into a host, so a procedure several commands share costs nothing in sessions that don't run them.
-- **CI runs `check.sh`** on every PR and push to `main`, on macOS (bash 3.2) and Ubuntu (bash 5).
-
-Why rules and rubrics ship in two sizes, and the measured savings: [design notes](docs/design-notes.md#sharing-text-between-skills-agents-and-commands).
-
-### Add an agent
-
-```bash
-# create agents/<name>.md with frontmatter: name, description, tools, model, color
-git add agents/<name>.md && git commit -m "feat: add <name> agent" && git push
-# users: git pull → Markdown in ~/.claude/agents/ and TOML in ~/.codex/agents/
-```
-
-### Use an agent in a command
-
-```
-Agent({ subagent_type: "<name>", prompt: "<content to review>" })
-```
-
-The harness loads the agent definition automatically, with no inline prompt needed.
-
----
+A skill handles work you invoke directly or that needs conversation history. An agent handles isolated work spawned by an orchestrator. Use both when you need both entry points. [Authoring reference](docs/guide.md#managing-skills)
 
 ## Architecture (EVPMR)
 
-All frontend features follow a strict 5-file module structure. Rules are enforced by `fe-rules` at all times, with no invocation needed.
-
-```
-feature-name/
-├── EntryFeatureName.tsx      ← ErrorBoundary + context providers
-├── ViewFeatureName.tsx       ← Pure render: calls usePresenter*, no state/effects
-├── PresenterFeatureName.ts   ← All hooks, state, React Query; returns plain object
-├── ModelFeatureName.ts       ← TypeScript types + pure functions only
-└── ResourceFeatureName.ts    ← All display strings
-```
-
-```
-View       NEVER  useState / useEffect / API calls
-Presenter  NEVER  return JSX
-Model      NEVER  import React or cause side effects
-Entry      ALWAYS wrap in <ErrorBoundary>
-Resource   ALWAYS own display strings, never hardcoded in View
-Styles     ALWAYS StyleSheet.create() + Token.spacing.* / Token.color.*
-```
-
-Async data always as discriminated unions:
-```ts
-type AsyncData<T> =
-  | { type: 'NOT_ASKED' }
-  | { type: 'LOADING' }
-  | { type: 'DATA_READY'; payload: T }
-  | { type: 'ERROR'; error: string }
-```
+Frontend features use Entry, View, Presenter, Model and Resource roles. Android uses MVP; iOS uses MVVM-C. [Frontend architecture diagram](docs/diagrams/evpmr.svg) · [Rules and examples](docs/guide.md#architecture-evpmr)
 
 ### How context flows between skills
 
-[`partials/change-scope.md`](partials/change-scope.md) supplies the shared collection contract: staged, unstaged, relevant untracked, and committed changes are unioned before classification. Base discovery uses local refs and reports `cannot-verify` when unavailable. No context cache is written.
-
-Context comes in two halves (ADR-0001, ADR-0002):
-
-| Half | What | Where it lives |
-|------|------|----------------|
-| **Derived** | What git knows: changed files, diff summary, patterns | Emitted into the turn by `/fe-context` (~800 tokens), never stored. A workflow derives it once and passes it down |
-| **Intent** | What a human decided: spec, task plan, decisions | One file per feature at `docs/planning/<slug>.md`, with a human-owned `status:`. The active feature is found by globbing for `status: active`, so there is no index to go stale |
-
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
----
-flowchart LR
-    A["/fe-context<br/>reads diff · emits derived context"]
-    P["/spec · /plan · /adr<br/>write docs/planning/&lt;slug&gt;.md"]
-    A --> B["/fe-scaffold<br/>5-file EVPMR module"]
-    A --> C["/fe-review · /fe-patterns<br/>/fe-performance · /code-quality"]
-    A --> D["/fe-test<br/>≥93% coverage"]
-    P --> C
-    P --> E["/eval<br/>spec conformance"]
-    P --> F["/docs<br/>dual-audience"]
-```
-
-| Level | Source | What | Stale when |
-|-------|--------|------|-----------|
-| L1 Rules | Always-active rule files | EVPMR, tokens, Karpathy guidelines | Never; loaded fresh each session |
-| L2 Intent | `docs/planning/<slug>.md` | What's being built, constraints, decisions | The author changes their mind, so `status:` is theirs to set |
-| L3 Derived | derived into the turn | Files touched by this branch, as git reports | Cannot be stale; nothing is stored (ADR-0002) |
-| L4 Errors | On demand | Failing tests, lint, TypeScript errors | n/a, always live |
-| L5 History | Session | Conversation context | n/a |
-
-Every skill that reads intent uses one resolver, `partials/planning-resolve.md` ([why](docs/design-notes.md#intent-resolution)). Test cases have one reader contract, `partials/test-cases-resolve.md` (approved rows only, never derived from the diff), and Figma/Lark sources one checker, `partials/external-sources.md` (markers, not content; `cannot-verify` when no MCP is reachable). Connected team docs repos have one consult step, `partials/context-source.md`, injected into `/interview`, `/spec`, `/plan` and `/define`: refresh once, search under a shared read budget, cite `<source>@<sha>:<path>:<line>`, pause on any conflict, and say `context source not consulted` rather than stay silent when the helper cannot run. Failing tests heal by one contract, `partials/test-heal.md`, injected into `/fe-test`, `/android-test` and `/ios-test`: each failure is classified before any edit, and an assertion changes only when an approved test case or Spec line states the new value.
-
----
+Git context is derived into the turn. Human intent lives in `docs/planning/<slug>.md`; approved cases live in its `.tests.md` sibling. [Context diagram and resolver contracts](docs/guide.md#how-context-flows-between-skills)
 
 ## Model routing
 
-Skills run on the everyday model and consult the escalate model inline when a question needs it, without stopping you.
+Skills name tiers rather than pinned model IDs. Claude derives tiers from account data; Gemini uses CLI aliases; Codex inherits its configured model and changes reasoning effort; Cursor stays picker-controlled.
 
-On Claude Code, `hooks/craftkit-routing.js` resolves the tiers on every prompt from `~/.claude.json`: **your plan picks the tier window, your entitlements pick the ids inside it.**
-
-```mermaid
----
-config:
-  theme: base
-  look: classic
-  fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-  themeVariables:
-    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: 16px
-    primaryColor: "#FFFFFF"
-    primaryBorderColor: "#C1C4C6"
-    primaryTextColor: "#242628"
-    lineColor: "#A2A6A8"
-    clusterBkg: "#F5FBFF"
-    clusterBorder: "#F0F1F2"
-    titleColor: "#707577"
-    edgeLabelBackground: "#FFFFFF"
-  flowchart:
-    curve: basis
-    wrappingWidth: 240
-    nodeSpacing: 30
-    rankSpacing: 40
----
-flowchart TD
-    A("routing hook<br/>every prompt") --> B{"~/.claude.json<br/>readable?"}
-    B -->|no| Z("family aliases<br/>haiku · sonnet · opus")
-    B -->|yes| PL{"plan"}
-    PL -->|enterprise| W1("window: sonnet · opus · fable<br/>everyday = opus")
-    PL -->|"personal / unknown"| W2("window: haiku · sonnet · opus<br/>everyday = sonnet")
-    W1 --> E("newest entitled id<br/>per family in the window")
-    W2 --> E
-    E --> J("inject cheapest · everyday · escalate")
-    Z --> J
-```
-
-A new model release needs no edit here: `opus-5` replaces `opus-4-8` as soon as the account is entitled to it. Only a brand-new family name touches the rank list. Personal plans are capped below the frontier family on purpose ([why](docs/design-notes.md#model-routing)).
-
-Skills name a tier, never a model id. Claude agents spawn on the family alias (`haiku` / `sonnet` / `opus` / `fable`), which tracks the newest model in that family. `check.sh` check 17 fails the build on a versioned id from any vendor.
-
-| AI | Everyday | Escalate | Fusion panel |
-|----|----------|----------|-------------|
-| Claude Code | injected per prompt | injected per prompt | 2× escalate → same-tier judge |
-| Gemini CLI | `flash` | `pro` | n/a |
-| Cursor | `auto` (picker/account-level, not repo-configurable) | `cursor-agent --model` | n/a |
-| Codex CLI | omit `model`, effort `medium` | omit `model`, effort `high` | n/a |
-
-| Route to | When |
-|----------|------|
-| Escalate model | Architecture call with non-obvious tradeoffs, security-sensitive code, no hypothesis after 2 debug attempts |
-| Fusion panel (2 independent escalate runs, then a judge) | Irreversible production changes, security architecture with real attack surface, decisions where one model may miss a reasoning path |
-
----
+[Model selection diagrams and escalation rules](docs/guide.md#model-routing)
 
 ## Managing skills
 
-**Edit source here, never the installed copies** in `~/.claude/`, `~/.cursor/`, `~/GEMINI.md`, `~/.codex/` or `~/.agents/skills/`. `sync.sh` overwrites those on the next pull.
-
-### Add a rule (always-on)
+Edit source files here. `sync.sh` generates installed copies. Follow the [authoring checklist](CLAUDE.md#critical-authoring-rules) and [contribution guide](CONTRIBUTING.md).
 
 ```bash
-# 1. create the file
-echo '---\nname: my-rule\ndescription: What it enforces\n---\n\n...' > rules/my-rule.md
-
-# 2. ship it
-git add rules/my-rule.md && git commit -m "feat: add my-rule" && git push
-# users: git pull → auto-installed
+bash check.sh
+bash sync.sh
+bash sync.sh
 ```
 
-### Add a skill (on-demand)
+The checks must pass, the first sync must succeed, and the second must report everything up to date. [Adding and removing content](docs/guide.md#managing-skills)
 
-> Not sure whether to add a skill or an agent? See [Skill vs agent](#skill-vs-agent-when-to-add-which).
+## Why bother?
 
-```bash
-mkdir -p skills/my-skill
-# create skills/my-skill/SKILL.md with frontmatter: name, description, alwaysApply: false
-git add skills/my-skill && git commit -m "feat: add my-skill" && git push
-```
-
-### Add a command (orchestrator)
-
-```bash
-# create commands/my-command.md with frontmatter: name, description
-git add commands/my-command.md && git commit -m "feat: add my-command" && git push
-```
-
-### Add an agent (cold specialist for Claude and Codex)
-
-```bash
-# create agents/my-agent.md with frontmatter: name, description, tools, model, color
-git add agents/my-agent.md && git commit -m "feat: add my-agent agent" && git push
-# users: git pull → Markdown in ~/.claude/agents/ and TOML in ~/.codex/agents/
-```
-
-### Add a hook (Claude Code enforcement)
-
-Drop the script in `hooks/`, add a `script%event%matcher%statusMessage` row to `_CRAFTKIT_HOOKS` in `adapters/claude.sh`, and document it in [Enforcement gates](#enforcement-gates-hooks-that-refuse). `check.sh` check 24 fails if any of the three is missing, in either direction. A gate must fail open and survive malformed stdin: check 23 asserts both, behaviorally.
-
-### Remove a skill, command, or agent
-
-```bash
-git rm -r skills/<name>/       # skill
-git rm commands/<name>.md      # command
-git rm agents/<name>.md        # agent → also remove from subagent_type references in commands/
-git commit -m "remove: <name>" && git push
-# users: git pull → auto-uninstalled from all AI tools
-```
-
----
+Keep the same coding standards when you switch AI tools. Load a skill when its job fits the task; use specialist reviews and project checks before claiming completion.
 
 ## Tooling
 
-External tools and inspirations bundled or adopted into this repo.
+| Tool | Purpose |
+|---|---|
+| RTK | Filter shell output before the agent reads it |
+| Caveman | Shorten agent responses |
+| Ponytail / Karpathy guidelines | Prefer simple code and delete unnecessary complexity |
+| Diagram Design | Editorial diagrams with editable HTML sources and SVG embeds |
 
-| Tool | Source | Purpose | How it's used |
-|------|--------|---------|---------------|
-| **RTK** | [github.com/rtk-ai/rtk](https://github.com/rtk-ai/rtk) | Filters shell output before it reaches the AI, for 60-90% input token savings | Auto-installed on `bash install.sh`. All commands prefixed with `rtk` |
-| **Caveman** | [github.com/JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) | Strips AI output verbosity, for 40-60% response token savings | Delivered by the caveman plugin's hooks (level tracking, stats). lite / full / ultra modes |
-| **Ponytail** | [github.com/DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) | YAGNI-first decision ladder + over-engineering audit, for 80-94% code reduction | Decision ladder in `karpathy-guidelines`, `ponytail:` comment convention, 3 skills: `/ponytail-review`, `/ponytail-audit`, `/ponytail-debt` |
-| **graphify** | [github.com/Graphify-Labs/graphify](https://github.com/Graphify-Labs/graphify) | Turns the repo into a queryable knowledge graph (tree-sitter, local, no embeddings), so `/debug` and `/fe-performance` follow edges instead of grepping | Optional. Install **project-scoped only** (`graphify claude install`); global mode can eat the managed block ([why](docs/design-notes.md#graphify)) |
-| **Karpathy Guidelines** | [karpathy.ai](https://karpathy.ai), adapted | Behavioral rules to prevent LLM coding pitfalls: think before coding, surgical changes, goal-driven execution | Always-active via `rules/karpathy-guidelines.md` |
-
----
-
-## Changelog
-
-See **[CHANGELOG.md](CHANGELOG.md)**, one `## vX.Y.Z` section per release, newest first.
-`.github/workflows/release.yml` reads the version from this README's header and the matching
-section of `CHANGELOG.md`, so a release updates both.
+[Design decisions](docs/design-notes.md) · [Diagram inventory and maintenance](docs/diagrams/README.md)
