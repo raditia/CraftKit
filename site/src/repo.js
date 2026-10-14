@@ -1,4 +1,4 @@
-export const { version: VERSION, repo: REPO } = __CRAFTKIT__;
+export const { version: VERSION, repo: REPO, diagrams: DIAGRAMS } = __CRAFTKIT__;
 export const INSTALL = `npm install -g ${__CRAFTKIT__.name}`;
 
 // One display name per sync.sh ADAPTERS entry, its first word being the adapter id; check.sh holds

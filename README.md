@@ -10,7 +10,7 @@
 
 CraftKit distributes coding rules, skills, workflows and specialist agents from one repository. Git installs sync updates automatically when you pull.
 
-[Website](https://raditia.github.io/CraftKit/) · [Detailed guide](docs/guide.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+[Website](https://raditia.github.io/CraftKit/) · [Diagram gallery](https://raditia.github.io/CraftKit/#diagrams) · [Detailed guide](docs/guide.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
 ## Start here
 

@@ -1,6 +1,6 @@
 # CraftKit diagrams
 
-[Back to README](../../README.md) · [Detailed guide](../guide.md)
+[Back to README](../../README.md) · [Detailed guide](../guide.md) · [Published gallery](https://raditia.github.io/CraftKit/#diagrams)
 
 All documentation and site diagrams use **Diagram Design** with CraftKit's color palette and Diagram Design's editorial typography. Each `.html` file is the editable source; its `.svg` sibling is the diagram-only export used in Markdown and the site. SVGs embed their styles and use system font fallbacks without network requests. HTML sources request Instrument Serif, Geist and Geist Mono through Google Fonts and fall back to system fonts when offline.
 

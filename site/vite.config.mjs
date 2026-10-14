@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -8,6 +8,22 @@ const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url),
 const repo = pkg.repository.url.replace(/^git\+/, "").replace(/\.git$/, "");
 const url = new URL(pkg.homepage).href;
 const os = { darwin: "macOS", linux: "Linux" };
+const diagramDir = new URL("../docs/diagrams/", import.meta.url);
+const xmlEntities = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+const decodeXml = (text) => text.replace(/&(amp|lt|gt|quot|apos|#\d+|#x[\da-f]+);/gi, (_, entity) =>
+  entity.startsWith("#")
+    ? String.fromCodePoint(entity[1].toLowerCase() === "x" ? parseInt(entity.slice(2), 16) : Number(entity.slice(1)))
+    : xmlEntities[entity.toLowerCase()]);
+const diagrams = Object.fromEntries(readdirSync(diagramDir).filter((file) => file.endsWith(".svg")).sort().map((file) => {
+  const svg = readFileSync(new URL(file, diagramDir), "utf8");
+  const [, , width, height] = svg.match(/\bviewBox="([^"]+)"/)[1].trim().split(/\s+/).map(Number);
+  return [file.slice(0, -4), {
+    name: decodeXml(svg.match(/<title\b[^>]*>([^<]*)<\/title>/)[1]),
+    description: decodeXml(svg.match(/<desc\b[^>]*>([^<]*)<\/desc>/)[1]),
+    width,
+    height,
+  }];
+}));
 
 const attr = (s) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 const head = {
@@ -33,7 +49,7 @@ export default defineConfig({
   // absolute asset URLs the client build emits, or hydration keeps a broken image src.
   base: new URL(url).pathname,
   define: {
-    __CRAFTKIT__: JSON.stringify({ name: pkg.name, version: pkg.version, repo }),
+    __CRAFTKIT__: JSON.stringify({ name: pkg.name, version: pkg.version, repo, diagrams }),
   },
   plugins: [
     react(),

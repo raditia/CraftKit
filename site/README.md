@@ -16,7 +16,7 @@ The build prerenders the page into `dist/index.html` (`scripts/prerender.mjs`) a
 
 | Kind of fact | Examples | How it stays current |
 |---|---|---|
-| Derived | version, npm package name, description, repo URL, canonical URL and base path (`homepage`), Open Graph tags, JSON-LD | Read from the root `package.json` at build time (`vite.config.mjs`). `.github/workflows/pages.yml` redeploys on every push to `main` that touches `package.json` or `site/`, so each release refreshes them |
+| Derived | version, npm package name, description, repo URL, canonical URL and base path (`homepage`), Open Graph tags, JSON-LD | Read from the root `package.json` at build time (`vite.config.mjs`). `.github/workflows/pages.yml` redeploys on every push to `main` that touches `package.json`, `site/` or `docs/diagrams/`, so releases and diagram edits refresh the page |
 | Referenced | README anchors, repo file links, workflow command names, the four tools | Written through `readme()`, `repoFile()`, `command:` and `TOOLS` in `src/`. `check.sh` check 41 resolves each one, so a renamed heading, moved file, renamed command, or added adapter fails the PR |
 | Judgment | workflow copy, the walkthrough, the hero illustration, `public/og.png` | Update by hand in the same change as the repo edit, per the sync matrix in `CLAUDE.md` |
 
@@ -44,6 +44,7 @@ There is no `robots.txt` or sitemap here: crawlers read those only at the domain
 - Clean cool-white background `#FAFBFC`, muted turquoise `#287D78` accents, neutral gray dividers. No warm paper tones, glow, or concentric rings.
 - Minimal: plain eyebrow text, fine dividers, soft palette. Inter is bundled; Phosphor supplies icons.
 - "AI-gnostic" is a tagline under the wordmark, not a product rename.
-- The hero and walkthrough reuse the Diagram Design SVGs in `../docs/diagrams/`. Their editable HTML sources, style choice and redraw notes are listed in [the diagram inventory](../docs/diagrams/README.md). Adding a tool means updating the distribution diagram and exporting it again.
+- The diagram gallery at `#diagrams` derives its list from `docs/diagrams/*.svg`. Rows expand with native keyboard-accessible controls, keep diagrams readable with local horizontal scrolling, and link to the full-size SVG and editable HTML source.
+- The hero, walkthrough and gallery reuse the Diagram Design SVGs in `../docs/diagrams/`. Their editable HTML sources, style choice and redraw notes are listed in [the diagram inventory](../docs/diagrams/README.md). Adding a tool means updating the distribution diagram and exporting it again.
 - The walkthrough follows the stage order in `commands/parallel-build.md` (context, scaffold and implement, fast gates, classifier, parallel read-only reviews alongside test authoring, synthesize and fix, run tests, handoff), with natural-language example requests rather than slash-command snippets.
 - Product facts come from this repo. No invented adoption metrics or guaranteed savings.
