@@ -10,7 +10,7 @@ alwaysApply: false
 
 ## Method
 
-1. Write the handoff doc to the OS temp directory (`$TMPDIR/handoff-<slug>.md`), not the workspace, because it is session baggage, not project content. Report the path.
+1. Write the handoff doc to the OS temp directory (`$TMPDIR`, else `/tmp`; `%TEMP%` on Windows) as `handoff-<slug>.md`, not the workspace, because it is session baggage, not project content. Report the path.
 2. Sections:
    - **Goal:** what the overall work is and why
    - **State:** done (with verification evidence) vs in-flight vs not started

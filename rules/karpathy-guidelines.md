@@ -68,22 +68,23 @@ Ask: "Would a senior engineer say 'why didn't you just…'?" If yes, simplify.
 // ponytail: linear scan over all items. ceiling: >10k rows gets slow. upgrade: add index when perf becomes issue.
 ```
 
-**Ponytail rubric: one list for writing and for reviewing.** `/ponytail-review`, `/ponytail-audit`, and the `ponytail-review` agent judge code by these six tags. Author under them, so review has nothing left to change:
+**Ponytail rubric: one list for writing and for reviewing.** `/ponytail-review`, `/ponytail-audit`, and the `ponytail-review` agent judge code by these seven tags. Author under them, so review has nothing left to change:
 
 | Tag | Fails when |
 |-----|-----------|
 | `delete:` | Dead code, flexibility nothing uses, or a speculative feature |
 | `stdlib:` | Hand-rolled logic the standard library already provides |
 | `native:` | A dependency, or hand-written code, doing what the platform already does |
+| `reuse:` | New code re-implementing a function or module the repo already has |
 | `yagni:` | Abstraction with one implementation, config nobody sets, or a single-caller layer |
 | `shrink:` | Same logic achievable in fewer lines |
 | `narrate:` | Comment restating the code, or denser comments than the file around it (see comment discipline above) |
 
-Every finding names its replacement: the stdlib function, the platform feature, or the shorter form. `delete:`, `yagni:`, and `narrate:` replace with nothing, and that is the finding.
+Every finding names its replacement: the stdlib function, the platform feature, the existing function or module by `file:line`, or the shorter form. `delete:`, `yagni:`, and `narrate:` replace with nothing, and that is the finding.
 
 Protected, never counted as over-engineering by either side: validation at trust boundaries, error handling that prevents data loss, security and accessibility code, smoke tests / basic assertions, and anything already marked `ponytail:` or `flag:` (the marker is the contract, and a `flag:` branch is a live rollback path, not dead config). For `narrate:` specifically, also protected: a comment carrying a non-obvious *why*, a license/pragma header, and a doc comment on a public API a consumer reads without opening the file.
 
-**Self-pass before reporting done.** Any turn that writes or edits code scans its own diff against those six tags before claiming completion. Each hit is cut now, or marked `ponytail:` with its ceiling. Report one line: `ponytail self-pass: clean` or `ponytail self-pass: cut <what>, marked <what>`. Bloat that reaches review unmarked is a defect in the write step, not a review finding.
+**Self-pass before reporting done.** Any turn that writes or edits code scans its own diff against those seven tags before claiming completion. Each hit is cut now, or marked `ponytail:` with its ceiling. Report one line: `ponytail self-pass: clean` or `ponytail self-pass: cut <what>, marked <what>`. Bloat that reaches review unmarked is a defect in the write step, not a review finding.
 
 **Applying ponytail findings is deletion, not rewrite.** A finding names `file:line` plus a tag, so act on exactly those lines: remove them, or swap in the named stdlib/native call. Never restructure surrounding code, rename, reorder, or tidy while in there. If a finding looks like it needs a rewrite, say so and stop; file churn costs more than the complexity does.
 

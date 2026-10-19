@@ -20,8 +20,8 @@ User says: "review for over-engineering", "what can we delete", "is this over-en
 ## Process
 
 1. Read the diff or file(s) specified.
-2. Apply the decision ladder + **ponytail rubric** from `karpathy-guidelines` rule 2, where the six tags (`delete:` `stdlib:` `native:` `yagni:` `shrink:` `narrate:`) and the protected list live, always active. Flag anything that fails an earlier rung.
-3. Output one finding per line.
+2. Apply the decision ladder + **ponytail rubric** from `karpathy-guidelines` rule 2, where the seven tags (`delete:` `stdlib:` `native:` `reuse:` `yagni:` `shrink:` `narrate:`) and the protected list live, always active. Flag anything that fails an earlier rung.
+3. Output one numbered finding per line, so the user can reply "fix 2 and 4".
 4. End with net line estimate.
 
 ---
@@ -29,7 +29,7 @@ User says: "review for over-engineering", "what can we delete", "is this over-en
 ## Output format
 
 ```
-<file>:L<line>: <tag> <what>. <replacement or "remove">.
+<N>. <file>:L<line>: <tag> <what>. <replacement or "remove">.
 ```
 
 End with:

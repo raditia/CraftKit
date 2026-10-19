@@ -28,9 +28,14 @@ User has a plan, decision, or design and wants it challenged before committing. 
    <question body, with choices where useful>
 
    ➡️ <your recommended answer>
+
+   ---
+
+   ❓ **Q2. <question title>**
+   ...
    ```
 
-   Word the recommendation so that agreeing with it never means answering "no" to the question above it. Where the honest recommendation contradicts the question's framing, rewrite the question.
+   Word each question so "yes" accepts the recommended answer. Where the honest recommendation contradicts the question's framing, rewrite the question.
 4. **Recompute after each round.** Settled decisions push the frontier outward and unblock dependent questions. A question whose answer depends on another question still open *this* round belongs to a later round.
 5. **Facts are your job, never the user's.** A frontier question needing a fact from the environment (code, configs, docs) → dispatch a sub-agent (`Explore`) to find it. Don't block: only questions downstream of the lookup wait, so ask the rest of the frontier now. Decisions go to the user; lookups never do.
 6. **The frontier is your judgement, not a computed graph.** Two questions in one round can turn out to be coupled, one answer changing the other. When the user says so, reopen that branch next round and name which answers you are re-asking. Defending the round is the failure.

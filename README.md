@@ -1,4 +1,4 @@
-# craftkit `v1.59.0`
+# craftkit `v1.60.0`
 
 [![npm](https://img.shields.io/npm/v/@raditia/craftkit)](https://www.npmjs.com/package/@raditia/craftkit)
 [![npm downloads](https://img.shields.io/npm/dw/@raditia/craftkit)](https://www.npmjs.com/package/@raditia/craftkit)
@@ -273,7 +273,7 @@ The `*-review`, `*-a11y` and `*-performance` skills are also the live source for
 | [`code-quality`](skills/code-quality/SKILL.md) | Review (5-axis) or simplify complex code | Security-sensitive review, or refactor > 500 lines |
 | [`debug`](skills/debug/SKILL.md) | Structured reproduce → isolate → fix | No hypothesis after 2 isolation attempts |
 | [`ideate`](skills/ideate/SKILL.md) | Divergent ideation: N framed generators → critic scores/clusters. Open-ended design, naming, fuzzy debug | High-stakes, so escalate the critic/deepen pass to opus |
-| [`think`](skills/think/SKILL.md) | Systems/strategy reasoning router: cynefin, systems, feedback loops, constraints, leverage, second-order. Architecture + complex-system decisions | Architecture call with non-obvious tradeoffs, so escalate analysis to opus |
+| [`think`](skills/think/SKILL.md) | Systems/strategy reasoning router: cynefin, systems (loops, leverage), constraints, second-order. Architecture + complex-system decisions | Architecture call with non-obvious tradeoffs, so escalate analysis to opus |
 | [`research`](skills/research/SKILL.md) | Background agent researches a question against primary sources only, writes a cited note into the repo | n/a |
 | [`handoff`](skills/handoff/SKILL.md) | Compact the session into a handoff doc for a fresh agent: state, decisions, next steps, suggested skills | n/a |
 | [`context-source`](skills/context-source/SKILL.md) | Connect, replace, disconnect or list the team docs repos on GitHub that `/interview`, `/spec` and `/plan` check asks against, with cited conflicts. Cache under `~/.craftkit`, never in the project (ADR-0003) | n/a |

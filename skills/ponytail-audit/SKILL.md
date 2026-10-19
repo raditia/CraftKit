@@ -29,20 +29,22 @@ Hunt for:
 
 Exclude: `node_modules/`, `.git/`, build output dirs.
 
+Before reporting a `delete:`, grep the whole tree for the symbol, tests, fixtures, and string or dynamic references included. Any caller drops the finding.
+
 ---
 
 ## Finding tags
 
-The six tags (`delete:` `stdlib:` `native:` `yagni:` `shrink:` `narrate:`) and the protected list are the **ponytail rubric** in `karpathy-guidelines` rule 2, always active, the same list `/ponytail-review` and the writing skills use.
+The seven tags (`delete:` `stdlib:` `native:` `reuse:` `yagni:` `shrink:` `narrate:`) and the protected list are the **ponytail rubric** in `karpathy-guidelines` rule 2, always active, the same list `/ponytail-review` and the writing skills use.
 
 ---
 
 ## Output format
 
-Ranked by impact (most lines saved first):
+Ranked by impact (most lines saved first), numbered so the user can reply "fix 2 and 4":
 
 ```
-<tag> <item>. <replacement>. [path]
+<N>. <tag> <item>. <replacement>. [path]
 ```
 
 End with:

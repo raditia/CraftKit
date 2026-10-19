@@ -47,7 +47,7 @@ Both documents are AI-drafted → run each through the humanizer to strip AI-wri
 test -f ~/.claude/skills/humanizer/SKILL.md && echo "humanizer: present" || echo "humanizer: absent"
 ```
 
-- **Present** → invoke `/humanizer` on each doc. Instruct it to preserve markdown structure verbatim, so headings, tables, and inline `code` pass through untouched. Use the humanized output as final.
+- **Present** → invoke `/humanizer` on each doc. Instruct it to preserve markdown structure verbatim, so headings, tables, and inline `code` pass through untouched. Before the rewrite, list each doc's names, numbers, qualifiers and caveats; after it, check the list against the output and restore anything lost. Use the humanized output as final.
 - **Absent** → note it and ship the un-humanized draft. (Only Claude Code exposes `/humanizer`; on Cursor/Gemini/Codex this step is a no-op by design, same as `/pr-message`.)
 
 Optional voice match: if the user points to a writing sample, pass it to `/humanizer` for voice calibration.

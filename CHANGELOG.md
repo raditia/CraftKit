@@ -7,6 +7,56 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.60.0 — 2026-10-19
+
+### Upstream sync: ponytail, humanizer, mattpocock, addyosmani, adhd, cc-thinking, anti-slop, caveman
+
+Six adapted upstreams had moved since their last reconciliation, and four of their baselines were
+dated guesses rather than commits. This release diffs each one, records a verdict per change, and
+pins every baseline to the exact commit, tracked in the new `docs/upstreams.md`.
+
+- **Ponytail** (to tag v5.3.2). Adopted: a seventh rubric tag, `reuse:`, for new code that
+  re-implements a function or module the repo already has, with the existing one named by
+  `file:line` (`rules/karpathy-guidelines.md`, mirrored in `partials/ponytail-rubric.md`; every tag
+  list and count updated). `/ponytail-audit` and the `ponytail-review` agent search the whole tree
+  for callers before reporting a `delete:`. `/ponytail-review`, `/ponytail-audit` and the agent
+  number their findings, so a reply can say "fix 2 and 4". `/ponytail-debt` scans with `git grep`,
+  which skips gitignored paths (plain `grep` outside a repo), and matches block comments.
+  Declined: the band and board UI (host-specific display), the mode system (collides with
+  caveman's levels), and new host adapters (CraftKit's adapters cover its four tools).
+- **blader/humanizer**. Adopted: `/pr-message` names the dash, bold-text and bold-heading-list
+  patterns instead of citing v2 numbers, which v3.0.0 renumbered.
+- **mattpocock/skills** (to `49dd158d1076`). Adopted: `/grill` words each question so "yes"
+  accepts the recommendation, and separates a round's questions with a `---` rule. `/handoff`
+  names its temp-dir fallbacks (`$TMPDIR`, else `/tmp`, `%TEMP%` on Windows). Declined: "call the
+  Skill tool" wording (Claude-specific, and the files sync to four tools), and the retro,
+  chief-of-staff and teach skills (outside CraftKit's engineering workflow).
+- **addyosmani/agent-skills** (to `aeac41d4d005`). Adopted: `/spec` proposes a capability map
+  before writing when one ask bundles several independently testable capabilities, one intent file
+  each. `/docs` lists names, numbers, qualifiers and caveats before the humanizer pass and restores
+  any it dropped. Declined: the configurable task list (yagni), the OpenSpec deferral (CraftKit's
+  intent files already fill that role), and constraint-driven development (overlaps the gates).
+- **UditAkhourii/adhd** (to `7b91ce601ed9`). Adopted: `/ideate` strips incidental stack and tool
+  names from the problem before fan-out, keeps going when one generator fails, gives every idea a
+  required `strength`, and frames traps as a heads-up to check. Declined: frame packs (the frame
+  table already covers selection).
+- **tjboudreaux/cc-thinking-skills** (to `7b8fece345df`). Adopted: `/think` merges systems,
+  feedback loops and leverage points into one Systems framework (boundary, stocks and flows, loops
+  with delays, ranked leverage points) with a stop condition and a guard against applying it to a
+  problem with no loop. Declined: OODA, TRIZ and the other single-use frameworks.
+- **miqdadbadjuber/anti-slop** (to `439a2ef5b9dd`). Adopted: `/fe-design` keeps a deliberate design
+  choice but names a clash with a slop pattern and asks the owner. The two source skills are
+  unchanged since `7437352`, so the research note's citations hold at the new pin.
+- **JuliusBrussee/caveman**. `docs/guide.md` gives the level names for both 2.x and 4.x. Declined:
+  cloud routing (a third-party data path).
+- **Fixed**: `/think` and `/spec` pointed at a "karpathy hard-to-reverse gate" that does not
+  exist. Both now point at the fusion-panel triggers in `using-agent-skills`.
+
+Pending decisions, listed in `docs/upstreams.md`: ponytail v5's rules rewrite and its
+`/ponytail-review` rebuilt as a full review (overlaps `/code-quality`); ponytail v5.1's neutral
+`shortcut:` marker replacing `ponytail:`; mattpocock's `to-questionnaire` skill; re-verifying
+`docs/research/codex-background-subagents.md` against codex 0.164 once it is stable.
+
 ## v1.59.0 — 2026-10-12
 
 ### Config toggles: pick extras and gate groups once

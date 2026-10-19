@@ -28,10 +28,16 @@ Any check fails → `Ideation gate not met (<which>). Answering directly.` then 
 
 Launch **5 isolated idea generators**, using all available concurrency without waiting for one
 before launching the next. Queue excess generators when the host's capacity is lower than five.
-Keep their prompts independent; no generator receives another's output.
+Keep their prompts independent; no generator receives another's output. A failed generator does not
+abort the run: continue with the ones that returned and mark its frame `(failed)` on the `Frames:`
+line. Abort only when all five fail.
+
+**Strip anchors first**, in this pass with no extra agent call: rewrite the problem statement without
+incidental stack or tool names, keeping the real constraints (a mandated platform, a system it must
+fit). When stripping loses meaning, keep the original wording.
 
 Each generator receives, and **nothing else** (no peer output, since isolation is the point):
-- the problem statement + user context
+- the anchor-stripped problem statement + user context
 - ONE cognitive frame (below), picking 5 distinct frames that fit the problem
 - generator-only instruction: **produce ideas, do NOT evaluate, rank, or hedge**
 
@@ -73,13 +79,13 @@ On Codex, use subprocess fan-out only when native spawning is unavailable and th
 
 Converge the ~30 ideas. Escalate this pass for high-stakes calls.
 
-1. **Score** each idea 0–10 on three axes → weighted total:
+1. **Score** each idea 0–10 on three axes → weighted total, and give every idea a required one-line `strength` (what it gets right, even at a low score):
    `score = novelty·0.35 + viability·0.40 + fit·0.25`
    - **novelty:** non-obvious, not the textbook answer
    - **viability:** buildable with current stack/constraints
    - **fit:** actually solves the stated problem
 2. **Cluster** by underlying angle, collapsing near-duplicates, and name each cluster.
-3. **Flag traps:** ideas that sound clever but hide a fatal assumption. Name the assumption.
+3. **Flag traps:** ideas that sound clever but rest on a risky assumption. Frame each as a heads-up the user can act on: the assumption and how to check it, not a verdict on the idea.
 4. **Deepen top 3:** one agent call each (parallel): concrete sketch, main risk, first step, 1–2 child ideas it unlocks.
 
 ---
@@ -92,8 +98,8 @@ Frames: <5 chosen>
 
 WIDE SET (clustered)
 ▸ <cluster name>
-  - <idea> → <score> (n/v/f)
-  - <idea> → <score> (n/v/f)
+  - <idea> → <score> (n/v/f) · strength: <what it gets right>
+  - <idea> → <score> (n/v/f) · strength: <what it gets right>
 ▸ <cluster name>
   ...
 
@@ -110,7 +116,7 @@ FOCUS
 2. ...
 
 TRAPS
-  - <clever-but-flawed idea> → hidden assumption: <what>
+  - <idea> → check first: <assumption> · how: <the quickest test>
 
 PROVOCATION
   <one uncomfortable question the shortlist still doesn't answer>

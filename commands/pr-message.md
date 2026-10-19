@@ -106,7 +106,7 @@ If the [humanizer skill](https://github.com/blader/humanizer) is installed, run 
 test -f ~/.claude/skills/humanizer/SKILL.md && echo "humanizer: present" || echo "humanizer: absent"
 ```
 
-- **Present** → invoke `/humanizer` on the whole message from Step 3. Instruct it to preserve markdown structure verbatim: the `## Changes` table, the test-coverage checkboxes, and any inline `code` must pass through untouched (patterns #14–16 must not collapse them). Use the humanized output as the final message.
+- **Present** → invoke `/humanizer` on the whole message from Step 3. Instruct it to preserve markdown structure verbatim: the `## Changes` table, the test-coverage checkboxes, and any inline `code` must pass through untouched (its dash, bold-text and bold-heading-list patterns must not collapse them). Use the humanized output as the final message.
 - **Absent** → skip silently and use the Step 3 message as-is. No warning.
 
 > Only Claude Code supports `/humanizer`. On the other synced tools (Cursor, Gemini, Codex) the file check fails and this step is a no-op, by design.

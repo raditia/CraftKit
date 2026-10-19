@@ -4,7 +4,7 @@ description: Read-only ledger of every ponytail: and flag: marker in the repo. S
 alwaysApply: false
 ---
 
-**Commands:** `rtk grep -E "ponytail:|flag:" . --include="*.ts" --include="*.tsx" --include="*.js"`
+**Commands:** `rtk git grep -nE "(//|#|\*) ?(ponytail|flag):"`, which skips gitignored paths; outside a git repo, `rtk grep -rnE "(//|#|\*) ?(ponytail|flag):" . --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude-dir=build`
 **Model:** cheapest tier (see the plan-aware Model routing table in `using-agent-skills`). No escalation, since the task is pure extraction.
 
 ---
@@ -17,7 +17,7 @@ User says: "show ponytail debt", "list deliberate shortcuts", "what did we defer
 
 ## Process
 
-1. Grep repo for `ponytail:` and `flag:` markers, excluding `node_modules/`, `.git/`, build dirs.
+1. Grep repo for `ponytail:` and `flag:` markers in line comments (`//`, `#`) and block comments (`/* ponytail: ... */`, or a ` * ` line inside one), with the commands above. Drop a closing `*/` from the parsed text.
 2. Parse each marker. `ponytail:` yields what was simplified, ceiling, upgrade trigger. `flag:` (see `flag-safety`) yields the flag key, OFF behavior, removal condition.
 3. Group by file, `ponytail:` and `flag:` in separate sections.
 4. Flag entries missing an exit condition with `[no-trigger]`. A flag whose removal condition already holds is `[removable]`, since a shipped flag nobody deletes is permanent branching.

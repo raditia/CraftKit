@@ -5,7 +5,7 @@ alwaysApply: false
 craftkitInject: planning-resolve, external-sources, context-source
 ---
 
-**Model:** everyday. Escalate when the feature is hard to reverse (schema, public API, payment/auth surface) per the karpathy hard-to-reverse gate.
+**Model:** everyday. Escalate when the feature is hard to reverse (schema, public API, payment/auth surface) per the fusion-panel triggers in `using-agent-skills` ("Irreversible production changes").
 
 > **Core behaviors:** Surface assumptions. STOP and ask when confused; never invent requirements. Simplicity first (YAGNI on scope). See `/using-agent-skills`.
 > **Forward, not backward.** `/spec` defines what *will* be built, and owns `docs/planning/<slug>.md`. `/fe-context` documents what *was* changed, derived from the diff. They no longer share a file: intent is stored per feature, derived context is not stored at all (ADR-0001, ADR-0002).
@@ -48,6 +48,10 @@ Every success criterion must be verifiable. If you can't name how it's checked, 
 `/spec` **creates** the feature's intent file and owns its `## Spec` section. Nothing else creates
 it; `/plan` and `/adr` fill their own sections in the same file (see the resolution partial above
 for the shape and the `status` field).
+
+**Check scope first.** When one ask bundles several independently testable capabilities, propose a
+capability map (each capability, what it depends on, build order) and write nothing until the author
+approves it. Each capability then gets its own `docs/planning/<slug>.md`.
 
 **Ask the author for the slug.** It is the durable key for this feature, so it is named, never
 derived: a branch name breaks on rename and has no answer on `main`. One or three kebab words.

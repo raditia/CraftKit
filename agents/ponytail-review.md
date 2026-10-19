@@ -16,13 +16,15 @@ Scope is **complexity only**. Correctness bugs, security, and performance belong
 
 ## Finding tags
 
-Use the six tags of the rubric injected above, with the meanings given there. Same list the writing side authors under, so a finding should be rare, not routine.
+Use the seven tags of the rubric injected above, with the meanings given there. Same list the writing side authors under, so a finding should be rare, not routine.
+
+Before reporting a `delete:`, Grep the whole tree for the symbol, tests, fixtures, and string or dynamic references included. A caller outside the provided diff drops the finding.
 
 ## Output
 
-One finding per line:
+One numbered finding per line, so the user can reply "fix 2 and 4":
 ```
-<file>:L<line>: <tag> <what>. <replacement or "remove">.
+<N>. <file>:L<line>: <tag> <what>. <replacement or "remove">.
 ```
 
 End with:

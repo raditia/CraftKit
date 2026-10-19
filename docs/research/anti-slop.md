@@ -1,6 +1,6 @@
 # anti-slop (miqdadbadjuber/anti-slop): what it ships, how it installs, what it touches
 
-Research date: **2026-09-17**. Primary sources only: the repository's own files, read from a shallow clone pinned at `743735248fbaefd76bb56619615687dfa8b3bc1e` (2026-09-16), plus the GitHub REST API for repository metadata. No blog post, write-up, or third-party summary was consulted. Every claim below cites either a `path:line` inside that clone or the API URL it came from.
+Research date: **2026-09-17**. Primary sources only: the repository's own files, read from a shallow clone pinned at `743735248fbaefd76bb56619615687dfa8b3bc1e` (2026-09-16), plus the GitHub REST API for repository metadata. No blog post, write-up, or third-party summary was consulted. Every claim below cites either a `path:line` inside that clone or the API URL it came from. Now pinned at `439a2ef5b9dd` (2026-10-16): the two source skills `skills/fe-design` adapts, `antislop-ui` and `antislop-layoutmobile`, are unchanged since `7437352`, so their citations hold at the new pin.
 
 **Verbatim-quoting caveat.** Upstream separates a rule id from its title with an em dash character (`R-02`, then that character, then `Copywriting`). This repo's `check.sh` check 19 greps `docs/` for that byte and exempts only `CHANGELOG` and `CRAFTKIT-INJECTED-RULES` lines, so reproducing it here would fail the gate. Rule titles below render the separator as a plain space. That is the single normalization applied to any quoted text in this note; everything else is byte-exact.
 

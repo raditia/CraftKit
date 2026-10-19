@@ -1,6 +1,6 @@
 ---
 name: think
-description: Router for systems/strategy reasoning frameworks. Classify the problem shape, then apply the matching mental model (systems, feedback loops, constraints, leverage, cynefin, second-order). Use for architecture, complex-system debugging, and decisions with non-obvious downstream effects. Curated from tjboudreaux/cc-thinking-skills (MIT).
+description: Router for systems/strategy reasoning frameworks. Classify the problem shape, then apply the matching mental model (cynefin, systems, constraints, second-order). Use for architecture, complex-system debugging, and decisions with non-obvious downstream effects. Curated from tjboudreaux/cc-thinking-skills (MIT).
 alwaysApply: false
 ---
 
@@ -25,21 +25,19 @@ Much reasoning is already covered, so send the user there instead of loading a f
 | Simplify / delete / "do we need this" | `ponytail` ladder (via-negativa, Occam), always active |
 | Root cause of a bug | `/debug` (five-whys, scientific method) |
 | Argue against a plan/change | `adversarial` agent, `plan-roaster` (red-team, steel-man) |
-| Is this decision hard to reverse? | `karpathy` "hard to reverse" gate + fusion-panel triggers |
+| Is this decision hard to reverse? | Fusion-panel triggers in `using-agent-skills` ("Irreversible production changes") |
 
 Only continue below when the problem is genuinely a **systems / strategy** shape.
 
 ---
 
-## The 6 frameworks: pick by problem shape
+## The 4 frameworks: pick by problem shape
 
 | Framework | Use when | Core move |
 |-----------|----------|-----------|
 | **Cynefin** | You don't know *what kind* of problem this is | Classify: Clear (best practice) · Complicated (analyze, expert) · Complex (probe→sense→respond, safe-to-fail experiments) · Chaotic (act→stabilize first). Match approach to domain, and don't apply best-practice to a complex problem. |
-| **Systems** | Parts interact; fixing one thing breaks another | Map elements → connections → the behavior they produce. Look for the structure generating the symptom, not the symptom. |
-| **Feedback loops** | Behavior amplifies or self-corrects over time | Name each loop: reinforcing (snowballs: growth, runaway retries, cache stampede) vs balancing (self-limits: backpressure, rate limit). Find which loop dominates. |
+| **Systems** | Parts interact, effects arrive late, or fixing one thing breaks another | Draw the boundary. Map stocks (what accumulates: queue depth, cache, debt) and the flows that fill or drain them. Name each loop as reinforcing (snowballs: runaway retries, cache stampede) or balancing (self-limits: backpressure, rate limit), with its delay, and find which dominates. Rank leverage points: params/numbers (weak) → feedback structure → rules → goals → paradigm (strong), then push the highest feasible one. |
 | **Theory of constraints** | System is slow/limited but effort is spread thin | Find the ONE bottleneck. Improving anything else is waste until the constraint moves. (Broader than `/fe-performance`, since it applies to process, build, data flow.) |
-| **Leverage points** | Many possible interventions, limited effort | Rank by leverage: params/numbers (weak) → feedback structure → rules → goals → paradigm (strong). Push the highest-leverage point that's feasible. |
 | **Second-order** | A fix looks obviously good | Ask "and then what?" 2–3 hops out. Surface the delayed/indirect cost the first-order view hides. |
 
 Combining is allowed: e.g. Cynefin to classify → Systems to map → Constraints to prioritize.
@@ -50,7 +48,7 @@ Combining is allowed: e.g. Cynefin to classify → Systems to map → Constraint
 
 1. **Classify** in one line: what shape is this problem? (If not systems/strategy → route to the table above and stop.)
 2. **Pick 1–2 frameworks** and name them and why.
-3. **Apply** the core move. Show the map/loops/constraint/hops explicitly, not just a conclusion.
+3. **Apply** the core move. Show the map/loops/constraint/hops explicitly, not just a conclusion. Systems stops once the dominant loop and one feasible leverage point are named; a problem with no loop or delay is not a systems shape, so drop the framework rather than draw one.
 4. **Output** the insight the framework surfaced that the naive view missed, then the concrete next action + which real skill executes it.
 
 ```
