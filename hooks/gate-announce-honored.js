@@ -86,8 +86,11 @@ process.stdin.on('end', () => {
   const invoked = new Set(turn.skills.concat(turn.slashCommands).map(norm));
 
   const missing = [];
+  // The transcript can lag the final reply at Stop time (documented), which judged the
+  // previous reply and blocked a declared retry, so the payload's copy is read as well.
   // A fenced example is documentation, not a claim about this turn.
-  const text = String(turn.assistantText || '').replace(/```[\s\S]*?```/g, '');
+  const text = (String(turn.assistantText || '') + '\n' + String(payload.last_assistant_message || ''))
+    .replace(/```[\s\S]*?```/g, '');
   let m;
   ANNOUNCE.lastIndex = 0;
   while ((m = ANNOUNCE.exec(text)) !== null) {
@@ -109,6 +112,9 @@ process.stdin.on('end', () => {
   // Check 2: the turn declared something. An invoked skill or a typed slash command is a
   // declaration by itself; otherwise the reply has to carry one of the two lines.
   if (invoked.size) return pass();
+  // A background-task wake-up is not a prompt, so there is no intent to declare; the
+  // honesty check above still holds it. Same exemption as gate-skill-first.
+  if (turn.notification) return pass();
   ANNOUNCE.lastIndex = 0;
   if (ANNOUNCE.test(text) || NO_MATCH.test(text)) return pass();
   // An empty reply claims nothing, so there is nothing to hold it to. Usually an
