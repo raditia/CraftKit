@@ -1,4 +1,4 @@
-# craftkit `v1.60.0`
+# craftkit `v1.61.0`
 
 [![npm](https://img.shields.io/npm/v/@raditia/craftkit)](https://www.npmjs.com/package/@raditia/craftkit)
 [![npm downloads](https://img.shields.io/npm/dw/@raditia/craftkit)](https://www.npmjs.com/package/@raditia/craftkit)
@@ -294,7 +294,7 @@ All opt-in, never auto-run from `/parallel-build`. `/spec`, `/plan` and `/adr` w
 | [`plan`](skills/plan/SKILL.md) | Break a spec into ordered, verifiable tasks + deps + executing skill; offers `plan-roaster` | Large dependency graph or > 5 interdependent files |
 | [`adr`](skills/adr/SKILL.md) | Record one architectural decision: context, options, decision, consequences (the *why*) | n/a |
 | [`grill`](skills/grill/SKILL.md) | Stress-test an existing plan/decision: frontier-round interview until nothing is silently assumed; parks ungrillable questions, captures `docs/glossary.md` terms, offers `/adr` | n/a |
-| [`docs`](skills/docs/SKILL.md) | Dual-audience docs: technical (engineers) + non-technical (stakeholders), Confluence-paste-ready markdown, run through `/humanizer` | Accuracy depends on subtle system behavior, so escalate to everyday |
+| [`docs`](skills/docs/SKILL.md) | Dual-audience docs: technical (engineers) + non-technical (stakeholders), concise Confluence-paste-ready markdown with tables and diagrams over long prose, run through `/humanizer` | Accuracy depends on subtle system behavior, so escalate to everyday |
 
 </details>
 

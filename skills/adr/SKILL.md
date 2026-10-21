@@ -2,7 +2,7 @@
 name: adr
 description: Record one architectural decision as an immutable ADR: context, options weighed, decision, consequences. Captures the WHY a choice was made so future readers don't re-litigate it. Appends a pointer to the feature's docs/planning/ intent file. Adapted from addyosmani/agent-skills documentation-and-adrs (MIT).
 alwaysApply: false
-craftkitInject: planning-resolve
+craftkitInject: planning-resolve, shape-before-prose
 ---
 
 **Model:** everyday.

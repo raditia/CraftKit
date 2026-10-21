@@ -1,7 +1,7 @@
 ---
 name: pr-message
 description: Generate a pull request message from branch commits and diff: title, summary, goal, changed files, test coverage status, and reviewer notes. Copies result to clipboard.
-craftkitInject: change-scope
+craftkitInject: change-scope, shape-before-prose
 ---
 
 **Commands:** `rtk git log`, `rtk git diff`, `rtk git status`, `rtk git remote`

@@ -2,7 +2,7 @@
 name: spec
 description: Turn a discovery brief or clear ask into a PRD before coding: objective, users, scope, constraints, boundaries, acceptance criteria. Writes the feature's intent file under docs/planning/ so downstream skills execute with intent, not guesses. Adapted from addyosmani/agent-skills spec-driven-development (MIT).
 alwaysApply: false
-craftkitInject: planning-resolve, external-sources, context-source
+craftkitInject: planning-resolve, external-sources, context-source, shape-before-prose
 ---
 
 **Model:** everyday. Escalate when the feature is hard to reverse (schema, public API, payment/auth surface) per the fusion-panel triggers in `using-agent-skills` ("Irreversible production changes").

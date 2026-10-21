@@ -86,8 +86,12 @@ process.stdin.on('end', () => {
   const invoked = new Set(turn.skills.concat(turn.slashCommands).map(norm));
 
   const missing = [];
+  // The transcript can lag the conversation when Stop fires, so the reply that just added
+  // the declaration is often only in last_assistant_message.
+  const last = String(payload.last_assistant_message || '');
+  const said = String(turn.assistantText || '');
   // A fenced example is documentation, not a claim about this turn.
-  const text = String(turn.assistantText || '').replace(/```[\s\S]*?```/g, '');
+  const text = (said.includes(last) ? said : said + '\n' + last).replace(/```[\s\S]*?```/g, '');
   let m;
   ANNOUNCE.lastIndex = 0;
   while ((m = ANNOUNCE.exec(text)) !== null) {

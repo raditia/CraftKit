@@ -1074,6 +1074,11 @@ PYEOF
         && { fail "announce gate blocks a turn that announced and invoked, because the skill body reset the turn"; _gd=1; }
     _announcegate "$_gx/declare-across-stop-feedback.jsonl" | grep -q '"decision"' \
         && { fail "announce gate loses a declaration to its own stop feedback, so the block repeats instead of clearing"; _gd=1; }
+    # The transcript lags the conversation at Stop, so a retry's new declaration is often
+    # only in last_assistant_message. Reading the file alone blocked the corrected retry.
+    _announcegate "$_gx/declare-silent.jsonl" ',"last_assistant_message":"No skill matched for this request. Responding directly."' \
+        | grep -q '"decision"' \
+        && { fail "announce gate ignores last_assistant_message, so a declaration the transcript has not flushed yet still blocks"; _gd=1; }
     # Negative control for check 2, mirroring s9.
     _announcegate "$_gx/declare-silent-across-injection.jsonl" | grep -q '"decision":"block"' \
         || { fail "announce gate stopped seeing an undeclared turn once an injected entry appeared, so the turn fix disarmed check 2"; _gd=1; }

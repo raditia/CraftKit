@@ -1,8 +1,8 @@
 ---
 name: docs
-description: Produce feature documentation in two registers from one source of truth, a technical version for engineers and a non-technical version for stakeholders, as Confluence-paste-ready markdown, then run both through /humanizer to strip AI-writing tells. Use after a feature ships or a spec is settled. Adapted from addyosmani/agent-skills documentation (MIT).
+description: Produce feature documentation in two registers from one source of truth, a technical version for engineers and a non-technical version for stakeholders, as concise Confluence-paste-ready markdown that puts comparisons in tables and flows in diagrams, then run both through /humanizer to strip AI-writing tells. Use after a feature ships or a spec is settled. Adapted from addyosmani/agent-skills documentation (MIT).
 alwaysApply: false
-craftkitInject: planning-resolve
+craftkitInject: planning-resolve, shape-before-prose
 ---
 
 **Model:** cheapest for the draft. Escalate to everyday if technical accuracy depends on subtle system behavior. The `/humanizer` pass runs on its own model.
@@ -39,6 +39,12 @@ Rules:
 
 ---
 
+## Shape before prose
+
+Follow the injected **Shape before prose** section. On top of its budget, the stakeholder doc fits on about one page.
+
+---
+
 ## Humanize pass: required when available
 
 Both documents are AI-drafted → run each through the humanizer to strip AI-writing tells.
@@ -47,7 +53,7 @@ Both documents are AI-drafted → run each through the humanizer to strip AI-wri
 test -f ~/.claude/skills/humanizer/SKILL.md && echo "humanizer: present" || echo "humanizer: absent"
 ```
 
-- **Present** → invoke `/humanizer` on each doc. Instruct it to preserve markdown structure verbatim, so headings, tables, and inline `code` pass through untouched. Before the rewrite, list each doc's names, numbers, qualifiers and caveats; after it, check the list against the output and restore anything lost. Use the humanized output as final.
+- **Present** → invoke `/humanizer` on each doc. Instruct it to preserve markdown structure verbatim, so headings, tables, diagram fences, and inline `code` pass through untouched, and to return no more words than it received. Before the rewrite, list each doc's names, numbers, qualifiers and caveats; after it, check the list against the output and restore anything lost. Use the humanized output as final.
 - **Absent** → note it and ship the un-humanized draft. (Only Claude Code exposes `/humanizer`; on Cursor/Gemini/Codex this step is a no-op by design, same as `/pr-message`.)
 
 Optional voice match: if the user points to a writing sample, pass it to `/humanizer` for voice calibration.
@@ -78,6 +84,7 @@ DOCS: <feature>
 Technical:    docs/<feature>.md          (printed below for copy)
 Stakeholder:  docs/<feature>-overview.md (printed below for copy)
 Format:       Confluence-paste-ready markdown ✓
+Shape:        comparisons in tables, flows in diagrams, sections within budget ✓
 Humanized:    YES / SKIPPED (humanizer absent)
 Consistency:  stakeholder claims trace to technical facts ✓
 ```

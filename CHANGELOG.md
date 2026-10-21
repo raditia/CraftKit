@@ -7,6 +7,16 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.61.0 — 2026-10-21
+
+### Shape before prose, for every document a human reads
+
+Docs came out as long paragraphs that readers skipped. A new partial, `partials/shape-before-prose.md`, picks each section's form by its content: comparisons go in tables, flows and state changes go in `text`-fenced ASCII diagrams (which render the same in a terminal, on GitHub and pasted into Confluence), and prose is kept for the why, tradeoffs and caveats. Each section opens with a one-line answer, and paragraphs cap at three sentences. `/docs`, `/spec`, `/adr`, `/research` and `/pr-message` inject it; `/research` passes it into its agent's brief, since the agent does not carry it. `/docs` also keeps the stakeholder doc to about one page, and tells `/humanizer` to keep diagram fences verbatim and return no more words than it received, so the humanize pass cannot undo the trim.
+
+### Fix: the announce gate blocked a retry that had added the routing line
+
+`gate-announce-honored.js` read the reply only from the transcript, but at Stop the transcript can lag the conversation, so a retry that added the missing routing line was blocked again (seen live: the block fired 140 ms after the corrected reply, which the file did not have yet). The gate now also reads `last_assistant_message` from the Stop payload, which Claude Code documents for exactly this case. `check.sh` gains a fixture for it.
+
 ## v1.60.0 — 2026-10-19
 
 ### Upstream sync: ponytail, humanizer, mattpocock, addyosmani, adhd, cc-thinking, anti-slop, caveman
