@@ -1,4 +1,4 @@
-# craftkit `v1.61.0`
+# craftkit `v1.62.0`
 
 [![npm](https://img.shields.io/npm/v/@raditia/craftkit)](https://www.npmjs.com/package/@raditia/craftkit)
 [![npm downloads](https://img.shields.io/npm/dw/@raditia/craftkit)](https://www.npmjs.com/package/@raditia/craftkit)
@@ -47,7 +47,7 @@ Run `bash sync.sh --configure` from a Git checkout to select optional extras and
 
 | Setting | Default | Purpose |
 |---|---|---|
-| `humanizer` | on | Natural writing for docs and PR messages |
+| `humanizer` | on | Standalone humanizer skill; `/docs` and `/pr-message` use `/clarity` instead |
 | `playwright` | off | Browser automation CLI and skills |
 | `dashboard` | off | Live Claude and Codex agent dashboard |
 | `gates.routing` | on | Skill routing and announcement gates |
@@ -276,6 +276,7 @@ The `*-review`, `*-a11y` and `*-performance` skills are also the live source for
 | [`think`](skills/think/SKILL.md) | Systems/strategy reasoning router: cynefin, systems (loops, leverage), constraints, second-order. Architecture + complex-system decisions | Architecture call with non-obvious tradeoffs, so escalate analysis to opus |
 | [`research`](skills/research/SKILL.md) | Background agent researches a question against primary sources only, writes a cited note into the repo | n/a |
 | [`handoff`](skills/handoff/SKILL.md) | Compact the session into a handoff doc for a fresh agent: state, decisions, next steps, suggested skills | n/a |
+| [`clarity`](skills/clarity/SKILL.md) | Rewrite, review, or co-write reader-facing prose: fixes substance before style, keeps every fact and attribution, marks author-only gaps `[TK]`. Used by `/docs` and `/pr-message`. Adapted from addyosmani/clarity (MIT) | n/a |
 | [`context-source`](skills/context-source/SKILL.md) | Connect, replace, disconnect or list the team docs repos on GitHub that `/interview`, `/spec` and `/plan` check asks against, with cited conflicts. Cache under `~/.craftkit`, never in the project (ADR-0003) | n/a |
 | [`eval`](skills/eval/SKILL.md) | Score a finished run into a weighted correctness %: spawns `eval-judge`, appends `docs/evals/ledger.md`, derives the success rate | Score gates a merge or release, so escalate the judge; irreversible gate, so run a fusion panel of two judges |
 | [`ponytail-review`](skills/ponytail-review/SKILL.md) | Over-engineering audit on a diff or file: what to delete/shrink | Correctness or security concerns → use `code-quality` |
@@ -294,7 +295,7 @@ All opt-in, never auto-run from `/parallel-build`. `/spec`, `/plan` and `/adr` w
 | [`plan`](skills/plan/SKILL.md) | Break a spec into ordered, verifiable tasks + deps + executing skill; offers `plan-roaster` | Large dependency graph or > 5 interdependent files |
 | [`adr`](skills/adr/SKILL.md) | Record one architectural decision: context, options, decision, consequences (the *why*) | n/a |
 | [`grill`](skills/grill/SKILL.md) | Stress-test an existing plan/decision: frontier-round interview until nothing is silently assumed; parks ungrillable questions, captures `docs/glossary.md` terms, offers `/adr` | n/a |
-| [`docs`](skills/docs/SKILL.md) | Dual-audience docs: technical (engineers) + non-technical (stakeholders), concise Confluence-paste-ready markdown with tables and diagrams over long prose, run through `/humanizer` | Accuracy depends on subtle system behavior, so escalate to everyday |
+| [`docs`](skills/docs/SKILL.md) | Dual-audience docs: technical (engineers) + non-technical (stakeholders), concise Confluence-paste-ready markdown with tables and diagrams over long prose, run through `/clarity` | Accuracy depends on subtle system behavior, so escalate to everyday |
 
 </details>
 

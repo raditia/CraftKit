@@ -39,7 +39,7 @@ Every sync reads `~/.craftkit-state/config`, one `key=value` per line, so a choi
 
 | Key | Default | On | Off |
 |-----|---------|----|-----|
-| `humanizer` | on | Installs the humanizer skill on an explicit install | Removes `~/.agents/skills/humanizer` and the `~/.claude/skills/humanizer` link pointing at it, only when craftkit installed them; `/pr-message` and `/docs` report it skipped |
+| `humanizer` | on | Installs the humanizer skill on an explicit install | Removes `~/.agents/skills/humanizer` and the `~/.claude/skills/humanizer` link pointing at it, only when craftkit installed them |
 | `playwright` | off | `npm i -g @playwright/cli@latest`, then `playwright-cli install --skills=agents -g`. Needs npm and Node 20+, and network. Ownership is the skill folders that appear under `~/.agents/skills`, where the CLI is assumed to write them. A failed install warns, the sync completes, and later syncs skip it until `bash sync.sh --configure` or `bash install.sh` retries | Removes the skill folders craftkit's install added, and the npm package only if craftkit installed it |
 | `dashboard` | off | The [agent dashboard](#agent-dashboard-opt-in) | Removes it, logs included |
 | `gates.routing` | on | Skill-first and announce gates, the routing rule prose, the full routing hook | Unregisters `gate-skill-first.js` and `gate-announce-honored.js`, drops their rule prose, and the routing hook injects only the model-tier and local-skills lines, plus the director line while `gates.director` is on |

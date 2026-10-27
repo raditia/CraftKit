@@ -51,7 +51,7 @@ fi
 # Resolved after the downgrade guard, so a refused sync never flips anything.
 CRAFTKIT_CONFIG="$STATE_DIR/config"
 _CK_KEYS=(
-    "humanizer%on%humanizer skill, used by /pr-message and /docs"
+    "humanizer%on%humanizer skill, standalone (/pr-message and /docs use /clarity)"
     "playwright%off%Playwright CLI and its agent skill (needs npm and Node 20+)"
     "dashboard%off%agent dashboard, logs tool calls to ~/.craftkit/agent-tree"
     "gates.routing%%routing gates: skill-first and announce hooks, routing rule prose"
