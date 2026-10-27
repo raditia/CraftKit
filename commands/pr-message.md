@@ -124,6 +124,6 @@ Branch:   <branch> → <base>
 Commits:  N
 Files:    N changed
 Tests:    COVERED / UNCOVERED (flag if no test files in diff)
-Clarity:  rewrite pass applied
+Clarity:  APPLIED / FAILED (reason)
 Copied:   YES / FAILED (fallback: message printed above)
 ```

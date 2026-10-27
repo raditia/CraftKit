@@ -17,10 +17,10 @@ An explicit mode word wins; otherwise infer, and ask only when review and rewrit
 | Mode | Words | Does |
 |---|---|---|
 | Rewrite | rewrite, edit, fix, humanize | Edits an existing draft |
-| Review | review, critique, check | Critiques; writes no replacement draft, changes no file |
-| Co-write | cowrite, write, draft, new | Interviews the author first, then drafts from their language |
+| Review | review, critique, check | Critiques with passage-level suggestions; writes no full replacement draft, changes no file |
+| Co-write | cowrite, co-write, help me write my own | Interviews the author first, then drafts from their language |
 
-Called from another skill (`/docs`, `/pr-message`), run Rewrite and obey the caller's structure constraints.
+Called from another skill (`/docs`, `/pr-message`), run Rewrite, obey the caller's structure constraints, and never ask or offer Co-write: leave no `[TK]` marker in the output, and report each gap in the change note instead.
 
 ## Safeguards, every mode
 
@@ -61,11 +61,11 @@ A hollow draft: say so in two or three sentences and offer Co-write. If the user
 
 | Pattern | Watch for | Test, then fix |
 |---|---|---|
-| Importance without mechanism | pivotal, crucial, transformative, underscores, testament to, plays a key role | Remove the emphasis: does an actor, mechanism, result, or limit remain? State the mechanism and let the reader judge. Keep `robust` when the passage names the failure handling |
+| Importance without mechanism | pivotal, crucial, transformative, underscores, testament to, plays a key role | Remove the emphasis: does an actor, mechanism, result, or limit remain? State the mechanism from the source and let the reader judge; absent from the source → `[TK]` or cut. Keep `robust` when the passage names the failure handling |
 | Specific-looking vagueness | "a package once caused a security problem" | Which package, what happened, how caught? Absent from the source → `[TK]` or cut. Never fill it |
 | Vague attribution, false precision | experts argue, studies show, industry reports suggest | Name the supplied source, keep the uncertainty, ask, or cut. Never turn `may` into `will`, `some` into `most`, association into cause, or a vendor claim into narrator fact |
 | Formula carrying the argument | not X but Y, balanced threes, punchline paragraphs, fake questions | Flatten test: state it without the cadence. Relation test: restate with because / although / when / so. If the relation must be invented, it was never there. Keep an earned contrast or list |
-| Abstract actors | decisions decide, data speaks | Name the person, team, or system. Passive stays when the actor is unknown, irrelevant, or protected |
+| Abstract actors | decisions decide, data speaks | Name the person, team, or system the source names. Passive stays when the actor is unknown, irrelevant, or protected |
 | Structural regularity | identical sections, swappable paragraphs, every paragraph ending on a quotable line, recap ending | Fix the dominant one: combine, let one section carry weight, name the relation at a weak join, stop at the last concrete consequence. Never add random wobble to look irregular |
 | Surface residue | Certainly, Great question, I hope this helps; Let's dive in, In this section; It is important to note, At its core; delve, tapestry, landscape, seamless, unlock; trailing "highlighting...", "fostering..."; In conclusion, Looking ahead | A search aid, not a ban. Keep quotes, proper names, terms of art, accurate ordinary words. Rewrite the claim rather than swapping in a synonym |
 | Default formatting | needless bold, bold-label bullets, decorative emoji, a heading restated by its first sentence | Keep formatting that supports scanning, accessibility, or the medium |
@@ -82,6 +82,8 @@ A hollow draft: say so in two or three sentences and offer Co-write. If the user
 - The medium still works: procedures scan, warnings stay visible, emails state the ask.
 - The strongest original sentence is untouched unless changing it solved a real problem.
 - The ending stops on the last useful thought.
+- The most important claim has evidence, mechanism, example, or honest uncertainty beside it.
+- No edit made the prose colder or less the author's merely to remove a stylistic tell.
 
 ---
 
@@ -149,12 +151,3 @@ Explicit user or house requirements outrank this table.
 | Marketing, launch copy | A specific audience and credible proof | Product names, constraints, calls to action | Unsupported superlatives, invented customers or metrics |
 | UI text | Task completion, brevity, consistent terms | Labels, error recovery, localization limits | Personality that obscures the action |
 
----
-
-## Final check
-
-- The output performs the requested mode and fits its medium.
-- No fact, attribution, scope, condition, quotation, link, or experience drifted.
-- The most important claim has evidence, mechanism, example, or honest uncertainty beside it.
-- Structure follows the reader's task, not a default template.
-- No edit made the prose colder or less the author's merely to remove a stylistic tell.

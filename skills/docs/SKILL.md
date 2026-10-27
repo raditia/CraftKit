@@ -47,7 +47,7 @@ Follow the injected **Shape before prose** section. On top of its budget, the st
 
 ## Clarity pass: required
 
-Both documents are AI-drafted, so run each through `/clarity` in rewrite mode. Instruct it to preserve markdown structure verbatim, so headings, tables, diagram fences, and inline `code` pass through untouched, and to return no more words than it received. Its rewrite check guards names, numbers, qualifiers and caveats; confirm the list survived before using the output as final.
+Both documents are AI-drafted, so run each through `/clarity` in rewrite mode. Instruct it to preserve markdown structure verbatim, so headings, tables, diagram fences, and inline `code` pass through untouched, and to return no more words than it received. Before the rewrite, list each doc's names, numbers, qualifiers and caveats; after it, check the list against the output and restore anything lost. Use the result as final.
 
 Optional voice match: if the user points to a writing sample, pass it to `/clarity` as the author's sample.
 
@@ -78,6 +78,6 @@ Technical:    docs/<feature>.md          (printed below for copy)
 Stakeholder:  docs/<feature>-overview.md (printed below for copy)
 Format:       Confluence-paste-ready markdown ✓
 Shape:        comparisons in tables, flows in diagrams, sections within budget ✓
-Clarity:      rewrite pass applied, facts preserved ✓
+Clarity:      APPLIED, facts preserved ✓ / FAILED (reason)
 Consistency:  stakeholder claims trace to technical facts ✓
 ```
