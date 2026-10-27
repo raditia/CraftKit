@@ -167,7 +167,7 @@ Planning & docs (general, opt-in, never auto-run; write the feature's intent fil
   ├── Break a spec into ordered verifiable tasks? ──→ /plan  (then plan-roaster agent to stress-test)
   ├── Record WHY a decision was made? ──────────────→ /adr
   ├── Stress-test an EXISTING plan/decision, interactive? → /grill  (frontier rounds; cold single-pass doc roast → plan-roaster agent)
-  └── Document a feature for engineers + stakeholders? → /docs  (dual-audience, humanized)
+  └── Document a feature for engineers + stakeholders? → /docs  (dual-audience, clarity pass)
   Chain them: /define runs interview → spec → test-cases → plan checkpoint-gated (one invoke). adr + docs offered as tail of /parallel-ship.
   Full arc: /define (interview→spec→test-cases→plan) → /parallel-build → /parallel-ship (→ offers /adr + /docs)
 
@@ -175,6 +175,7 @@ General utilities (any platform)
   ├── Research a question against primary sources? ──→ /research  (background agent, cited note in repo)
   ├── Score a finished run, correctness %? ──────────→ /eval  (eval-judge + weighted rubric + ledger)
   ├── Connect / switch / remove a team docs repo? ──→ /context-source  (planning then checks asks against it)
+  ├── Rewrite / review / co-write prose? ────────────→ /clarity  (no invented facts; feature discovery is /interview)
   └── Hand this session off to a fresh agent? ───────→ /handoff  (compact state + decisions + next steps)
 
 Native Android (MVP + Core framework)          Native iOS (MVVM-C)
