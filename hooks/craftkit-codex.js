@@ -242,7 +242,9 @@ function prPreflight(p, cwd) {
   const deny = reason => ({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny',
     permissionDecisionReason: 'PR preflight: ' + reason } });
   if (process.env.GH_REPO) return deny('GH_REPO overrides are unsupported; unset it and run from the target worktree.');
-  if (/[`$()<>|;&\n\r\\#*?\[\]{}~!]/.test(command)) return deny('Use a direct gh pr create command without shell expansion or chaining.');
+  const shellSyntax = command.replace(/'[^'\n]*'|"[^"\n]*"/g,
+    quoted => quoted[0] === "'" ? '' : quoted.replace(/[^$`\\\n\r]/g, ''));
+  if (/[`$()<>|;&\n\r\\#*?\[\]{}~!]/.test(shellSyntax)) return deny('Use a direct gh pr create command without shell expansion or chaining.');
   const tokens = command.match(/"[^"\n]*"|'[^'\n]*'|[^\s"']+/g) || [];
   if (tokens.join(' ').replace(/\s+/g, ' ') !== command.trim().replace(/\s+/g, ' ')) return deny('Use simple complete quoted arguments.');
   const args = tokens.map(token => token.replace(/^(['"])(.*)\1$/, '$2'));

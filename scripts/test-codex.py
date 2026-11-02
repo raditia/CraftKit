@@ -426,6 +426,13 @@ class CodexGatewayTests(unittest.TestCase):
         for prefix in ('gh', '/usr/bin/gh', 'rtk gh', 'rtk /usr/bin/gh'):
             self.assertEqual(self.pr_hook(prefix + ' pr create --body-file "' + str(body) + '"'), {})
 
+    def test_pr_preflight_allows_literal_punctuation_in_quoted_titles(self):
+        body, _ = self.pr_fixture()
+        base = 'gh pr create --body-file "' + str(body) + '"'
+        for title in ('"Fix #123"', '"Fix retry (race)"', "'Fix $TITLE and `literal`'", '"Fix apostrophe\'s #123"'):
+            with self.subTest(title=title):
+                self.assertEqual(self.pr_hook(base + ' --title ' + title), {})
+
     def test_pr_preflight_denies_missing_stale_dirty_records(self):
         body, saved = self.pr_fixture()
         command = 'gh pr create --body-file "' + str(body) + '"'
@@ -450,7 +457,9 @@ class CodexGatewayTests(unittest.TestCase):
                         base + ' --head=other', base + ' -Hother',
                         base + ' --body-file=other.md', base + ' -F other.md', base + ' -Fother.md',
                         base + ' # --draft', base + ' --title *',
-                        base + '; echo done', base + ' && true', base + ' --title "$TITLE"'):
+                        base + '; echo done', base + ' && true', base + ' --title "$TITLE"',
+                        base + ' --title "$(echo injected)"', base + ' --title "`echo injected`"',
+                        base + ' --title "Fix \'$TITLE\'"'):
             self.assert_pr_denied(self.pr_hook(command))
 
     def test_pr_preflight_limitations_require_draft(self):
