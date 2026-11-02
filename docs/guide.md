@@ -599,7 +599,13 @@ Skills name a tier, never a model id. Claude agents spawn on the family alias (`
 | Claude Code | injected per prompt | injected per prompt | 2× escalate → same-tier judge |
 | Gemini CLI | `flash` | `pro` | n/a |
 | Cursor | `auto` (picker/account-level, not repo-configurable) | `cursor-agent --model` | n/a |
-| Codex CLI | omit `model`, effort `medium` | omit `model`, effort `high` | n/a |
+| Codex CLI | configured model for implementation and critical reviews | runtime-listed stronger model or higher supported effort | n/a |
+
+Codex can select a cheaper runtime-listed model for bounded lookup, extraction, docs, and fixed
+checks. The coordinator stays on its configured model. Explicit user/profile pins win; when
+overrides or cost/capability information are unavailable, subagents inherit. Model overrides use
+isolated task context and keep all verification gates. Profiles do not pin model ids, and lowering
+reasoning effort alone does not change the model. [Codex subagent settings](https://learn.chatgpt.com/docs/agent-configuration/subagents)
 
 | Route to | When |
 |----------|------|
