@@ -7,6 +7,14 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.62.0 — 2026-10-27
+
+### New skill: `/clarity`, for prose that keeps its facts
+
+`/humanizer` strips AI-writing tells, but it is a third-party extra that only Claude Code loads, so the clarity pass in `/docs` and `/pr-message` did nothing on Cursor, Gemini and Codex. It also had no rule for keeping facts intact. The new `skills/clarity` is adapted from addyosmani/clarity (MIT, baseline `e27ceeff6036`). It has three modes: rewrite, review (a critique with `keep` / `revise` / `ask-author` / `cut` verdicts) and co-write (interviews the author first). Each mode fixes substance before style, keeps every claim, number and attribution at the same force, and marks author-only gaps `[TK]` instead of inventing them. The upstream's five reference files are condensed into the one `SKILL.md`, because skills here install as a single file. Its prose linter, evals and wrapper commands are left out. The upstream's separators were normalized to drop em-dashes.
+
+`/docs` and `/pr-message` now run `/clarity` in rewrite mode instead of `/humanizer`, and `/fe-design` sends product copy there. The `humanizer` extra still installs as a standalone skill. Co-write mode is not feature discovery, which stays `/interview`, and the skill says so.
+
 ## v1.61.0 — 2026-10-21
 
 ### Shape before prose, for every document a human reads

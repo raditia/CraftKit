@@ -11,6 +11,7 @@ These repos' content was rewritten into CraftKit files. Licenses and attribution
 | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) | `rules/karpathy-guidelines.md` (ponytail rubric), `skills/ponytail-{review,audit,debt}`, `agents/ponytail-review.md` | `16352ac229eb` (tag v5.3.2) | v1.60.0, 2026-10-19 | reconciled |
 | [mattpocock/skills](https://github.com/mattpocock/skills) | `skills/{grill,research,handoff}`, CLAUDE.md "Writing levers" | `49dd158d1076` | v1.60.0, 2026-10-19 | reconciled |
 | [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) | `skills/{adr,docs,interview,spec,plan}` | `aeac41d4d005` | v1.60.0, 2026-10-19 | reconciled |
+| [addyosmani/clarity](https://github.com/addyosmani/clarity) | `skills/clarity` (SKILL.md + references condensed; lint script, evals and wrapper commands dropped) | `e27ceeff6036` | v1.62.0, 2026-10-27 | reconciled |
 | [UditAkhourii/adhd](https://github.com/UditAkhourii/adhd) | `skills/ideate` | `7b91ce601ed9` | v1.60.0, 2026-10-19 | reconciled |
 | [tjboudreaux/cc-thinking-skills](https://github.com/tjboudreaux/cc-thinking-skills) | `skills/think` | `7b8fece345df` | v1.60.0, 2026-10-19 | reconciled |
 | [miqdadbadjuber/anti-slop](https://github.com/miqdadbadjuber/anti-slop) | `skills/fe-design` (from `antislop-ui`, `antislop-layoutmobile`) | `439a2ef5b9dd` | v1.60.0, 2026-10-19 | reconciled, pinned in `docs/research/anti-slop.md` |

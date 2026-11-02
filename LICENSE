@@ -36,6 +36,9 @@ adaptations are covered by the MIT license above.
   Adapted into: skills/interview, skills/spec, skills/plan, skills/adr,
   skills/docs.
 
+- addyosmani/clarity: https://github.com/addyosmani/clarity
+  Adapted into: skills/clarity.
+
 - UditAkhourii/adhd: https://github.com/UditAkhourii/adhd
   Adapted into: skills/ideate.
 

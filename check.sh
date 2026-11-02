@@ -2895,7 +2895,9 @@ _TG_ALLOW="- **Contract.** Rule 12's four fields plus the project's verify comma
 **Ponytail rubric: one list for writing and for reviewing.**
 New code re-implementing a function or module the repo already has
 Every finding names its replacement:
-**Self-pass before reporting done.**"
+**Self-pass before reporting done.**
+→ /docs  (dual-audience,
+→ /clarity  (no invented facts"
 _TG_HOOKS_verify='gate-verify-on-stop.js'
 _TG_HOOKS_director='gate-delegate.js'
 

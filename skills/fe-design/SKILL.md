@@ -12,7 +12,7 @@ craftkitInject: external-sources
 
 **Context:** Derived context for the change (Summary + Changed Files), emitted by `/fe-context`. Read the changed `View*.tsx` and any `UI*` sub-components. When your caller passed a slug, read its Figma source per `external-sources`: a choice the design file makes deliberately is intent, not a model default. Keep a deliberate choice (Figma, brand guide, `DESIGN.md`); when it matches a slop pattern, name the clash and ask the owner which wins.
 
-> **Visual design only.** Correctness, dead controls and layer violations belong to `/fe-review` and `/code-quality`. Contrast ratios, tap-target sizes, focus order and keyboard paths belong to `/fe-a11y`. Product copy belongs to `/humanizer`. Inline styles, `StyleSheet.create` and design tokens are already laws in `fe-rules`. This skill judges one thing: whether the design has a character of its own, or wears the model's defaults.
+> **Visual design only.** Correctness, dead controls and layer violations belong to `/fe-review` and `/code-quality`. Contrast ratios, tap-target sizes, focus order and keyboard paths belong to `/fe-a11y`. Product copy belongs to `/clarity`. Inline styles, `StyleSheet.create` and design tokens are already laws in `fe-rules`. This skill judges one thing: whether the design has a character of its own, or wears the model's defaults.
 
 ---
 
