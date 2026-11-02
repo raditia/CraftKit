@@ -9,6 +9,11 @@ Used by `/parallel-review`, `/parallel-ship`, `/parallel-build`. Run this classi
 
 ### Runtime execution
 
+Each isolated worker receives an explicit context packet: task/acceptance criteria, repository and
+baseline revision, scoped source excerpts/citations, applicable project conventions, ownership,
+allowed actions, verification commands and known gaps. Reviewers also receive the final revision
+and evidence. The coordinator resolves sources; cold agents report missing material as not provided.
+
 Use the host's native agent tools. On Claude Code, select the named `subagent_type`, give each a task-specific `description`
 (3-5 words, e.g. `Review EVPMR layers`), and put every selected agent's `Agent` block, plus the background test run, in **one** message, never in
 sequential waves: the agents are independent, so splitting them across turns serializes the slow

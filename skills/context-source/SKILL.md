@@ -1,12 +1,12 @@
 ---
 name: context-source
-description: Connect, replace, disconnect or inspect the team docs repos (PRDs, specs, SQL, meeting notes, decisions on GitHub) this project's planning consults. Use when the user wants to connect a docs repo, switch or remove one, or see which are connected. /interview, /spec and /plan then check asks against them.
+description: Connect, replace, disconnect or inspect the team docs repos (PRDs, specs, SQL, meeting notes, decisions on GitHub) this project's development and planning consult. Use when the user wants to connect a docs repo, switch or remove one, or see which are connected.
 alwaysApply: false
 ---
 
 **Model:** cheapest, since every step is a helper call plus one file edit.
 
-> **Lifecycle only.** Searching and citing happen inside `/interview`, `/spec` and `/plan`.
+> **Lifecycle only.** Searching and citing follow the shared consultation procedure inside planning and development workflows.
 
 ---
 

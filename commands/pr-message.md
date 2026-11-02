@@ -1,6 +1,6 @@
 ---
 name: pr-message
-description: Generate a pull request message from branch commits and diff: title, summary, goal, changed files, test coverage status, and reviewer notes. Copies result to clipboard.
+description: Prepare a PR description with reviewer evidence and commit-bound preflight; include test results, independent review and explicit limitations. Copies result to clipboard.
 craftkitInject: change-scope, shape-before-prose
 ---
 
@@ -87,6 +87,14 @@ From the diff, extract:
 ## Notes for reviewer
 
 <Optional. Flag: non-obvious decisions, known trade-offs, areas that need extra attention, follow-up tickets if any.>
+
+## Evidence
+
+<Reviewer-accessible recordings/screenshots for visual or interaction changes; logs, request/response
+samples or test output for nonvisual work. Label scenario, expected/actual result, platform/environment,
+capture time/timezone and tested commit. Distinguish original bug evidence from fixed behavior.>
+
+<Explicit limitations and unverified scenarios. Missing essential evidence means INCOMPLETE.>
 ```
 
 Rules:
@@ -95,6 +103,42 @@ Rules:
 - File table: only files that matter to the reviewer, so skip auto-generated, lock files, trivial renames
 - Test coverage: if no test files changed, always flag it explicitly
 - Notes section: omit if nothing warrants reviewer attention
+- Evidence: use short before/after videos when available, or sufficient screenshots. Open/play the
+  uploaded reviewer-facing destination before claiming it verified; local playback alone does not
+  establish reviewer access. Use approved durable links, remove secrets/PII, and refresh after
+  behavior-changing fixes. Never invent a recording, test result or playback/access verification.
+
+### PR creation preflight
+
+Description-only requests stop at the draft. Before creating a PR, validate the final body and a
+JSON record using `node ~/.craftkit/bin/craftkit-pr-preflight.js --record <record.json> --body <body.md>`.
+The record contains `version: 1`, `head` (full current SHA), `checks` (name/result/details;
+result is `pass` or `blocked`),
+`review` (status/agent/summary), `evidence` (kind/url/verified/revision/scenario) and `limitations`
+(strings). The helper stamps the repository root and saves the record outside the worktree.
+Example shape, with values replaced by actual results:
+
+```json
+{
+  "version": 1,
+  "head": "<full current commit SHA>",
+  "checks": [{"name": "project checks", "result": "pass", "details": "<actual output>"}],
+  "review": {"status": "pass", "agent": "<independent reviewer ID>", "summary": "<final findings>"},
+  "evidence": [{"kind": "video", "url": "https://<reviewer-accessible destination>", "verified": true,
+    "revision": "<tested commit SHA>", "scenario": "<action and observed result>"}],
+  "limitations": []
+}
+```
+
+Use an empty evidence array only with explicit limitations in the body; the result is INCOMPLETE,
+and any authorized PR is a draft. A successful preflight verifies structure, repository, revision,
+clean tracked files and body consistency; checks, independent review and playback remain recorded
+claims, not independently observed facts. Do not mark a blocked check as passed to satisfy it.
+Put each blocked check's details verbatim in limitations and the body; those records permit
+only an INCOMPLETE draft, never READY.
+Run after committing, then publish the same body using `gh pr create --body-file <body.md>`.
+Use the same preflight with connected PR-creation tools; hook interception covers only the documented
+CLI path. After creation, attach the PR where supported and activate `/pr-followup` within scope.
 
 ---
 

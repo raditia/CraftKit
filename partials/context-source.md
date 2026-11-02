@@ -1,6 +1,6 @@
 ---
 name: context-source
-description: How a planning skill consults the project's connected team docs repos, reports agreement and conflict with citations, and pauses on a conflict. Shared by /interview, /spec, /plan and /define; spliced in at sync time, never loaded always-on.
+description: How development and planning consult connected team docs, report cited agreement/conflict and surface gaps. Spliced into planning skills and installed as the development workflow consultation procedure.
 ---
 
 ## Consulting the project's context sources
