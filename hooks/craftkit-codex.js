@@ -234,6 +234,44 @@ function patchFiles(text, cwd) {
   return files;
 }
 
+function prPreflight(p, cwd) {
+  if (!['Bash', 'exec_command'].includes(p.tool_name)) return null;
+  const ti = p.tool_input || {};
+  const command = String(ti.command || ti.cmd || '');
+  if (!/^\s*(?:rtk\s+)?(?:\/[^\s]+\/)?gh\s+pr\s+create\b/.test(command)) return null;
+  const deny = reason => ({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny',
+    permissionDecisionReason: 'PR preflight: ' + reason } });
+  if (process.env.GH_REPO) return deny('GH_REPO overrides are unsupported; unset it and run from the target worktree.');
+  if (/[`$()<>|;&\n\r\\#*?\[\]{}~!]/.test(command)) return deny('Use a direct gh pr create command without shell expansion or chaining.');
+  const tokens = command.match(/"[^"\n]*"|'[^'\n]*'|[^\s"']+/g) || [];
+  if (tokens.join(' ').replace(/\s+/g, ' ') !== command.trim().replace(/\s+/g, ' ')) return deny('Use simple complete quoted arguments.');
+  const args = tokens.map(token => token.replace(/^(['"])(.*)\1$/, '$2'));
+  if (args.some(arg => /^(--repo(?:=|$)|--head(?:=|$)|-R|-H)/.test(arg))) return deny('Repository and head overrides are unsupported; run from the target worktree.');
+  const bodyIndex = args.indexOf('--body-file');
+  if (bodyIndex < 0 || args.lastIndexOf('--body-file') !== bodyIndex || !args[bodyIndex + 1] ||
+      args[bodyIndex + 1].startsWith('-') || args.some(arg => /^(--body(?:=|$)|--body-file=|-b|-F)/.test(arg))) {
+    return deny('Provide --body-file <markdown path>; inline body and stdin are unsupported.');
+  }
+  try {
+    const target = typeof ti.workdir === 'string' ? path.resolve(cwd, ti.workdir) : cwd;
+    const helper = require('./craftkit-pr-preflight.js');
+    const record = JSON.parse(fs.readFileSync(helper.recordPath(target), 'utf8'));
+    const body = fs.readFileSync(path.resolve(target, args[bodyIndex + 1]), 'utf8');
+    const reason = helper.check(target, body, record);
+    if (reason) return deny(reason);
+    const valueFlags = new Set(['--title', '-t', '--body-file', '--base', '-B', '--label', '-l', '--reviewer', '-r', '--assignee', '-a', '--milestone', '-m', '--project', '-p', '--template', '-T']);
+    let draft = false;
+    for (let i = 0; i < args.length; i++) {
+      if (valueFlags.has(args[i])) i++;
+      else if (args[i] === '--draft') draft = true;
+    }
+    if (record.limitations.length && (!draft || args.some(arg => arg === '--' || /^(--draft=|-d)/.test(arg)))) {
+      return deny('Validation is incomplete: use --draft and describe limitations in Evidence.');
+    }
+    return null;
+  } catch (_) { return deny('Preflight helper, saved record or body file is missing or invalid. Run the preflight CLI first.'); }
+}
+
 function delegate(p, file, cwd) {
   // flag: gates.director. off or unset: no delegate gate, unless unset with CRAFTKIT_DELEGATE=on. remove: never, it is a user choice.
   const director = gateValue('director');
@@ -296,6 +334,8 @@ process.stdin.on('end', () => {
   if (!session) return output({});
   const file = statePath(session);
   if (event === 'PreToolUse') {
+    const prDenied = prPreflight(p, cwd);
+    if (prDenied) return output(prDenied);
     let denied = null;
     try { denied = delegate(p, file, cwd); } catch (_) { /* fail open */ }
     if (denied) return output(denied);

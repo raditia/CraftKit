@@ -98,6 +98,7 @@ See [installation details and collision handling](docs/guide.md#where-files-land
 | “Fix this bug” | `/fix` | Reproduction, fix and regression check |
 | “Write tests” | `/fe-test`, `/android-test`, `/ios-test` | Tests for the detected platform |
 | “Generate a PR message” | `/pr-message` | Description grounded in the branch changes |
+| “Follow PR CI and comments” | `/pr-followup` | Inspect, fix/review/retest, push and reply within authorization; establish an actual watcher |
 
 The routing hook uses the nearest project markers to detect RN/web, Android, iOS or Node/tooling. [Routing diagram](docs/diagrams/platform-routing.svg)
 
@@ -120,6 +121,18 @@ At each checkpoint you can continue, edit or stop. `/define` stops at the plan. 
 ### Enforcement gates: hooks that refuse
 
 Claude and Codex can require verification before a task ends. Some gates are configurable; Cursor and Gemini rely on advisory guidance. Codex verification enforces successful checks against unchanged snapshots, but cannot prove native skill activation.
+
+CraftKit provides reusable skills and checks. End-to-end team workflows, source selection,
+ticket routing and operational defaults belong in each team's own repository or project instructions.
+CraftKit has no required team repository and does not install team policies globally. PR creation
+uses `~/.craftkit/bin/craftkit-pr-preflight.js` with the `/pr-message` record. Codex additionally
+denies recognized direct `gh pr create --body-file ...` calls with missing/stale preflight. Shell
+wrappers and connector calls are outside that interception; every tool still follows the shared
+instruction. Structure, revision and body consistency are checked; actual playback, reviewer
+independence and semantic correctness remain agent assertions. Limitations mean INCOMPLETE and
+draft only. CI/comment monitoring requires a successfully scheduled watcher; otherwise UNMONITORED.
+Existing sessions must read updated skills; validate startup in a fresh session after sync and
+review changed hook definitions with `/hooks` when prompted. No automatic merge/deploy/status changes.
 
 <details>
 <summary>Hook reference and enforcement details</summary>
@@ -278,6 +291,7 @@ The `*-review`, `*-a11y` and `*-performance` skills are also the live source for
 | [`handoff`](skills/handoff/SKILL.md) | Compact the session into a handoff doc for a fresh agent: state, decisions, next steps, suggested skills | n/a |
 | [`clarity`](skills/clarity/SKILL.md) | Rewrite, review, or co-write reader-facing prose: fixes substance before style, keeps every fact and attribution, marks author-only gaps `[TK]`. Used by `/docs` and `/pr-message`. Adapted from addyosmani/clarity (MIT) | n/a |
 | [`context-source`](skills/context-source/SKILL.md) | Connect, replace, disconnect or list the team docs repos on GitHub that `/interview`, `/spec` and `/plan` check asks against, with cited conflicts. Cache under `~/.craftkit`, never in the project (ADR-0003) | n/a |
+| [`pr-followup`](skills/pr-followup/SKILL.md) | Follow current-head CI and all PR comment sources, repair/test/review/push/reply, and report actual watcher status | Conflicting scope or unresolved blockers |
 | [`eval`](skills/eval/SKILL.md) | Score a finished run into a weighted correctness %: spawns `eval-judge`, appends `docs/evals/ledger.md`, derives the success rate | Score gates a merge or release, so escalate the judge; irreversible gate, so run a fusion panel of two judges |
 | [`ponytail-review`](skills/ponytail-review/SKILL.md) | Over-engineering audit on a diff or file: what to delete/shrink | Correctness or security concerns → use `code-quality` |
 | [`ponytail-audit`](skills/ponytail-audit/SKILL.md) | Whole-repo bloat scan: ranked list of removals | n/a |

@@ -24,8 +24,8 @@ Use `rtk` for supported shell commands and run project verification from the pro
 Build, review, and ship use `parallel-build`, `parallel-review`, and `parallel-ship` when native
 spawning is available; otherwise use `build`, `review`, and `ship`. Broken behavior uses `fix`;
 planning uses `define`; test authoring uses the platform's test skill; PR descriptions use
-`pr-message`. Use the actual project's architecture and verification commands. Generic Node
-or tooling repositories do not inherit React/EVPMR merely from a `package.json`.
+`pr-message`; PR CI/comments use `pr-followup`. Use project architecture and verification.
+Node/tooling repositories do not inherit React/EVPMR from `package.json`.
 <!-- END CRAFTKIT-GATE-ROUTING -->
 
 Use native Codex agents and respect the available concurrency. Select the installed custom
@@ -103,6 +103,7 @@ Match natural language to the right command. **Dynamic parallel is the default w
 | "something is broken", "fix this bug", "this crashes", "why is X not working", "coverage is failing in CI": **clear breakage signal**; vague complaints without error/crash/fail → `/parallel-review` instead | `/fix` | sequential (linear by nature) |
 | Any test work: "write tests", "add tests", "update tests", "fix tests", "test this", "do tests need updating", "any tests to update", "coverage is low", "improve coverage", "I need tests for X", "create a test for X", "create tests for X", "should I update tests", "are there tests to update": **test authoring/updating, not broken coverage**. When in doubt about test intent → default here | platform's test skill: `/fe-test` (RN/web) · `/android-test` · `/ios-test` | n/a |
 | "generate PR message", "write PR description", "draft a PR", "what should my PR say", "PR message for this branch" | `/pr-message` | n/a |
+| "follow this PR", "address PR comments", "check PR CI", "monitor PR feedback" | `/pr-followup` | coordinator |
 
 **Tiebreakers:**
 - Vague complaint ("this looks wrong", "something seems off") with no error/crash/fail signal → `/parallel-review`

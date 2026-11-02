@@ -1398,7 +1398,13 @@ _table="$(bash -c ". '$REPO_DIR/adapters/claude.sh' >/dev/null 2>&1; printf '%s\
 for _f in "$REPO_DIR"/hooks/*.js; do
     _b="$(basename "$_f")"
     if ! echo "$_table" | grep -qx "$_b"; then
-        if [[ "$_b" != "craftkit-codex.js" ]] || ! grep -qF "for script in craftkit-codex.js craftkit-platform.js" "$REPO_DIR/adapters/codex.sh"; then
+        if [[ "$_b" == "craftkit-codex.js" ]] && grep -qF "for script in craftkit-codex.js craftkit-platform.js" "$REPO_DIR/adapters/codex.sh"; then
+            :
+        elif [[ "$_b" == "craftkit-pr-preflight.js" ]] \
+            && grep -qF "for script in craftkit-codex.js craftkit-platform.js craftkit-pr-preflight.js; do" "$REPO_DIR/adapters/codex.sh" \
+            && grep -qF 'craftkit-pr-preflight.js) source="$REPO_DIR/hooks/$name"' "$REPO_DIR/sync.sh"; then
+            :
+        else
             fail "hooks/$_b is in no adapter hook entry, so sync never installs it"
             _ht=1
         fi
@@ -1493,7 +1499,7 @@ for event in ('SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', '
 # our hook out of a group it shared, and a matcher the user narrowed is left alone.
 pre = hooks['PreToolUse']
 assert [(g['matcher'], [h['command'] for h in g['hooks']]) for g in pre][0] == ('Bash', ['user-pre-hook'])
-assert pre[1]['matcher'] == 'Bash|apply_patch|spawn_agent' and 'craftkit-codex.js' in pre[1]['hooks'][0]['command']
+assert pre[1]['matcher'] == 'Bash|exec_command|apply_patch|spawn_agent' and 'craftkit-codex.js' in pre[1]['hooks'][0]['command']
 assert len(pre) == 2
 assert hooks['PostToolUse'][0]['matcher'] == 'Bash|exec_command'
 PYEOF
@@ -1508,6 +1514,13 @@ fi
 check "Codex verification, concurrency, and native agent regressions"
 if command -v node >/dev/null 2>&1; then
     if python3 "$REPO_DIR/scripts/test-codex.py"; then pass; else fail "Codex behavioral regressions failed"; fi
+else
+    echo "    skipped (node not on PATH)"
+fi
+
+check "PR preflight records bind evidence and review to the current commit"
+if command -v node >/dev/null 2>&1; then
+    if python3 "$REPO_DIR/scripts/test-pr-preflight.py"; then pass; else fail "PR preflight regressions failed"; fi
 else
     echo "    skipped (node not on PATH)"
 fi
@@ -2888,7 +2901,7 @@ _TG_VOCAB_director='Director mode|ListAgents|TaskStop|Keep quick, coupled work|g
 _TG_HOOKS_routing='gate-skill-first.js gate-announce-honored.js'
 # TC-001's baseline and the line prefixes allowed to differ from it: T13's spawn label in
 # rule 12a, the Codex next-step agreement #41 added after v1.58.0 shipped, and v1.60.0's
-# seventh ponytail tag, reuse, and Codex task model selection.
+# seventh ponytail tag, reuse, general PR follow-up routing, and Codex task model selection.
 _TG_BASE=v1.58.0
 _TG_ALLOW="- **Contract.** Rule 12's four fields plus the project's verify command;
 - At the end of every completed task, suggest one concrete, relevant next step
@@ -2896,6 +2909,12 @@ _TG_ALLOW="- **Contract.** Rule 12's four fields plus the project's verify comma
 New code re-implementing a function or module the repo already has
 Every finding names its replacement:
 **Self-pass before reporting done.**
+| \"follow this PR\", \"address PR comments\", \"check PR CI\", \"monitor PR feedback\"
+Use pr-message for PR evidence and preflight, and pr-followup for authorized
+Use the actual project's architecture and verification commands. Generic Node
+or tooling repositories do not inherit React/EVPMR merely from a
+PR CI/comments use
+Node/tooling repositories do not inherit React/EVPMR from
 → /docs  (dual-audience,
 → /clarity  (no invented facts
 Keep the configured model; Codex reasoning tiers are low, medium, and high.

@@ -769,14 +769,19 @@ done
 # file cannot know where this repo lives, so the scripts get a fixed path every tool can reach.
 # The dashboard viewer and its launcher ride along only while the dashboard is opted into.
 sync_bin() {
-    local bin="$HOME/.craftkit/bin" link="$HOME/.local/bin/ccdash" name changed=0 names="cross-review.sh context-source.sh context-source.js"
+    local bin="$HOME/.craftkit/bin" link="$HOME/.local/bin/ccdash" name source changed=0 names="cross-review.sh context-source.sh context-source.js craftkit-pr-preflight.js context-source-consult.md"
     echo ""
     echo "[bin]"
     mkdir -p "$bin"
     [[ "$CRAFTKIT_DASHBOARD_ON" == 1 ]] && names="$names dashboard.py ccdash"
     for name in $names; do
-        cmp -s "$REPO_DIR/scripts/$name" "$bin/$name" && continue
-        cp "$REPO_DIR/scripts/$name" "$bin/.$name.tmp" && chmod +x "$bin/.$name.tmp" \
+        source="$REPO_DIR/scripts/$name"
+        case "$name" in
+            craftkit-pr-preflight.js) source="$REPO_DIR/hooks/$name" ;;
+            context-source-consult.md) source="$REPO_DIR/partials/context-source.md" ;;
+        esac
+        cmp -s "$source" "$bin/$name" && continue
+        cp "$source" "$bin/.$name.tmp" && chmod +x "$bin/.$name.tmp" \
             && mv -f "$bin/.$name.tmp" "$bin/$name" || return 1
         echo "    + $name"
         changed=1

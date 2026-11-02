@@ -23,6 +23,7 @@ _rebuild_codex_agents_md() {
 
 Use the installed CraftKit skills when their descriptions match the task. Invoke one explicitly with `$skill-name` when useful. Build, review, and ship workflows are skills too. Read only relevant skills.
 Use native Codex subagents for parallel workflows. CraftKit agent profiles are installed in the Codex agents directory. If the spawn tool cannot select a custom profile, read its TOML and pass its developer_instructions explicitly with an isolated context. Respect available concurrency and collect every result. Use the sequential twin only when spawning is unavailable: `parallel-build` to `build`, `parallel-review` to `review`, or `parallel-ship` to `ship`.
+Use pr-message for PR evidence and preflight, and pr-followup for authorized CI/comment handling. Team-specific workflows and context choices belong in the team's own repository or project instructions.
 EOF
         # flag: gates.verify. off: the guide stops naming a Stop-hook check that no longer runs. remove: never, it is a user choice.
         echo "The Codex SessionStart hook loads the full applicable rule bodies. Follow those instructions and the activated skill or command body.$([[ "${CK_gates_verify:-}" == off ]] || echo " The Stop hook checks project verification after edits.")"
@@ -184,7 +185,7 @@ PYEOF
 install_codex_craftkit_hooks() {
     local script dest node_bin rtk_bin
     mkdir -p "$CODEX_HOOKS_DIR"
-    for script in craftkit-codex.js craftkit-platform.js; do
+    for script in craftkit-codex.js craftkit-platform.js craftkit-pr-preflight.js; do
         dest="$CODEX_HOOKS_DIR/$script"
         if [[ ! -f "$dest" ]] || ! diff -q "$REPO_DIR/hooks/$script" "$dest" &>/dev/null; then
             cp "$REPO_DIR/hooks/$script" "$dest"
@@ -215,10 +216,9 @@ except (ValueError, AssertionError):
     sys.exit(3)
 command = json.dumps(node) + ' ' + json.dumps(script)
 ours = lambda h: isinstance(h, dict) and 'craftkit-codex.js' in str(h.get('command', ''))
-# PreToolUse also sees file patches and spawns, for the delegate gate. Only the matcher
-# this installer used to write is migrated; a matcher the user narrowed is theirs.
-matchers = {'PreToolUse': 'Bash|apply_patch|spawn_agent', 'PostToolUse': 'Bash'}
-LEGACY = 'Bash'
+# Migrate only known managed matchers; a matcher the user narrowed is theirs.
+matchers = {'PreToolUse': 'Bash|exec_command|apply_patch|spawn_agent', 'PostToolUse': 'Bash'}
+LEGACY = {'PreToolUse': {'Bash', 'Bash|apply_patch|spawn_agent'}}
 before = json.dumps(data, sort_keys=True)
 for event in EVENTS:
     groups = data.setdefault('hooks', {}).setdefault(event, [])
@@ -227,7 +227,7 @@ for event in EVENTS:
         for hook in [h for h in group.get('hooks', []) if ours(h)]:
             found = True
             hook['command'] = command
-            if event in matchers and group.get('matcher') == LEGACY != matchers[event]:
+            if event in matchers and group.get('matcher') in LEGACY.get(event, set()) and group.get('matcher') != matchers[event]:
                 if len(group['hooks']) == 1:
                     group['matcher'] = matchers[event]
                 else:

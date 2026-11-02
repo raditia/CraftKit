@@ -142,6 +142,13 @@ class CodexGatewayTests(unittest.TestCase):
                                           tool_input={'command': command}), {})
         self.assertFalse((self.root / 'rtk-input').exists())
 
+    def test_rtk_does_not_replace_a_preflight_denial(self):
+        self.fake_rtk('unexpected invocation')
+        result = self.hook('PreToolUse', tool_name='Bash', permission_mode='default',
+                           tool_input={'command': 'gh pr create'})
+        self.assertEqual(result['hookSpecificOutput']['permissionDecision'], 'deny')
+        self.assertFalse((self.root / 'rtk-input').exists())
+
     def test_global_gate_off_skips_rtk(self):
         self.fake_rtk('unexpected invocation')
         self.env['CRAFTKIT_GATE'] = 'off'
@@ -386,6 +393,163 @@ class CodexGatewayTests(unittest.TestCase):
             content = (REPO / 'commands' / (workflow + '.md')).read_text()
             self.assertIn('change-scope', content.split('---')[1])
             self.assertNotIn('freshness check (branch + commit)', content)
+
+    def pr_fixture(self, limitations=False):
+        head = subprocess.check_output(['git', '-C', str(self.repo), 'rev-parse', 'HEAD'], text=True).strip()
+        body = self.root / 'PR body.md'
+        url = 'https://github.com/team/project/actions/runs/123'
+        limitation = 'Incomplete: simulator runtime evidence unavailable.'
+        body.write_text('## Evidence\n' + (limitation if limitations else url))
+        record = {
+            'version': 1, 'repository': str(self.repo.resolve()), 'head': head,
+            'checks': [{'name': 'unit', 'result': 'pass', 'details': '3 passed'}],
+            'review': {'status': 'pass', 'agent': 'separate-reviewer', 'summary': 'No findings'},
+            'evidence': [] if limitations else [{'kind': 'test', 'url': url, 'verified': True,
+                                                'revision': head, 'scenario': 'Regression'}],
+            'limitations': [limitation] if limitations else [],
+        }
+        saved = self.home / '.craftkit-state/pr-preflight' / (hashlib.sha256(str(self.repo.resolve()).encode()).hexdigest() + '.json')
+        saved.parent.mkdir(parents=True, exist_ok=True)
+        saved.write_text(json.dumps(record))
+        return body, saved
+
+    def pr_hook(self, command):
+        return self.hook('PreToolUse', tool_name='Bash', tool_input={'command': command})
+
+    def assert_pr_denied(self, result):
+        out = result.get('hookSpecificOutput', {})
+        self.assertEqual(out.get('permissionDecision'), 'deny')
+        self.assertIn('PR preflight:', out.get('permissionDecisionReason', ''))
+
+    def test_pr_preflight_allows_current_record_and_spaced_body_file(self):
+        body, _ = self.pr_fixture()
+        for prefix in ('gh', '/usr/bin/gh', 'rtk gh', 'rtk /usr/bin/gh'):
+            self.assertEqual(self.pr_hook(prefix + ' pr create --body-file "' + str(body) + '"'), {})
+
+    def test_pr_preflight_denies_missing_stale_dirty_records(self):
+        body, saved = self.pr_fixture()
+        command = 'gh pr create --body-file "' + str(body) + '"'
+        saved.unlink()
+        self.assert_pr_denied(self.pr_hook(command))
+        _, saved = self.pr_fixture()
+        record = json.loads(saved.read_text())
+        record['head'] = 'stale'
+        saved.write_text(json.dumps(record))
+        self.assert_pr_denied(self.pr_hook(command))
+        self.pr_fixture()
+        self.edit()
+        self.assert_pr_denied(self.pr_hook(command))
+        self.git('add', 'app.js')
+        self.assert_pr_denied(self.pr_hook(command))
+
+    def test_pr_preflight_rejects_inline_overrides_and_shell_expansion(self):
+        body, _ = self.pr_fixture()
+        base = 'gh pr create --body-file "' + str(body) + '"'
+        for command in ('gh pr create --body "## Evidence"', 'gh pr create --body-file -',
+                        base + ' --repo team/other', base + ' -Rteam/other',
+                        base + ' --head=other', base + ' -Hother',
+                        base + ' --body-file=other.md', base + ' -F other.md', base + ' -Fother.md',
+                        base + ' # --draft', base + ' --title *',
+                        base + '; echo done', base + ' && true', base + ' --title "$TITLE"'):
+            self.assert_pr_denied(self.pr_hook(command))
+
+    def test_pr_preflight_limitations_require_draft(self):
+        body, _ = self.pr_fixture(limitations=True)
+        command = 'gh pr create --body-file "' + str(body) + '"'
+        self.assert_pr_denied(self.pr_hook(command))
+        self.assert_pr_denied(self.pr_hook(command + ' --title \"--draft\"'))
+        self.assert_pr_denied(self.pr_hook(command + ' --draft --draft=false'))
+        self.assert_pr_denied(self.pr_hook(command + ' --draft -d=false'))
+        self.assert_pr_denied(self.pr_hook(command + ' -d'))
+        self.assertEqual(self.pr_hook(command + ' --draft'), {})
+
+    def test_pr_preflight_blocked_checks_require_documented_draft(self):
+        body, saved = self.pr_fixture(limitations=True)
+        record = json.loads(saved.read_text())
+        record['checks'].append({'name': 'runtime', 'result': 'blocked', 'details': record['limitations'][0]})
+        saved.write_text(json.dumps(record))
+        command = 'gh pr create --body-file "' + str(body) + '"'
+        self.assert_pr_denied(self.pr_hook(command))
+        self.assertEqual(self.pr_hook(command + ' --draft'), {})
+
+    def test_pr_preflight_rejects_environment_repository_override(self):
+        body, _ = self.pr_fixture()
+        self.env['GH_REPO'] = 'team/other'
+        self.assert_pr_denied(self.pr_hook('gh pr create --body-file "' + str(body) + '"'))
+
+    def test_pr_preflight_uses_explicit_tool_workdir(self):
+        body, _ = self.pr_fixture()
+        other = self.root / 'other'
+        subprocess.run(['git', 'clone', '-q', str(self.repo), str(other)], check=True, capture_output=True)
+        command = 'gh pr create --body-file "' + str(body) + '"'
+        self.assert_pr_denied(self.hook('PreToolUse', tool_name='exec_command',
+                                       tool_input={'cmd': command, 'workdir': str(other)}))
+
+    def test_pr_preflight_missing_helper_denies(self):
+        body, _ = self.pr_fixture()
+        hook = self.root / 'isolated-hook'
+        hook.mkdir()
+        for name in ('craftkit-codex.js', 'craftkit-platform.js'):
+            (hook / name).write_text((REPO / 'hooks' / name).read_text())
+        payload = {'hook_event_name': 'PreToolUse', 'session_id': self.session, 'cwd': str(self.repo),
+                   'tool_name': 'Bash', 'tool_input': {'command': 'gh pr create --body-file "' + str(body) + '"'}}
+        result = subprocess.run(['node', str(hook / 'craftkit-codex.js')], input=json.dumps(payload),
+                                env=self.env, text=True, capture_output=True, check=True)
+        self.assert_pr_denied(json.loads(result.stdout))
+
+    def test_pr_preflight_non_pr_and_gate_off_unchanged(self):
+        for command in ('gh pr view 123', 'echo gh pr create', 'git status --short'):
+            self.assertEqual(self.pr_hook(command), {})
+        self.env['CRAFTKIT_GATE'] = 'off'
+        self.assertEqual(self.pr_hook('gh pr create --body inline'), {})
+
+    def test_pr_preflight_installer_migrates_only_managed_matchers(self):
+        config = self.home / '.codex/hooks.json'
+        config.parent.mkdir(parents=True)
+        script = '_resolve_node_bin() { command -v node; }\nsource adapters/codex.sh\ninstall_codex_craftkit_hooks'
+        env = dict(self.env, REPO_DIR=str(REPO))
+        for previous in ('Bash', 'Bash|apply_patch|spawn_agent', 'apply_patch'):
+            config.write_text(json.dumps({'hooks': {'PreToolUse': [{'matcher': previous, 'hooks': [
+                {'type': 'command', 'command': 'user-hook'},
+                {'type': 'command', 'command': 'node old/craftkit-codex.js'}]}]}}))
+            subprocess.run(['/bin/bash', '-c', script], cwd=REPO, env=env, check=True, capture_output=True)
+            first = config.read_text()
+            subprocess.run(['/bin/bash', '-c', script], cwd=REPO, env=env, check=True, capture_output=True)
+            self.assertEqual(config.read_text(), first)
+            groups = json.loads(first)['hooks']['PreToolUse']
+            managed = [g for g in groups for h in g['hooks'] if 'craftkit-codex.js' in h['command']]
+            self.assertEqual(len(managed), 1)
+            expected = previous if previous == 'apply_patch' else 'Bash|exec_command|apply_patch|spawn_agent'
+            self.assertEqual(managed[0]['matcher'], expected)
+            self.assertEqual([g['matcher'] for g in groups for h in g['hooks'] if h['command'] == 'user-hook'], [previous])
+
+    def test_fresh_session_loads_generic_pr_routing(self):
+        rules = self.home / '.craftkit/codex/rules'
+        rules.mkdir(parents=True)
+        (rules / 'using-agent-skills.md').write_text((REPO / 'rules/using-agent-skills.md').read_text())
+        context = self.hook('SessionStart')['hookSpecificOutput']['additionalContext']
+        self.assertIn('pr-message', context)
+        self.assertIn('pr-followup', context)
+        skill = self.home / '.agents/skills/pr-followup/SKILL.md'
+        skill.parent.mkdir(parents=True)
+        skill.write_text((REPO / 'skills/pr-followup/SKILL.md').read_text())
+        prompt_context = self.hook('UserPromptSubmit', prompt='$pr-followup inspect this PR')['hookSpecificOutput']['additionalContext']
+        self.assertIn('$pr-followup: read ' + str(skill), prompt_context)
+
+    def test_pr_capabilities_and_generated_guide_have_no_team_defaults(self):
+        subprocess.run(['/bin/bash', '-c', 'source adapters/codex.sh\n_rebuild_codex_agents_md'],
+                       cwd=REPO, env=self.env, capture_output=True, check=True)
+        sources = [REPO / name for name in ('hooks/craftkit-pr-preflight.js', 'commands/pr-message.md',
+                                            'skills/pr-followup/SKILL.md', 'rules/using-agent-skills.md')]
+        sources.append(self.home / '.codex/AGENTS.md')
+        for source in sources:
+            content = source.read_text().lower()
+            for team_default in ('gtr-team', 'traveloka', 'meegle', 'larksuite.com', 'gt-bus-train'):
+                self.assertNotIn(team_default, content, str(source))
+        guide = sources[-1].read_text()
+        self.assertNotIn('development-workflow', guide)
+        self.assertIn('pr-message', guide)
+        self.assertIn('pr-followup', guide)
 
     def test_gate_off_does_not_inject_or_block(self):
         self.env['CRAFTKIT_GATE'] = 'off'
