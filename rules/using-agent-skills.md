@@ -45,8 +45,13 @@ Steer via `send_message`/`followup_task` and `interrupt_agent`, or `send_input`/
 when available. Collect results with `wait_agent` before replying. Reuse verification for
 an unchanged tree; report "not verified" if it is missing or failing.
 
-Keep the configured model; Codex reasoning tiers are low, medium, and high. Do not pass Claude
-family aliases. Before reporting completion, verify the latest edits using project gates and
+Keep the coordinator's model. For subagents, choose a runtime-listed cheaper model for bounded
+lookup/extraction, docs, or fixed check execution; keep the configured model for implementation
+and correctness/security reviews. Honor user/profile pins. If model overrides or cost/capability
+information are unavailable, inherit. Never guess ids or use Claude aliases. Model overrides
+use isolated task context (`fork_turns: none` when required); announce the model and reason.
+Escalate uncertain units, retain all verification gates, and verify cheaper-agent output before use.
+Before reporting completion, verify the latest edits using project gates and
 report actual results. Findings use `[ERROR]` (must fix), `[WARNING]` (should fix), and
 `[SUGGESTION]` (optional). For unusual routing or escalation, read the full rule referenced in
 the managed `AGENTS.md`; load only the relevant section.

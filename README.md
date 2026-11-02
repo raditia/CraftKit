@@ -365,9 +365,24 @@ Keep the same coding standards when you switch AI tools. Load a skill when its j
 
 | Tool | Purpose |
 |---|---|
-| RTK | Filter shell output before the agent reads it |
-| Caveman | Shorten agent responses |
+| RTK | Filter shell output before the agent reads it. Codex automatically rewrites simple read commands through the native RTK hook |
+| Caveman | Shorten agent responses through the separately installed Claude plugin; CraftKit does not enable it in Codex |
 | Ponytail / Karpathy guidelines | Prefer simple code and delete unnecessary complexity |
 | Diagram Design | Editorial diagrams with editable HTML sources and SVG embeds |
+
+Codex auto-compression covers single `git status`, `git diff`, `git log`, `rg`, `grep`, and `ls`
+commands. Shell programs, mutation commands, file reads, and verification wrappers stay unchanged;
+continue using explicit RTK test/lint commands. Missing or incompatible RTK leaves input unchanged.
+Sync records RTK's absolute executable path so hooks work with a minimal PATH. Rewritten reads
+still undergo normal Codex approval checks and may need approval for the RTK prefix. When a filter
+omits evidence, rerun the read with `rtk bypass` to inspect the full output before drawing conclusions.
+Codex loads full routing instructions at SessionStart; prompt hooks carry a short reminder and
+explicit skill pointers. Other tools' routing and model choices are unchanged.
+
+The Codex coordinator can select a cheaper runtime-listed subagent model for bounded lookup,
+extraction, docs, or fixed checks. Implementation and correctness/security reviews keep the
+configured model. Explicit user/profile pins win; unavailable model choices fall back to
+inheritance. Overrides use isolated task context and keep verification gates. No model ids or
+global model settings are pinned by this policy; lower reasoning effort alone is not a model change.
 
 [Design decisions](docs/design-notes.md) · [Diagram inventory and maintenance](docs/diagrams/README.md)

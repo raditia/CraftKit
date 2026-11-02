@@ -53,6 +53,32 @@ function requestedSkill(prompt) {
   return pointers.join('\n');
 }
 
+function rtkRead(p, cwd) {
+  const command = p.tool_input && p.tool_input.command;
+  if (p.tool_name !== 'Bash' || typeof command !== 'string' ||
+      !/^\s*(?:git\s+(?:status|diff|log)\b|(?:rg|grep|ls)\b)/.test(command) ||
+      /[;&|<>`$()\n\r\\]/.test(command) ||
+      /(?:^|\s)--(?:output|pre|hostname-bin|ext-diff|textconv)(?:[=\s]|$)/.test(command.replace(/['"]/g, ''))) return {};
+  const dir = process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
+  const binary = read(path.join(dir, 'hooks', 'rtk-path')).trim() || 'rtk';
+  try {
+    const response = JSON.parse(execFileSync(binary, ['hook', 'codex'], {
+      cwd, input: JSON.stringify(p), encoding: 'utf8', timeout: 2000, stdio: ['pipe', 'pipe', 'ignore']
+    }));
+    const hook = response.hookSpecificOutput;
+    if (hook && hook.hookEventName === 'PreToolUse' && hook.permissionDecision === 'allow' &&
+        hook.updatedInput && typeof hook.updatedInput.command === 'string' &&
+        hook.updatedInput.command.startsWith('rtk ')) {
+      // Keep reads visible to normal Codex approval checks; never rewrite mutation commands.
+      const prefix = binary === 'rtk' ? binary : "'" + binary.replace(/'/g, "'\\''") + "'";
+      return { hookSpecificOutput: { ...hook, updatedInput: {
+        ...p.tool_input, command: prefix + hook.updatedInput.command.slice(3)
+      } } };
+    }
+  } catch (_) { /* missing or incompatible RTK leaves the original command intact */ }
+  return {};
+}
+
 function snapshot(cwd) {
   try {
     const git = args => execFileSync('git', ['-C', cwd].concat(args),
@@ -291,21 +317,19 @@ process.stdin.on('end', () => {
     const selected = requestedSkill(p.prompt);
     // flag: gates.routing / gates.verify. off: omit that group's prompt instructions. remove: never, the groups are user choices.
     const routing = gateValue('routing') !== 'off' ?
-      'classify this request against installed skills and workflows before work. ' +
-      'For a match, activate its native $skill and follow its full SKILL.md. ' +
-      'Use parallel-build, parallel-review, or parallel-ship for their respective workflows when native subagents are available; otherwise use the sequential twin. ' +
-      'If none matches, state that briefly.' : '';
+      'Follow installed Codex skill routing.' : '';
     const verify = gateValue('verify') !== 'off' ? 'After edits, run the project verification command and report its result.' : '';
     return output({ hookSpecificOutput: { hookEventName: event, additionalContext:
       'CraftKit: ' + [routing, verify].filter(Boolean).join(' ') +
       (platform ? '\nDetected platform: ' + platform + '.' : '') +
       (selected ? '\n\nExplicitly requested CraftKit skills:\n' + selected : '') } });
   }
-  if (!state) return output({});
+  const compressed = event === 'PreToolUse' ? rtkRead(p, cwd) : {};
+  if (!state) return output(compressed);
   // flag: gates.verify. off: no verification bookkeeping and no Stop block. remove: never, it is a user choice.
   if (gateValue('verify') === 'off') {
     if (event === 'Stop') clear(file);
-    return output({});
+    return output(compressed);
   }
   if (event === 'PreToolUse' || event === 'PostToolUse') {
     const ti = p.tool_input || {};
@@ -335,7 +359,7 @@ process.stdin.on('end', () => {
         }
       }
     }
-    return output({});
+    return output(compressed);
   }
   if (event !== 'Stop') return output({});
   const required = gate(cwd);

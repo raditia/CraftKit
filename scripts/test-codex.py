@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -56,6 +57,117 @@ class CodexGatewayTests(unittest.TestCase):
 
     def edit(self, text='new\n'):
         (self.repo / 'app.js').write_text(text)
+
+    def fake_rtk(self, response, status=0):
+        binary = self.root / 'bin/rtk'
+        binary.parent.mkdir(exist_ok=True)
+        binary.write_text(f'#!{sys.executable}\nimport pathlib, sys\n'
+                          f'pathlib.Path({str(self.root / "rtk-input")!r}).write_text(sys.stdin.read())\n'
+                          f'print({response!r})\nsys.exit({status})\n')
+        binary.chmod(0o755)
+        self.env['PATH'] = str(binary.parent) + os.pathsep + self.env['PATH']
+        return binary
+
+    def test_rtk_compresses_reads_without_turn_state_and_keeps_metadata(self):
+        self.fake_rtk(json.dumps({'hookSpecificOutput': {
+            'hookEventName': 'PreToolUse', 'permissionDecision': 'allow',
+            'updatedInput': {'command': 'rtk git status --short'}}}))
+        tool_input = {'command': 'git status --short', 'timeout': 30000, 'description': 'Inspect changes'}
+        result = self.hook('PreToolUse', tool_name='Bash', permission_mode='default', tool_input=tool_input)
+        self.assertEqual(result['hookSpecificOutput']['updatedInput'],
+                         dict(tool_input, command='rtk git status --short'))
+        payload = json.loads((self.root / 'rtk-input').read_text())
+        self.assertEqual(payload['permission_mode'], 'default')
+        self.assertEqual(payload['tool_input'], tool_input)
+
+    def test_rtk_failures_leave_the_command_unchanged(self):
+        for response, status in [('', 0), ('not json', 0), ('{}', 0), ('{}', 1),
+                                 (json.dumps({'hookSpecificOutput': {'updatedInput': {'command': 'echo changed'}}}), 0)]:
+            with self.subTest(response=response, status=status):
+                self.fake_rtk(response, status)
+                self.assertEqual(self.hook('PreToolUse', tool_name='Bash', permission_mode='default',
+                                          tool_input={'command': 'git status'}), {})
+
+    def test_missing_rtk_leaves_the_command_unchanged(self):
+        record = self.home / '.codex/hooks/rtk-path'
+        record.parent.mkdir(parents=True)
+        record.write_text(str(self.root / 'not-installed'))
+        self.assertEqual(self.hook('PreToolUse', tool_name='Bash', permission_mode='default',
+                                  tool_input={'command': 'git status'}), {})
+
+    def test_rtk_timeout_leaves_the_command_unchanged(self):
+        binary = self.fake_rtk(json.dumps({'hookSpecificOutput': {
+            'hookEventName': 'PreToolUse', 'permissionDecision': 'allow',
+            'updatedInput': {'command': 'rtk git status'}}}))
+        binary.write_text(binary.read_text().replace('import pathlib, sys',
+                                                    'import pathlib, sys, time\ntime.sleep(3)'))
+        self.assertEqual(self.hook('PreToolUse', tool_name='Bash', permission_mode='default',
+                                  tool_input={'command': 'git status'}), {})
+
+    def test_rtk_absolute_path_works_without_rtk_on_path(self):
+        binary = self.fake_rtk(json.dumps({'hookSpecificOutput': {
+            'hookEventName': 'PreToolUse', 'permissionDecision': 'allow',
+            'updatedInput': {'command': 'rtk git status'}}}))
+        self.env['PATH'] = os.environ['PATH']
+        record = self.home / '.codex/hooks/rtk-path'
+        record.parent.mkdir(parents=True)
+        record.write_text(str(binary))
+        result = self.hook('PreToolUse', tool_name='Bash', permission_mode='default',
+                           tool_input={'command': 'git status'})
+        self.assertEqual(result['hookSpecificOutput']['updatedInput']['command'], f"'{binary}' git status")
+
+    def test_rtk_installer_pins_executable_and_is_idempotent(self):
+        binary = self.fake_rtk('{}')
+        script = 'source adapters/claude.sh\nsource adapters/codex.sh\ninstall_codex_craftkit_hooks'
+        env = dict(self.env, REPO_DIR=str(REPO))
+        first = subprocess.run(['/bin/bash', '-c', script], cwd=REPO, env=env,
+                               capture_output=True, text=True, check=True)
+        record = self.home / '.codex/hooks/rtk-path'
+        self.assertEqual(record.read_text().strip(), str(binary))
+        second = subprocess.run(['/bin/bash', '-c', script], cwd=REPO, env=env,
+                                capture_output=True, text=True, check=True)
+        self.assertIn('+ Codex RTK path', first.stdout)
+        self.assertNotIn('+ Codex RTK path', second.stdout)
+
+    def test_rtk_does_not_rewrite_mutations_shell_programs_or_file_reads(self):
+        self.fake_rtk('unexpected invocation')
+        for command in ('git push', 'git branch -D topic', 'find . -delete',
+                        'git status && git push', 'git status; git push', 'git status > result',
+                        'git log --output=result', 'rg --pre=script pattern', 'rg --hostname-bin=script pattern',
+                        "git log '--output=result'", 'rg "--pre=script" pattern', "rg --p're'=script pattern",
+                        'git diff --ext-diff', "git diff '--textconv'",
+                        'git diff $(touch marker)', 'cat rules.md', 'rtk git status'):
+            with self.subTest(command=command):
+                self.assertEqual(self.hook('PreToolUse', tool_name='Bash', permission_mode='default',
+                                          tool_input={'command': command}), {})
+        self.assertFalse((self.root / 'rtk-input').exists())
+
+    def test_global_gate_off_skips_rtk(self):
+        self.fake_rtk('unexpected invocation')
+        self.env['CRAFTKIT_GATE'] = 'off'
+        self.assertEqual(self.hook('PreToolUse', tool_name='Bash', permission_mode='default',
+                                  tool_input={'command': 'git status'}), {})
+        self.assertFalse((self.root / 'rtk-input').exists())
+
+    def test_rtk_reads_still_compress_with_verification_disabled(self):
+        self.gate_file('verify', 'off')
+        self.fake_rtk(json.dumps({'hookSpecificOutput': {
+            'hookEventName': 'PreToolUse', 'permissionDecision': 'allow',
+            'updatedInput': {'command': 'rtk git status'}}}))
+        self.start()
+        result = self.hook('PreToolUse', tool_name='Bash', permission_mode='default',
+                           tool_input={'command': 'git status'})
+        self.assertEqual(result['hookSpecificOutput']['updatedInput']['command'], 'rtk git status')
+
+    def test_rtk_leaves_verification_wrapper_authoritative(self):
+        self.fake_rtk('unexpected invocation')
+        self.start()
+        self.edit()
+        process = self.run_verification()
+        process.communicate(timeout=10)
+        self.assertEqual(process.returncode, 0)
+        self.assertEqual(self.hook('Stop'), {})
+        self.assertFalse((self.root / 'rtk-input').exists())
 
     def blocked(self):
         self.assertEqual(self.hook('Stop').get('decision'), 'block')
@@ -303,7 +415,39 @@ class CodexGatewayTests(unittest.TestCase):
         context = self.hook('SessionStart')['hookSpecificOutput']['additionalContext']
         self.assertIn('native Codex agents', context)
         self.assertNotIn('~/.claude.json', context)
-        self.assertLess(len(context), 2500)
+        self.assertLess(len(context), 3000)
+
+    def test_codex_model_routing_is_task_scoped_and_keeps_quality_gates(self):
+        rules = self.home / '.craftkit/codex/rules'
+        rules.mkdir(parents=True)
+        (rules / 'using-agent-skills.md').write_text((REPO / 'rules/using-agent-skills.md').read_text())
+        context = self.hook('SessionStart')['hookSpecificOutput']['additionalContext']
+        for phrase in ("Keep the coordinator's model", 'runtime-listed cheaper model',
+                       'correctness/security reviews', 'Honor user/profile pins',
+                       'information are unavailable, inherit', 'fork_turns: none',
+                       'retain all verification gates', 'verify cheaper-agent output'):
+            self.assertIn(phrase, context)
+        self.assertNotIn('gpt-', context)
+        self.assertNotIn('Keep the configured model;', context)
+
+    def test_codex_model_policy_does_not_reach_other_tools(self):
+        script = '''source adapters/claude.sh
+CLAUDE_RULES_DIR="$HOME/claude-rules"; CLAUDE_MD="$HOME/CLAUDE.md"; CLAUDE_COMMANDS_DIR="$HOME/cmds"
+install_claude_rule using-agent-skills rules/using-agent-skills.md
+source adapters/gemini.sh
+GEMINI_SKILLS_DIR="$HOME/gemini"; GEMINI_MD="$HOME/GEMINI.md"
+install_gemini_rule using-agent-skills rules/using-agent-skills.md
+source adapters/cursor.sh
+CURSOR_RULES_DIR="$HOME/cursor"
+install_cursor_rule using-agent-skills rules/using-agent-skills.md
+'''
+        subprocess.run(['/bin/bash', '-c', script], cwd=REPO, env=self.env,
+                       check=True, capture_output=True)
+        for name in ('CLAUDE.md', 'GEMINI.md', 'cursor/using-agent-skills.mdc'):
+            content = (self.home / name).read_text()
+            self.assertIn('Use the everyday model by default', content)
+            self.assertNotIn('runtime-listed cheaper model', content)
+            self.assertNotIn('Honor user/profile pins', content)
 
     def test_generic_node_repo_does_not_load_evpmr(self):
         (self.repo / 'package.json').write_text('{}')
@@ -452,17 +596,26 @@ class CodexGatewayTests(unittest.TestCase):
                     self.gate_file('routing', routing)
                     self.gate_file('verify', verify)
                     context = self.hook('UserPromptSubmit')['hookSpecificOutput']['additionalContext']
-                    self.assertEqual('classify this request' in context, routing == 'on')
+                    self.assertEqual('Follow installed Codex skill routing.' in context, routing == 'on')
                     self.assertEqual('After edits, run' in context, verify == 'on')
+                    if routing == 'off':
+                        self.assertEqual(context, 'CraftKit: ' + (
+                            'After edits, run the project verification command and report its result.'
+                            if verify == 'on' else ''))
 
-    def test_default_prompt_context_is_unchanged(self):
+    def test_prompt_reminder_references_the_full_session_routing_contract(self):
         expected = (
-            'CraftKit: classify this request against installed skills and workflows before work. '
-            'For a match, activate its native $skill and follow its full SKILL.md. '
-            'Use parallel-build, parallel-review, or parallel-ship for their respective workflows when native subagents are available; otherwise use the sequential twin. '
-            'If none matches, state that briefly. After edits, run the project verification command and report its result.'
+            'CraftKit: Follow installed Codex skill routing. '
+            'After edits, run the project verification command and report its result.'
         )
         self.assertEqual(self.hook('UserPromptSubmit')['hookSpecificOutput']['additionalContext'], expected)
+        rules = self.home / '.craftkit/codex/rules'
+        rules.mkdir(parents=True)
+        (rules / 'using-agent-skills.md').write_text((REPO / 'rules/using-agent-skills.md').read_text())
+        context = self.hook('SessionStart')['hookSpecificOutput']['additionalContext']
+        for phrase in ('Classify task intent', 'Announce the selected', 'full rule referenced',
+                       'parallel-build', 'parallel-review', 'parallel-ship', 'Before reporting completion'):
+            self.assertIn(phrase, context)
 
     def test_explicit_skill_pointer_survives_disabled_routing(self):
         self.gate_file('routing', 'off')

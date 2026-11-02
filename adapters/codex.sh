@@ -182,7 +182,7 @@ PYEOF
 # command stable across script updates, preserve unrelated hooks, and report review when
 # this installer first registers the definition.
 install_codex_craftkit_hooks() {
-    local script dest node_bin
+    local script dest node_bin rtk_bin
     mkdir -p "$CODEX_HOOKS_DIR"
     for script in craftkit-codex.js craftkit-platform.js; do
         dest="$CODEX_HOOKS_DIR/$script"
@@ -191,6 +191,11 @@ install_codex_craftkit_hooks() {
             echo "    + hook: ${script%.js}"
         fi
     done
+    rtk_bin="$(command -v rtk 2>/dev/null)" || rtk_bin=""
+    if [[ "$rtk_bin" == /* && "$(cat "$CODEX_HOOKS_DIR/rtk-path" 2>/dev/null)" != "$rtk_bin" ]]; then
+        printf '%s\n' "$rtk_bin" > "$CODEX_HOOKS_DIR/rtk-path"
+        echo "    + Codex RTK path"
+    fi
     node_bin="$(_resolve_node_bin)"
     python3 - "$CODEX_HOOKS_CONFIG" "$node_bin" "$CODEX_HOOKS_DIR/craftkit-codex.js" <<'PYEOF' || return 0
 import json, os, stat, sys
