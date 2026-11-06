@@ -158,6 +158,7 @@ Frontend (React Native / web, EVPMR)
   ├── Design reads as AI-generated / template? ──────→ /fe-design
   ├── Writing or improving tests only? ────────────→ /fe-test
   ├── Review or simplify code quality? ────────────→ /code-quality
+  ├── Untangle a codebase or area end to end? ──────→ /untangle-codebase
   ├── Debug a bug (reproduce → isolate → fix)? ─────→ /debug
   ├── Open-ended design/naming/fuzzy debug, need OPTIONS? → /ideate
   ├── Complex system / architecture / non-obvious downstream effects? → /think

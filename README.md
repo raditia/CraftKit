@@ -284,6 +284,7 @@ The `*-review`, `*-a11y` and `*-performance` skills are also the live source for
 | Skill | When to use | Escalate if |
 |-------|-------------|-------------|
 | [`code-quality`](skills/code-quality/SKILL.md) | Review (5-axis) or simplify complex code | Security-sensitive review, or refactor > 500 lines |
+| [`untangle-codebase`](skills/untangle-codebase/SKILL.md) | End-to-end structural refactor of a repository or named area: coupling inventory, decision log, incremental fixes, independent review. Adapted from [caldoai/skills](https://github.com/caldoai/skills/blob/main/skills/untangle-codebase/SKILL.md) (MIT) | Architecture decisions with significant tradeoffs |
 | [`debug`](skills/debug/SKILL.md) | Structured reproduce → isolate → fix | No hypothesis after 2 isolation attempts |
 | [`ideate`](skills/ideate/SKILL.md) | Divergent ideation: N framed generators → critic scores/clusters. Open-ended design, naming, fuzzy debug | High-stakes, so escalate the critic/deepen pass to opus |
 | [`think`](skills/think/SKILL.md) | Systems/strategy reasoning router: cynefin, systems (loops, leverage), constraints, second-order. Architecture + complex-system decisions | Architecture call with non-obvious tradeoffs, so escalate analysis to opus |

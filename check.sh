@@ -2901,9 +2901,11 @@ _TG_VOCAB_director='Director mode|ListAgents|TaskStop|Keep quick, coupled work|g
 _TG_HOOKS_routing='gate-skill-first.js gate-announce-honored.js'
 # TC-001's baseline and the line prefixes allowed to differ from it: T13's spawn label in
 # rule 12a, the Codex next-step agreement #41 added after v1.58.0 shipped, and v1.60.0's
-# seventh ponytail tag, reuse, general PR follow-up routing, and Codex task model selection.
+# seventh ponytail tag, reuse, general PR follow-up routing, Codex task model selection,
+# and untangle-codebase discovery.
 _TG_BASE=v1.58.0
 _TG_ALLOW="- **Contract.** Rule 12's four fields plus the project's verify command;
+  ├── Untangle a codebase or area end to end? ──────→ /untangle-codebase
 - At the end of every completed task, suggest one concrete, relevant next step
 **Ponytail rubric: one list for writing and for reviewing.**
 New code re-implementing a function or module the repo already has
