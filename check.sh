@@ -2904,6 +2904,7 @@ _TG_HOOKS_routing='gate-skill-first.js gate-announce-honored.js'
 # seventh ponytail tag, reuse, general PR follow-up routing, and Codex task model selection.
 _TG_BASE=v1.58.0
 _TG_ALLOW="- **Contract.** Rule 12's four fields plus the project's verify command;
+- **Model.**
 - At the end of every completed task, suggest one concrete, relevant next step
 **Ponytail rubric: one list for writing and for reviewing.**
 New code re-implementing a function or module the repo already has
