@@ -1,4 +1,4 @@
-# craftkit `v1.62.0`
+# craftkit `v1.63.0`
 
 [![npm](https://img.shields.io/npm/v/@raditia/craftkit)](https://www.npmjs.com/package/@raditia/craftkit)
 [![npm downloads](https://img.shields.io/npm/dw/@raditia/craftkit)](https://www.npmjs.com/package/@raditia/craftkit)

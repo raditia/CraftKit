@@ -7,6 +7,22 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.63.0 — 2026-11-09
+
+### Director mode sizes each spawn's model to the work
+
+Director mode said when to delegate but not on what model, so spawns inherited the
+director's model or an agent's frontmatter pin regardless of the job. Rule 12a gains a
+**Model** bullet, mirrored in the routing hook's Director line. The main session is expected
+to be opus-class (the user sets it; the session says so once when it is not), overriding the
+everyday default for the director only. Every spawn passes `model:` as the family alias of
+its tier (derived from the concrete id the tier line carries), and that outranks an agent's
+frontmatter pin. The tier comes from the existing Model routing section rather than a second
+list: locate, map, read-only search, and pattern-matching reviews go to cheapest; bounded
+edits, reviews, and test runs to everyday; its escalation and fusion triggers to escalate. Tiers stay
+derived from entitlements: haiku / sonnet / opus on a personal plan, sonnet / opus / fable
+on enterprise.
+
 ## v1.62.0 — 2026-10-27
 
 ### New skill: `/clarity`, for prose that keeps its facts
