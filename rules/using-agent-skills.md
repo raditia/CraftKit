@@ -49,8 +49,24 @@ Keep the coordinator's model. For subagents, choose a runtime-listed cheaper mod
 lookup/extraction, docs, or fixed check execution; keep the configured model for implementation
 and correctness/security reviews. Honor user/profile pins. If model overrides or cost/capability
 information are unavailable, inherit. Never guess ids or use Claude aliases. Model overrides
-use isolated task context (`fork_turns: none` when required); announce the model and reason.
+use isolated task context (`fork_turns: none`); announce the model and reason.
 Escalate uncertain units, retain all verification gates, and verify cheaper-agent output before use.
+Lower reasoning effort is not a cheaper model; report model and effort separately.
+Require every worker packet to carry the advice protocol below, including generic workers.
+On material uncertainty, missing evidence, or 2 failed hypotheses, workers send the parent
+`ADVICE_REQUEST` with the question, evidence, attempts and blocked decision, then pause the
+uncertain work. Specialists do not spawn advisors. The coordinator consults the next suitable
+stronger runtime-listed model for that question only, using `escalation`; repeat if unresolved.
+Honor pins and concurrency limits. If no stronger model is available or slots are full,
+use the coordinator or higher supported effort and disclose the fallback. Return `ADVICE_RESPONSE`
+with advice and evidence; the worker incorporates it and verifies before continuing.
+<!-- BEGIN CRAFTKIT-GATE-ROUTING -->
+Every spawn uses `fork_turns: none` and starts its message with
+`MODEL: <reason> - <explanation>` followed by a newline and the task packet.
+Reasons: `bounded` (explicit cheaper model), `escalation` (explicit stronger model), `implementation`, `critical-review`,
+`user-pin`, `profile-pin`, `unavailable`. Omit model for implementation, critical-review
+or unavailable; pins may be explicit or inherited. The routing hook denies missing contracts.
+<!-- END CRAFTKIT-GATE-ROUTING -->
 Before reporting completion, verify the latest edits using project gates and
 report actual results. Findings use `[ERROR]` (must fix), `[WARNING]` (should fix), and
 `[SUGGESTION]` (optional). For unusual routing or escalation, read the full rule referenced in
@@ -414,16 +430,16 @@ Use the everyday model by default. Escalate inline when you detect genuine uncer
 
 **On Claude Code the tiers arrive per turn, so never name a model id yourself.** `hooks/craftkit-routing.js` reads `~/.claude.json` every prompt and injects the resolved trio as `additionalContext` (`Model tiers (<plan> plan, ids resolved from ~/.claude.json entitlements): cheapest=… everyday=… escalate=…`). That line is authoritative wherever a skill names a tier. **Plan picks the tier window; entitlements pick the ids inside it.** Enterprise reaches the frontier family, so its window is sonnet / opus / fable, and everyday is opus. Personal caps below the frontier, so its window is haiku / sonnet / opus, and everyday is sonnet. Within the window, the id is the newest entitled version of that family from `modelAccessCache` ∪ `additionalModelOptionsCache`, which is what makes a release a no-op here: a new `opus-6` displaces `opus-5` on its own. Entitlements unreadable, or the plan unrecognized → personal window, family aliases only, said out loud in the line.
 
-**On Claude Code, spawn agents with the family alias** (`haiku` · `sonnet` · `opus` · `fable`), not a versioned id: the Agent tool's `model:` accepts aliases and each tracks the newest model in its family, which is why `agents/*.md` frontmatter pins `sonnet` and stays correct across releases. Codex profiles inherit the configured model and set reasoning effort. Concrete ids are for showing the user.
+**On Claude Code, spawn agents with the family alias** (`haiku` · `sonnet` · `opus` · `fable`), not a versioned id: the Agent tool's `model:` accepts aliases and each tracks the newest model in its family, which is why `agents/*.md` frontmatter pins `sonnet` and stays correct across releases. Codex follows its runtime section above. Concrete Claude ids are for showing the user.
 
 | AI | Cheapest | Everyday | Escalate | Fusion panel |
 |---|---|---|---|---|
 | Claude Code | injected per turn (see above) | injected | injected | 2× escalate → same-tier judge |
 | Gemini CLI | `flash-lite` | `flash` | `pro` | 2× `pro` → `pro` judge |
 | Cursor | `auto` | `auto` | `cursor-agent --model` or the picker | 2× escalate → same-tier judge |
-| Codex CLI | omit `model`, effort `low` | omit `model`, effort `medium` | omit `model`, effort `high` | 2× escalate → same-tier judge |
+| Codex CLI | runtime-listed cheaper model for bounded work | inherit for implementation and critical reviews | next suitable stronger runtime-listed model; disclosed effort fallback | 2× escalate → same-tier judge |
 
-**No row names a versioned id, on any tool**, for the same reason as the Claude row, reached differently per tool. Gemini CLI ships its own `auto`/`pro`/`flash`/`flash-lite` aliases that resolve against CLI constants *and* the account's preview entitlement, so they self-update on CLI upgrade (prefer these over the API's `gemini-*-latest`, which Google steers production away from and which can land on a rate-limited preview build). Codex CLI has no self-updating model id, because OpenAI's undated ids pin the minor version, so leave `model` unset in `~/.codex/config.toml` and let the CLI's server-refreshed catalog pick, expressing the tier as `model_reasoning_effort` instead. Cursor's model lives in the picker or the account default chain; no committed file selects it, so the row is a best-effort note, not a setting. Sources and the retired ids this replaced: `docs/research/self-updating-model-ids.md`.
+**No row names a versioned id, on any tool**, for the same reason as the Claude row, reached differently per tool. Gemini CLI ships its own `auto`/`pro`/`flash`/`flash-lite` aliases that resolve against CLI constants *and* the account's preview entitlement, so they self-update on CLI upgrade (prefer these over the API's `gemini-*-latest`, which Google steers production away from and which can land on a rate-limited preview build). Codex selects subagent models from runtime availability and capability/cost information, leaving global model settings unchanged. Cursor's model lives in the picker or the account default chain; no committed file selects it, so the row is a best-effort note, not a setting. Sources and the retired ids this replaced: `docs/research/self-updating-model-ids.md`.
 
 Cheapest = the floor for pure pattern-matching/extraction skills (scaffold, context, a11y, ponytail-*, debug's first pass). On an account whose ladder starts at sonnet, that floor *is* sonnet, which is why the cold review agents pin `sonnet` rather than `haiku`.
 
@@ -441,7 +457,7 @@ Use when a single higher-model pass might still miss something and being wrong h
 
 ### Escalation process (single higher model)
 
-Never ask the user to switch models; escalate inline. (1) Tell the user one line first: `Low confidence on [problem], consulting higher model.` (2) Spawn an agent on the tier's **Escalate** model (the alias from the injected tier line), scoped to the uncertain part only, not the whole skill. (3) Incorporate the result, continue on the everyday model. (4) Note at end: `[consulted <escalate-model> for: X]`. Targeted question, not a hand-off; you stay in control.
+On Codex, use the coordinator advice protocol in its runtime section above. On other tools, never ask the user to switch models; escalate inline. (1) Tell the user one line first: `Low confidence on [problem], consulting higher model.` (2) Spawn an agent on the tier's **Escalate** model (the alias from the injected tier line), scoped to the uncertain part only, not the whole skill. (3) Incorporate the result, continue on the everyday model. (4) Note at end: `[consulted <escalate-model> for: X]`. Targeted question, not a hand-off; you stay in control.
 
 ### Fusion panel process
 

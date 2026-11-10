@@ -326,7 +326,11 @@ frontmatter, body = re.match(r'^---\n(.*?)\n---\s*(.*)', text, re.S).groups()
 description = re.search(r'^description:\s*(.+)$', frontmatter, re.M).group(1)
 instructions = ('You are a read-only CraftKit specialist. Follow your assigned task directly; '
                 'do not activate skills, route workflows, or spawn agents. Project conventions '
-                'are supplied by the parent.\n\n' + body)
+                'are supplied by the parent. On material uncertainty, missing evidence, or '
+                '2 failed hypotheses, send the parent ADVICE_REQUEST with your question, '
+                'evidence, attempts and blocked decision; pause the uncertain work until '
+                'ADVICE_RESPONSE. Incorporate the advice and verify before continuing; '
+                'do not spawn an advisor.\n\n' + body)
 with open(dest, 'w') as f:
     f.write('# CraftKit managed agent\n')
     for key, value in [('name', name), ('description', description),

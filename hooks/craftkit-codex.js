@@ -274,6 +274,26 @@ function prPreflight(p, cwd) {
   } catch (_) { return deny('Preflight helper, saved record or body file is missing or invalid. Run the preflight CLI first.'); }
 }
 
+function agentContract(p) {
+  // flag: gates.routing. off: spawns pass through without a model/context contract. remove: never, routing is a user choice.
+  if (p.tool_name !== 'spawn_agent' || gateValue('routing') === 'off') return null;
+  const ti = p.tool_input || {};
+  const deny = reason => ({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny',
+    permissionDecisionReason: 'Agent contract: ' + reason } });
+  if (ti.fork_turns !== 'none') return deny('Use fork_turns: none and supply the task, scoped source, project conventions and verification in message.');
+  const decision = typeof ti.message === 'string' && ti.message.match(
+    /^MODEL: (bounded|escalation|implementation|critical-review|user-pin|profile-pin|unavailable) - (\S[^\r\n]*)\r?\n/);
+  if (!decision) return deny('Start message with MODEL: <reason> - <explanation> and a newline. Reasons: bounded, escalation, implementation, critical-review, user-pin, profile-pin, unavailable.');
+  if (!ti.message.slice(decision[0].length).trim()) return deny('Include the task packet after the model decision.');
+  const model = typeof ti.model === 'string' && ti.model.trim();
+  if (decision[1] === 'bounded' && !model) return deny('Bounded work needs an explicit runtime-listed cheaper model; use unavailable with an explanation if model/cost information is absent.');
+  if (decision[1] === 'escalation' && !model) return deny('Escalation needs an explicit runtime-listed stronger model; use unavailable and disclose the fallback if none is available.');
+  if (model && ['implementation', 'critical-review', 'unavailable'].includes(decision[1])) {
+    return deny('Omit model to inherit for implementation, critical-review or unavailable; explicit pins use user-pin or profile-pin.');
+  }
+  return null;
+}
+
 function delegate(p, file, cwd) {
   // flag: gates.director. off or unset: no delegate gate, unless unset with CRAFTKIT_DELEGATE=on. remove: never, it is a user choice.
   const director = gateValue('director');
@@ -336,6 +356,8 @@ process.stdin.on('end', () => {
   if (!session) return output({});
   const file = statePath(session);
   if (event === 'PreToolUse') {
+    const agentDenied = agentContract(p);
+    if (agentDenied) return output(agentDenied);
     const prDenied = prPreflight(p, cwd);
     if (prDenied) return output(prDenied);
     let denied = null;
