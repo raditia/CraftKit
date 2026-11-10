@@ -607,6 +607,13 @@ overrides or cost/capability information are unavailable, subagents inherit. Mod
 isolated task context and keep all verification gates. Profiles do not pin model ids, and lowering
 reasoning effort alone does not change the model. [Codex subagent settings](https://learn.chatgpt.com/docs/agent-configuration/subagents)
 
+Codex workers send `ADVICE_REQUEST` to the coordinator on material uncertainty, missing evidence,
+or two failed hypotheses, and pause the uncertain work. The coordinator consults the next suitable
+stronger runtime-listed model using the `escalation` spawn reason and returns `ADVICE_RESPONSE`.
+The worker incorporates and verifies the advice. If no stronger model is available or concurrency
+is full, the coordinator discloses its fallback. Specialists request advice without spawning advisors; generic worker
+packets carry the same protocol. Advice seeking is instruction-driven, not detected by the hook.
+
 | Route to | When |
 |----------|------|
 | Escalate model | Architecture call with non-obvious tradeoffs, security-sensitive code, no hypothesis after 2 debug attempts |

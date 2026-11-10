@@ -355,7 +355,7 @@ Git context is derived into the turn. Human intent lives in `docs/planning/<slug
 
 ## Model routing
 
-Skills name tiers rather than pinned model IDs. Claude derives tiers from account data; Gemini uses CLI aliases; Codex inherits its configured model and changes reasoning effort; Cursor stays picker-controlled.
+Skills name tiers rather than pinned model IDs. Claude derives tiers from account data; Gemini uses CLI aliases; Codex selects runtime-listed cheaper workers and stronger advisors while preserving its coordinator model; Cursor stays picker-controlled.
 
 [Model selection diagrams and escalation rules](docs/guide.md#model-routing)
 
@@ -398,5 +398,22 @@ extraction, docs, or fixed checks. Implementation and correctness/security revie
 configured model. Explicit user/profile pins win; unavailable model choices fall back to
 inheritance. Overrides use isolated task context and keep verification gates. No model ids or
 global model settings are pinned by this policy; lower reasoning effort alone is not a model change.
+
+The Codex routing gate blocks spawns unless `fork_turns` is `none` and the message begins
+`MODEL: <reason> - <explanation>` followed by a newline and the task packet. Reasons are
+`bounded` (requires an explicit runtime-listed cheaper model), `implementation`, `critical-review`,
+`escalation` (requires an explicit runtime-listed stronger model), `user-pin`, `profile-pin`,
+or `unavailable`. Implementation, critical-review and unavailable
+inherit the configured model; pins may be explicit or inherited. The gate validates the
+declaration, not current prices or task difficulty. `gates.routing=off` disables this check;
+verification gates remain independent. Reload trusted hooks and start a fresh session after sync.
+
+Workers request advice with `ADVICE_REQUEST` on material uncertainty, missing evidence, or two
+failed hypotheses, and pause the uncertain work. The coordinator consults the next suitable
+stronger runtime-listed model and returns `ADVICE_RESPONSE`; the worker incorporates and verifies
+the advice. Specialists request advice through their parent, without spawning advisors. Generic
+worker packets must carry the same protocol. Unavailable stronger models or full concurrency use
+a disclosed coordinator or reasoning-effort fallback. This is instruction-driven; the hook validates spawn
+contracts, not whether a worker recognized uncertainty or requested advice.
 
 [Design decisions](docs/design-notes.md) · [Diagram inventory and maintenance](docs/diagrams/README.md)

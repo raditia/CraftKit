@@ -2901,7 +2901,8 @@ _TG_VOCAB_director='Director mode|ListAgents|TaskStop|Keep quick, coupled work|g
 _TG_HOOKS_routing='gate-skill-first.js gate-announce-honored.js'
 # TC-001's baseline and the line prefixes allowed to differ from it: T13's spawn label in
 # rule 12a, the Codex next-step agreement #41 added after v1.58.0 shipped, and v1.60.0's
-# seventh ponytail tag, reuse, general PR follow-up routing, and Codex task model selection.
+# seventh ponytail tag, reuse, general PR follow-up routing, Codex task model selection,
+# and the Codex advice protocol.
 _TG_BASE=v1.58.0
 _TG_ALLOW="- **Contract.** Rule 12's four fields plus the project's verify command;
 - **Model.**
@@ -2925,7 +2926,27 @@ lookup/extraction, docs, or fixed check execution; keep the configured model
 and correctness/security reviews. Honor user/profile pins.
 information are unavailable, inherit. Never guess ids or use Claude aliases.
 use isolated task context (\`fork_turns: none\` when required)
+use isolated task context (\`fork_turns: none\`); announce the model and reason.
+Every spawn uses \`fork_turns: none\` and starts its message with
+\`MODEL: <reason> - <explanation>\` followed by a newline and the task packet.
+Reasons: \`bounded\` (explicit cheaper model),
+\`user-pin\`, \`profile-pin\`, \`unavailable\`. Omit model for implementation, critical-review
+or unavailable; pins may be explicit or inherited. The routing hook denies missing contracts.
 Escalate uncertain units, retain all verification gates,
+Lower reasoning effort is not a cheaper model;
+Require every worker packet to carry the advice protocol below,
+On material uncertainty, missing evidence, or 2 failed hypotheses,
+\`ADVICE_REQUEST\` with the question, evidence, attempts and blocked decision,
+uncertain work. Specialists do not spawn advisors.
+stronger runtime-listed model for that question only,
+Honor pins and concurrency limits
+use the coordinator or higher supported effort and disclose the fallback.
+with advice and evidence; the worker incorporates it and verifies before continuing.
+**On Claude Code, spawn agents with the family alias**
+| Codex CLI |
+**No row names a versioned id, on any tool**
+Never ask the user to switch models; escalate inline.
+On Codex, use the coordinator advice protocol in its runtime section above.
 Before reporting completion, verify the latest edits using project gates and"
 _TG_HOOKS_verify='gate-verify-on-stop.js'
 _TG_HOOKS_director='gate-delegate.js'

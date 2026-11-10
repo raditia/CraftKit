@@ -588,7 +588,7 @@ class CodexGatewayTests(unittest.TestCase):
         context = self.hook('SessionStart')['hookSpecificOutput']['additionalContext']
         self.assertIn('native Codex agents', context)
         self.assertNotIn('~/.claude.json', context)
-        self.assertLess(len(context), 3000)
+        self.assertLess(len(context), 4500)
 
     def test_codex_model_routing_is_task_scoped_and_keeps_quality_gates(self):
         rules = self.home / '.craftkit/codex/rules'
@@ -602,6 +602,23 @@ class CodexGatewayTests(unittest.TestCase):
             self.assertIn(phrase, context)
         self.assertNotIn('gpt-', context)
         self.assertNotIn('Keep the configured model;', context)
+
+    def test_codex_advice_protocol_reaches_coordinator(self):
+        rules = self.home / '.craftkit/codex/rules'
+        rules.mkdir(parents=True)
+        (rules / 'using-agent-skills.md').write_text((REPO / 'rules/using-agent-skills.md').read_text())
+        context = ' '.join(self.hook('SessionStart')['hookSpecificOutput']['additionalContext'].split())
+        for phrase in ('ADVICE_REQUEST', 'ADVICE_RESPONSE', '2 failed hypotheses',
+                       'next suitable stronger runtime-listed model', 'no stronger model is available',
+                       'slots are full', 'escalation', 'Lower reasoning effort is not a cheaper model'):
+            self.assertIn(phrase, context)
+
+    def test_agent_contract_allows_explicit_escalation_and_requires_model(self):
+        self.assertEqual(self.agent_spawn('escalation', model='runtime-stronger-model'), {})
+        for model in (None, '', '  '):
+            with self.subTest(model=model):
+                self.assertEqual(self.agent_spawn('escalation', model=model)
+                                 ['hookSpecificOutput']['permissionDecision'], 'deny')
 
     def test_codex_model_policy_does_not_reach_other_tools(self):
         script = '''source adapters/claude.sh
@@ -619,8 +636,75 @@ install_cursor_rule using-agent-skills rules/using-agent-skills.md
         for name in ('CLAUDE.md', 'GEMINI.md', 'cursor/using-agent-skills.mdc'):
             content = (self.home / name).read_text()
             self.assertIn('Use the everyday model by default', content)
-            self.assertNotIn('runtime-listed cheaper model', content)
+            self.assertNotIn('For subagents, choose a runtime-listed cheaper model', content)
             self.assertNotIn('Honor user/profile pins', content)
+            self.assertNotIn('MODEL: <reason>', content)
+            self.assertNotIn('ADVICE_REQUEST', content)
+
+    def agent_spawn(self, reason='implementation', **fields):
+        tool_input = dict(fork_turns='none', message=f'MODEL: {reason} - scoped task\nEdit app.js; verify: bash check.sh')
+        tool_input.update(fields)
+        return self.hook('PreToolUse', tool_name='spawn_agent', tool_input=tool_input,
+                         turn_id='main-turn', tool_use_id='spawn')
+
+    def test_agent_contract_requires_isolation_even_before_prompt(self):
+        for fork in (None, 'all', ''):
+            with self.subTest(fork=fork):
+                out = self.agent_spawn(fork_turns=fork)['hookSpecificOutput']
+                self.assertEqual(out['permissionDecision'], 'deny')
+                self.assertIn('fork_turns: none', out['permissionDecisionReason'])
+        self.assertEqual(self.agent_spawn(), {})
+
+    def test_agent_contract_requires_decision_and_task_packet(self):
+        for message in ('edit app.js', '', None, 'MODEL: unknown - task\nReview app.js',
+                        'MODEL: implementation - \nEdit app.js',
+                        'MODEL: implementation - scoped task\n  '):
+            with self.subTest(message=message):
+                self.assertEqual(self.agent_spawn(message=message)['hookSpecificOutput']['permissionDecision'], 'deny')
+
+    def test_agent_contract_bounded_work_requires_model_and_preserves_pins(self):
+        for model in (None, '', '  '):
+            with self.subTest(model=model):
+                out = self.agent_spawn('bounded', model=model)['hookSpecificOutput']
+                self.assertEqual(out['permissionDecision'], 'deny')
+                self.assertIn('runtime-listed cheaper model', out['permissionDecisionReason'])
+        self.assertEqual(self.agent_spawn('bounded', model='runtime-cheaper-model'), {})
+        for reason in ('user-pin', 'profile-pin'):
+            self.assertEqual(self.agent_spawn(reason), {})
+            self.assertEqual(self.agent_spawn(reason, model='runtime-pinned-model'), {})
+
+    def test_agent_contract_preserves_inheritance_for_quality_and_unavailable_models(self):
+        for reason in ('implementation', 'critical-review', 'unavailable'):
+            with self.subTest(reason=reason):
+                self.assertEqual(self.agent_spawn(reason), {})
+                self.assertEqual(self.agent_spawn(reason, model='override')['hookSpecificOutput']['permissionDecision'], 'deny')
+
+    def test_agent_contract_off_paths_preserve_old_spawn_behavior(self):
+        self.gate_file('routing', 'off')
+        self.assertEqual(self.agent_spawn(message='legacy task', fork_turns='all'), {})
+        self.assertEqual(self.agent_spawn('escalation'), {})
+        self.gate_file('routing', 'on')
+        for variable in ('CRAFTKIT_GATE', 'CRAFTKIT_PANELIST'):
+            self.env[variable] = 'off' if variable == 'CRAFTKIT_GATE' else '1'
+            self.assertEqual(self.agent_spawn(message='legacy task', fork_turns='all'), {})
+            self.env[variable] = ''
+
+    def test_agent_contract_does_not_intercept_other_tools(self):
+        self.assertEqual(self.hook('PreToolUse', tool_name='other_spawn_agent', tool_input={}), {})
+        self.assertEqual(self.hook('PostToolUse', tool_name='spawn_agent', tool_input={}), {})
+
+    def test_agent_contract_denial_cannot_disarm_director(self):
+        self.env['CRAFTKIT_DELEGATE'] = 'on'
+        self.patch('a.js')
+        self.patch('b.js')
+        self.assertEqual(self.agent_spawn(fork_turns='all')['hookSpecificOutput']['permissionDecision'], 'deny')
+        self.denied(self.patch('c.js'))
+
+    def test_agent_routing_off_does_not_disable_verification(self):
+        self.gate_file('routing', 'off')
+        self.start()
+        self.edit()
+        self.assertEqual(self.hook('Stop')['decision'], 'block')
 
     def test_generic_node_repo_does_not_load_evpmr(self):
         (self.repo / 'package.json').write_text('{}')
@@ -818,10 +902,11 @@ install_cursor_rule using-agent-skills rules/using-agent-skills.md
         self.patch('a.js')
         self.patch('b.js')
         self.hook('PreToolUse', tool_name='spawn_agent', turn_id='main-turn', tool_use_id='ro',
-                  tool_input={'agent_type': 'fe-review', 'message': 'review a.js'})
+                  tool_input={'agent_type': 'fe-review', 'fork_turns': 'none',
+                              'message': 'MODEL: critical-review - correctness\nreview a.js'})
         self.denied(self.patch('c.js'))
         self.hook('PreToolUse', tool_name='spawn_agent', turn_id='main-turn', tool_use_id='rw',
-                  tool_input={'message': 'edit c.js; verify: bash check.sh'})
+                  tool_input={'fork_turns': 'none', 'message': 'MODEL: implementation - source change\nedit c.js; verify: bash check.sh'})
         self.assertEqual(self.patch('c.js'), {})
 
     def test_delegate_record_clears_on_new_prompt(self):
@@ -871,7 +956,7 @@ install_cursor_rule using-agent-skills rules/using-agent-skills.md
         self.patch('a.js')
         self.patch('b.js')
         self.hook('PreToolUse', tool_name='spawn_agent', turn_id='main-turn', tool_use_id='sp',
-                  tool_input={'message': 'edit c.js; verify: bash check.sh'})
+                  tool_input={'fork_turns': 'none', 'message': 'MODEL: implementation - source change\nedit c.js; verify: bash check.sh'})
         self.assertEqual(self.patch('c.js'), {})
         self.patch('a.js', turn='t2', agent_id='child', agent_type='worker')
         self.patch('b.js', turn='t2', agent_id='child', agent_type='worker')
@@ -909,6 +994,9 @@ install_cursor_rule using-agent-skills rules/using-agent-skills.md
         self.assertNotIn('model', fields)
         self.assertIn('Layer constraints', fields['developer_instructions'])
         self.assertIn('not provided', fields['developer_instructions'])
+        for phrase in ('ADVICE_REQUEST', 'ADVICE_RESPONSE', '2 failed hypotheses',
+                       'pause the uncertain work', 'do not spawn an advisor'):
+            self.assertIn(phrase, fields['developer_instructions'])
         before = profile.read_text()
         subprocess.run(['/bin/bash', '-c', script, 'fixture', str(lib)], cwd=REPO,
                        env=env, check=True, capture_output=True)
