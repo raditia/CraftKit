@@ -595,8 +595,8 @@ class CodexGatewayTests(unittest.TestCase):
         rules.mkdir(parents=True)
         (rules / 'using-agent-skills.md').write_text((REPO / 'rules/using-agent-skills.md').read_text())
         context = self.hook('SessionStart')['hookSpecificOutput']['additionalContext']
-        for phrase in ("Keep the coordinator's model", 'runtime-listed cheaper model',
-                       'correctness/security reviews', 'Honor user/profile pins',
+        for phrase in ("Keep the coordinator's model", 'cheapest runtime-listed model',
+                       'implementation and critical reviews', 'Honor user/profile pins',
                        'information are unavailable, inherit', 'fork_turns: none',
                        'retain all verification gates', 'verify cheaper-agent output'):
             self.assertIn(phrase, context)
@@ -609,6 +609,8 @@ class CodexGatewayTests(unittest.TestCase):
         (rules / 'using-agent-skills.md').write_text((REPO / 'rules/using-agent-skills.md').read_text())
         context = ' '.join(self.hook('SessionStart')['hookSpecificOutput']['additionalContext'].split())
         for phrase in ('ADVICE_REQUEST', 'ADVICE_RESPONSE', '2 failed hypotheses',
+                       'coordinator answers if it is the next suitable stronger model',
+                       'If the coordinator is uncertain, consult the next suitable stronger',
                        'next suitable stronger runtime-listed model', 'no stronger model is available',
                        'slots are full', 'escalation', 'Lower reasoning effort is not a cheaper model'):
             self.assertIn(phrase, context)
@@ -636,7 +638,7 @@ install_cursor_rule using-agent-skills rules/using-agent-skills.md
         for name in ('CLAUDE.md', 'GEMINI.md', 'cursor/using-agent-skills.mdc'):
             content = (self.home / name).read_text()
             self.assertIn('Use the everyday model by default', content)
-            self.assertNotIn('For subagents, choose a runtime-listed cheaper model', content)
+            self.assertNotIn('Start all delegated work', content)
             self.assertNotIn('Honor user/profile pins', content)
             self.assertNotIn('MODEL: <reason>', content)
             self.assertNotIn('ADVICE_REQUEST', content)
@@ -653,7 +655,7 @@ install_cursor_rule using-agent-skills rules/using-agent-skills.md
                 out = self.agent_spawn(fork_turns=fork)['hookSpecificOutput']
                 self.assertEqual(out['permissionDecision'], 'deny')
                 self.assertIn('fork_turns: none', out['permissionDecisionReason'])
-        self.assertEqual(self.agent_spawn(), {})
+        self.assertEqual(self.agent_spawn(model='runtime-cheapest-model'), {})
 
     def test_agent_contract_requires_decision_and_task_packet(self):
         for message in ('edit app.js', '', None, 'MODEL: unknown - task\nReview app.js',
@@ -667,17 +669,19 @@ install_cursor_rule using-agent-skills rules/using-agent-skills.md
             with self.subTest(model=model):
                 out = self.agent_spawn('bounded', model=model)['hookSpecificOutput']
                 self.assertEqual(out['permissionDecision'], 'deny')
-                self.assertIn('runtime-listed cheaper model', out['permissionDecisionReason'])
+                self.assertIn('cheapest runtime-listed model', out['permissionDecisionReason'])
         self.assertEqual(self.agent_spawn('bounded', model='runtime-cheaper-model'), {})
         for reason in ('user-pin', 'profile-pin'):
             self.assertEqual(self.agent_spawn(reason), {})
             self.assertEqual(self.agent_spawn(reason, model='runtime-pinned-model'), {})
 
-    def test_agent_contract_preserves_inheritance_for_quality_and_unavailable_models(self):
-        for reason in ('implementation', 'critical-review', 'unavailable'):
+    def test_agent_contract_requires_explicit_model_for_delegated_work(self):
+        for reason in ('implementation', 'critical-review'):
             with self.subTest(reason=reason):
-                self.assertEqual(self.agent_spawn(reason), {})
-                self.assertEqual(self.agent_spawn(reason, model='override')['hookSpecificOutput']['permissionDecision'], 'deny')
+                self.assertEqual(self.agent_spawn(reason)['hookSpecificOutput']['permissionDecision'], 'deny')
+                self.assertEqual(self.agent_spawn(reason, model='runtime-cheapest-model'), {})
+        self.assertEqual(self.agent_spawn('unavailable'), {})
+        self.assertEqual(self.agent_spawn('unavailable', model='override')['hookSpecificOutput']['permissionDecision'], 'deny')
 
     def test_agent_contract_off_paths_preserve_old_spawn_behavior(self):
         self.gate_file('routing', 'off')
@@ -903,10 +907,10 @@ install_cursor_rule using-agent-skills rules/using-agent-skills.md
         self.patch('b.js')
         self.hook('PreToolUse', tool_name='spawn_agent', turn_id='main-turn', tool_use_id='ro',
                   tool_input={'agent_type': 'fe-review', 'fork_turns': 'none',
-                              'message': 'MODEL: critical-review - correctness\nreview a.js'})
+                              'model': 'runtime-cheapest-model', 'message': 'MODEL: critical-review - correctness\nreview a.js'})
         self.denied(self.patch('c.js'))
         self.hook('PreToolUse', tool_name='spawn_agent', turn_id='main-turn', tool_use_id='rw',
-                  tool_input={'fork_turns': 'none', 'message': 'MODEL: implementation - source change\nedit c.js; verify: bash check.sh'})
+                  tool_input={'fork_turns': 'none', 'model': 'runtime-cheapest-model', 'message': 'MODEL: implementation - source change\nedit c.js; verify: bash check.sh'})
         self.assertEqual(self.patch('c.js'), {})
 
     def test_delegate_record_clears_on_new_prompt(self):
@@ -956,7 +960,7 @@ install_cursor_rule using-agent-skills rules/using-agent-skills.md
         self.patch('a.js')
         self.patch('b.js')
         self.hook('PreToolUse', tool_name='spawn_agent', turn_id='main-turn', tool_use_id='sp',
-                  tool_input={'fork_turns': 'none', 'message': 'MODEL: implementation - source change\nedit c.js; verify: bash check.sh'})
+                  tool_input={'fork_turns': 'none', 'model': 'runtime-cheapest-model', 'message': 'MODEL: implementation - source change\nedit c.js; verify: bash check.sh'})
         self.assertEqual(self.patch('c.js'), {})
         self.patch('a.js', turn='t2', agent_id='child', agent_type='worker')
         self.patch('b.js', turn='t2', agent_id='child', agent_type='worker')

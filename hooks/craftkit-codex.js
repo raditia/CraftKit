@@ -286,10 +286,10 @@ function agentContract(p) {
   if (!decision) return deny('Start message with MODEL: <reason> - <explanation> and a newline. Reasons: bounded, escalation, implementation, critical-review, user-pin, profile-pin, unavailable.');
   if (!ti.message.slice(decision[0].length).trim()) return deny('Include the task packet after the model decision.');
   const model = typeof ti.model === 'string' && ti.model.trim();
-  if (decision[1] === 'bounded' && !model) return deny('Bounded work needs an explicit runtime-listed cheaper model; use unavailable with an explanation if model/cost information is absent.');
+  if (['bounded', 'implementation', 'critical-review'].includes(decision[1]) && !model) return deny('Delegated work needs an explicit cheapest runtime-listed model; use unavailable with an explanation if model/cost information is absent.');
   if (decision[1] === 'escalation' && !model) return deny('Escalation needs an explicit runtime-listed stronger model; use unavailable and disclose the fallback if none is available.');
-  if (model && ['implementation', 'critical-review', 'unavailable'].includes(decision[1])) {
-    return deny('Omit model to inherit for implementation, critical-review or unavailable; explicit pins use user-pin or profile-pin.');
+  if (model && decision[1] === 'unavailable') {
+    return deny('Omit model to inherit when model selection is unavailable; explicit pins use user-pin or profile-pin.');
   }
   return null;
 }

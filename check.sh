@@ -2922,6 +2922,8 @@ Node/tooling repositories do not inherit React/EVPMR from
 Keep the configured model; Codex reasoning tiers are low, medium, and high.
 family aliases. Before reporting completion, verify the latest edits using project gates and
 Keep the coordinator's model. For subagents, choose a runtime-listed cheaper model
+Keep the coordinator's model. Start all delegated work, including implementation and critical reviews,
+with the cheapest runtime-listed model. Honor user/profile pins.
 lookup/extraction, docs, or fixed check execution; keep the configured model
 and correctness/security reviews. Honor user/profile pins.
 information are unavailable, inherit. Never guess ids or use Claude aliases.
@@ -2930,6 +2932,9 @@ use isolated task context (\`fork_turns: none\`); announce the model and reason.
 Every spawn uses \`fork_turns: none\` and starts its message with
 \`MODEL: <reason> - <explanation>\` followed by a newline and the task packet.
 Reasons: \`bounded\` (explicit cheaper model),
+Reasons: \`bounded\`, \`implementation\`, \`critical-review\` (explicit cheapest model),
+\`escalation\` (explicit stronger model), \`user-pin\`, \`profile-pin\`, \`unavailable\`.
+Omit model for unavailable; pins may be explicit or inherited.
 \`user-pin\`, \`profile-pin\`, \`unavailable\`. Omit model for implementation, critical-review
 or unavailable; pins may be explicit or inherited. The routing hook denies missing contracts.
 Escalate uncertain units, retain all verification gates,
@@ -2938,6 +2943,9 @@ Require every worker packet to carry the advice protocol below,
 On material uncertainty, missing evidence, or 2 failed hypotheses,
 \`ADVICE_REQUEST\` with the question, evidence, attempts and blocked decision,
 uncertain work. Specialists do not spawn advisors.
+uncertain work. Specialists do not spawn advisors. The coordinator answers if it is the next suitable
+stronger model; otherwise it consults that model for the question only using
+coordinator is uncertain, consult the next suitable stronger runtime-listed model;
 stronger runtime-listed model for that question only,
 Honor pins and concurrency limits
 use the coordinator or higher supported effort and disclose the fallback.

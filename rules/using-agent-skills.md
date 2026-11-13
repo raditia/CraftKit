@@ -45,9 +45,8 @@ Steer via `send_message`/`followup_task` and `interrupt_agent`, or `send_input`/
 when available. Collect results with `wait_agent` before replying. Reuse verification for
 an unchanged tree; report "not verified" if it is missing or failing.
 
-Keep the coordinator's model. For subagents, choose a runtime-listed cheaper model for bounded
-lookup/extraction, docs, or fixed check execution; keep the configured model for implementation
-and correctness/security reviews. Honor user/profile pins. If model overrides or cost/capability
+Keep the coordinator's model. Start all delegated work, including implementation and critical reviews,
+with the cheapest runtime-listed model. Honor user/profile pins. If model overrides or cost/capability
 information are unavailable, inherit. Never guess ids or use Claude aliases. Model overrides
 use isolated task context (`fork_turns: none`); announce the model and reason.
 Escalate uncertain units, retain all verification gates, and verify cheaper-agent output before use.
@@ -55,17 +54,18 @@ Lower reasoning effort is not a cheaper model; report model and effort separatel
 Require every worker packet to carry the advice protocol below, including generic workers.
 On material uncertainty, missing evidence, or 2 failed hypotheses, workers send the parent
 `ADVICE_REQUEST` with the question, evidence, attempts and blocked decision, then pause the
-uncertain work. Specialists do not spawn advisors. The coordinator consults the next suitable
-stronger runtime-listed model for that question only, using `escalation`; repeat if unresolved.
+uncertain work. Specialists do not spawn advisors. The coordinator answers if it is the next suitable
+stronger model; otherwise it consults that model for the question only using `escalation`. If the
+coordinator is uncertain, consult the next suitable stronger runtime-listed model; repeat if unresolved.
 Honor pins and concurrency limits. If no stronger model is available or slots are full,
 use the coordinator or higher supported effort and disclose the fallback. Return `ADVICE_RESPONSE`
 with advice and evidence; the worker incorporates it and verifies before continuing.
 <!-- BEGIN CRAFTKIT-GATE-ROUTING -->
 Every spawn uses `fork_turns: none` and starts its message with
 `MODEL: <reason> - <explanation>` followed by a newline and the task packet.
-Reasons: `bounded` (explicit cheaper model), `escalation` (explicit stronger model), `implementation`, `critical-review`,
-`user-pin`, `profile-pin`, `unavailable`. Omit model for implementation, critical-review
-or unavailable; pins may be explicit or inherited. The routing hook denies missing contracts.
+Reasons: `bounded`, `implementation`, `critical-review` (explicit cheapest model),
+`escalation` (explicit stronger model), `user-pin`, `profile-pin`, `unavailable`.
+Omit model for unavailable; pins may be explicit or inherited. The routing hook denies missing contracts.
 <!-- END CRAFTKIT-GATE-ROUTING -->
 Before reporting completion, verify the latest edits using project gates and
 report actual results. Findings use `[ERROR]` (must fix), `[WARNING]` (should fix), and
@@ -437,7 +437,7 @@ Use the everyday model by default. Escalate inline when you detect genuine uncer
 | Claude Code | injected per turn (see above) | injected | injected | 2× escalate → same-tier judge |
 | Gemini CLI | `flash-lite` | `flash` | `pro` | 2× `pro` → `pro` judge |
 | Cursor | `auto` | `auto` | `cursor-agent --model` or the picker | 2× escalate → same-tier judge |
-| Codex CLI | runtime-listed cheaper model for bounded work | inherit for implementation and critical reviews | next suitable stronger runtime-listed model; disclosed effort fallback | 2× escalate → same-tier judge |
+| Codex CLI | cheapest runtime-listed model for all delegated work | coordinator's selected model | next suitable stronger runtime-listed model; disclosed effort fallback | 2× escalate → same-tier judge |
 
 **No row names a versioned id, on any tool**, for the same reason as the Claude row, reached differently per tool. Gemini CLI ships its own `auto`/`pro`/`flash`/`flash-lite` aliases that resolve against CLI constants *and* the account's preview entitlement, so they self-update on CLI upgrade (prefer these over the API's `gemini-*-latest`, which Google steers production away from and which can land on a rate-limited preview build). Codex selects subagent models from runtime availability and capability/cost information, leaving global model settings unchanged. Cursor's model lives in the picker or the account default chain; no committed file selects it, so the row is a best-effort note, not a setting. Sources and the retired ids this replaced: `docs/research/self-updating-model-ids.md`.
 
