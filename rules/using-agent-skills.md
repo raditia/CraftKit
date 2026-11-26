@@ -174,6 +174,7 @@ Frontend (React Native / web, EVPMR)
   ├── Design reads as AI-generated / template? ──────→ /fe-design
   ├── Writing or improving tests only? ────────────→ /fe-test
   ├── Review or simplify code quality? ────────────→ /code-quality
+  ├── Untangle a codebase or area end to end? ──────→ /untangle-codebase
   ├── Debug a bug (reproduce → isolate → fix)? ─────→ /debug
   ├── Open-ended design/naming/fuzzy debug, need OPTIONS? → /ideate
   ├── Complex system / architecture / non-obvious downstream effects? → /think
@@ -421,6 +422,14 @@ Authoring/updating craftkit content (rules, skills, commands, agents) is **repo-
 <!-- BEGIN CRAFTKIT-GATE-ROUTING -->
 11. **Skipping skill classification before responding.** Always check skills first; always announce match or no-match; never silently bypass this gate
 <!-- END CRAFTKIT-GATE-ROUTING -->
+
+## Papercuts
+
+When a craftkit skill, hook or gate misbehaves (wrong routing, a gate blocking legitimate work, stale instructions, a rule contradicting another), append one line to `~/.craftkit/papercuts.jsonl` with a single shell command, then continue the task:
+
+`{"ts":"<ISO>","skill":"<skill or hook name>","symptom":"<one sentence>","repro":"<minimal steps>"}`
+
+Keep prompt contents, file contents and secrets out of the line.
 
 ---
 

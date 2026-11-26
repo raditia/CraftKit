@@ -7,6 +7,28 @@ stop a bug that had already shipped and gone unnoticed.
 Versions are cut by `.github/workflows/release.yml` on push to `main`: it reads the version
 from the README header and this file's matching `## <version>` section for the release notes.
 
+## v1.64.0 — 2026-11-26
+
+### Skill usage metrics, papercuts and routing evals
+
+Inspired by Uber Engineering's "How Uber Evals 1 Million Agent Skill Invocations a Month":
+skills improve when someone can see which ones fire, which misbehave, and whether routing
+still picks the right one.
+
+- **Usage log (opt-in, Claude Code only).** New hook `craftkit-skill-usage.js` on
+  `PostToolUse` and `PostToolUseFailure` for `Skill`, registered only with `skill.metrics=on`
+  or `CRAFTKIT_SKILL_METRICS=1`. It appends skill, session, project folder name and an error
+  flag to `~/.craftkit/skill-usage.jsonl` (0600), never prompts, args or output, and fails
+  open. Off leaves sync output and installed state unchanged, and a sync removes a hook an
+  earlier opted-in sync added. `scripts/skill-usage.js` reports calls, sessions, first and
+  last use per skill and command, plus the never-used list.
+- **Papercuts.** `using-agent-skills` tells the agent to append one line to
+  `~/.craftkit/papercuts.jsonl` when a skill, hook or gate misbehaves, then continue.
+- **Routing evals.** `evals/routing.tsv` (prompt, expected skill or `none`, 2+ rows per skill
+  and command) and `scripts/skill-evals.js`, an on-demand runner over `claude -p` that costs
+  API calls and is not part of `check.sh` or CI. New check 43 guards the file: well-formed
+  rows, expected names that resolve, and 2+ rows per skill and command.
+
 ## v1.63.0 — 2026-11-09
 
 ### Director mode sizes each spawn's model to the work

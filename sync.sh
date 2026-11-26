@@ -54,6 +54,7 @@ _CK_KEYS=(
     "humanizer%on%humanizer skill, standalone (/pr-message and /docs use /clarity)"
     "playwright%off%Playwright CLI and its agent skill (needs npm and Node 20+)"
     "dashboard%off%agent dashboard, logs tool calls to ~/.craftkit/agent-tree"
+    "skill.metrics%off%skill usage metrics, Claude Code only: logs skill names to ~/.craftkit/skill-usage.jsonl"
     "gates.routing%%routing gates: skill-first and announce hooks, routing rule prose"
     "gates.director%%director gate: delegate 3+ file edits (unset: Claude on, Codex off)"
     "gates.verify%%verify gate: Stop hook blocks a turn that edited without verifying"
