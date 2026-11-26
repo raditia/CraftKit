@@ -423,6 +423,14 @@ Authoring/updating craftkit content (rules, skills, commands, agents) is **repo-
 11. **Skipping skill classification before responding.** Always check skills first; always announce match or no-match; never silently bypass this gate
 <!-- END CRAFTKIT-GATE-ROUTING -->
 
+## Papercuts
+
+When a craftkit skill, hook or gate misbehaves (wrong routing, a gate blocking legitimate work, stale instructions, a rule contradicting another), append one line to `~/.craftkit/papercuts.jsonl` with a single shell command, then continue the task:
+
+`{"ts":"<ISO>","skill":"<skill or hook name>","symptom":"<one sentence>","repro":"<minimal steps>"}`
+
+Keep prompt contents, file contents and secrets out of the line.
+
 ---
 
 ## Model routing

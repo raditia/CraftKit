@@ -1,4 +1,4 @@
-# craftkit `v1.63.0`
+# craftkit `v1.64.0`
 
 [![npm](https://img.shields.io/npm/v/@raditia/craftkit)](https://www.npmjs.com/package/@raditia/craftkit)
 [![npm downloads](https://img.shields.io/npm/dw/@raditia/craftkit)](https://www.npmjs.com/package/@raditia/craftkit)
@@ -50,6 +50,7 @@ Run `bash sync.sh --configure` from a Git checkout to select optional extras and
 | `humanizer` | on | Standalone humanizer skill; `/docs` and `/pr-message` use `/clarity` instead |
 | `playwright` | off | Browser automation CLI and skills |
 | `dashboard` | off | Live Claude and Codex agent dashboard |
+| `skill.metrics` | off | Claude Code skill usage log (`CRAFTKIT_SKILL_METRICS=1`) |
 | `gates.routing` | on | Skill routing and announcement gates |
 | `gates.director` | Claude on, Codex off | Delegate larger source edits |
 | `gates.verify` | on | Require verification before completion |
@@ -148,6 +149,7 @@ review changed hook definitions with `/hooks` when prompted. No automatic merge/
 | [`craftkit-platform-rules.js`](hooks/craftkit-platform-rules.js) | `SessionStart` | Loads `platform:`-scoped rules only where the cwd matches, so EVPMR laws stay out of Kotlin and Swift sessions |
 | [`craftkit-update-check.js`](hooks/craftkit-update-check.js) | `SessionStart` | Tells you when a newer craftkit is on npm. Asks the registry at most once a day (1.5s timeout, cached in `~/.craftkit-state/update-check`) and stays silent on any failure |
 | [`craftkit-read-cap.js`](hooks/craftkit-read-cap.js) | `PreToolUse` on `Bash` | Rewrites a bare `cat F` / `rtk read F` over 800 lines to `rtk read -m 800`. Leaves piped commands alone |
+| [`craftkit-skill-usage.js`](hooks/craftkit-skill-usage.js) | `PostToolUse` and `PostToolUseFailure` on `Skill`, Claude Code only, opt-in (`skill.metrics=on`) | Appends skill name, session id, project folder name and an error flag to `~/.craftkit/skill-usage.jsonl` (mode 0600). Never logs prompts, args or output. Fails open. The file is never pruned |
 
 [Shared helpers](hooks/craftkit-transcript.js): `craftkit-transcript.js`, `craftkit-platform.js`, `craftkit-filesize.js` and `craftkit-drift.js`.
 
@@ -171,6 +173,14 @@ Enable `dashboard=on` through configuration, then run `ccdash` to watch Claude a
 [Setup, controls and runtime limitations](docs/guide.md#agent-dashboard-opt-in)
 
 </details>
+
+### Measure skills (opt-in)
+
+Inspired by Uber Engineering's [How Uber Evals 1 Million Agent Skill Invocations a Month](https://www.uber.com/us/en/blog/optimizing-ubers-agent-skills/). Three small pieces, all local:
+
+- **Usage log, Claude Code only.** `skill.metrics=on` (or `CRAFTKIT_SKILL_METRICS=1`) installs `craftkit-skill-usage.js`; `node scripts/skill-usage.js` then lists every skill and command with calls, sessions, first and last use, and what was never used. Off removes the hook; the log stays until you delete it.
+- **Papercuts.** The always-on rule has the agent append one line to `~/.craftkit/papercuts.jsonl` when a skill, hook or gate misbehaves.
+- **Routing evals.** [`evals/routing.tsv`](evals/routing.tsv) holds prompts with the expected skill; `node scripts/skill-evals.js [--skill NAME] [--limit N] [--min PCT]` replays them through `claude -p` and reports pass rates. It costs API calls, so neither `check.sh` nor CI runs it; `check.sh` only guards the file.
 
 ### How the classifier picks agents
 

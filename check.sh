@@ -1394,7 +1394,7 @@ fi
 # ---------------------------------------------------------------------------
 check "hook table matches hooks/"
 _ht=0
-_table="$(bash -c ". '$REPO_DIR/adapters/claude.sh' >/dev/null 2>&1; printf '%s\n' \"\${_CRAFTKIT_HOOKS[@]}\" \"\${_CRAFTKIT_DASHBOARD_HOOKS[@]}\"" | cut -d'%' -f1 | sort -u)"
+_table="$(bash -c ". '$REPO_DIR/adapters/claude.sh' >/dev/null 2>&1; printf '%s\n' \"\${_CRAFTKIT_HOOKS[@]}\" \"\${_CRAFTKIT_DASHBOARD_HOOKS[@]}\" \"\${_CRAFTKIT_SKILL_METRICS_HOOKS[@]}\"" | cut -d'%' -f1 | sort -u)"
 for _f in "$REPO_DIR"/hooks/*.js; do
     _b="$(basename "$_f")"
     if ! echo "$_table" | grep -qx "$_b"; then
@@ -2902,9 +2902,13 @@ _TG_HOOKS_routing='gate-skill-first.js gate-announce-honored.js'
 # TC-001's baseline and the line prefixes allowed to differ from it: T13's spawn label in
 # rule 12a, the Codex next-step agreement #41 added after v1.58.0 shipped, and v1.60.0's
 # seventh ponytail tag, reuse, general PR follow-up routing, Codex task model selection,
-# untangle-codebase discovery, and the Codex advice protocol.
+# untangle-codebase discovery, the papercuts section, and the Codex advice protocol.
 _TG_BASE=v1.58.0
 _TG_ALLOW="- **Contract.** Rule 12's four fields plus the project's verify command;
+## Papercuts
+When a craftkit skill, hook or gate misbehaves
+{\"ts\":\"<ISO>\"
+Keep prompt contents, file contents and secrets out of the line.
 - **Model.**
   ├── Untangle a codebase or area end to end? ──────→ /untangle-codebase
 - At the end of every completed task, suggest one concrete, relevant next step
@@ -3029,7 +3033,7 @@ _tg_suite() {
             git -C "$REPO_DIR" archive "$_TG_BASE" sync.sh adapters hooks rules | tar -x -C "$x/old"
             _tg_lib "$x/old" "$x/oldlib.sh"
             ( export HOME="$x/c"; mkdir -p "$HOME"; . "$x/oldlib.sh"; _tg_rules_all ) >/dev/null 2>&1
-            out="$(diff <(_tg_rules_out "$x/c") <(_tg_rules_out "$x/a") | grep '^[<>]' | cut -c3- | grep -vF -- "$_TG_ALLOW" | head -3)"
+            out="$(diff <(_tg_rules_out "$x/c") <(_tg_rules_out "$x/a") | grep '^[<>]' | cut -c3- | grep -vF -- "$_TG_ALLOW" | grep -v '^$' | head -3)"
             [[ -n "$out" ]] && _no "with no config the installed rules differ from $_TG_BASE beyond _TG_ALLOW: $(echo "$out" | cut -c1-80 | tr '\n' ';')"
             [[ "$(diff <(_tg_rules_out "$x/c") <(_tg_rules_out "$x/a") | grep -c '^>')" -gt 0 ]] \
                 || _no "the $_TG_BASE baseline renders identically, so the allowlist is stale"
@@ -3409,6 +3413,35 @@ fi
 check "file-mode probes try GNU stat before BSD stat"
 _sf="$(grep -nE '\$\(stat -f' "$REPO_DIR/check.sh" "$REPO_DIR/sync.sh" "$REPO_DIR"/adapters/*.sh "$REPO_DIR/install.sh" | grep -v '_sf=' || true)"
 if [[ -n "$_sf" ]]; then fail "BSD-first stat probe, which breaks on Linux: $_sf"; else pass; fi
+
+# ---------------------------------------------------------------------------
+# 43. evals/routing.tsv stays a usable routing eval set. A row whose expected name matches
+#     no skill or command grades every run against a target that cannot be hit, and a skill
+#     with under two prompts has no sample to read a pass rate from.
+#     scripts/skill-evals.js runs it on demand; this only guards the file. $ROUTING_TSV
+#     points the check at a scratch copy so it can be shown to fail.
+# ---------------------------------------------------------------------------
+check "routing eval set covers every skill and command"
+_rt="${ROUTING_TSV:-$REPO_DIR/evals/routing.tsv}"
+_rt_out="$(
+    if [[ ! -f "$_rt" ]]; then echo "evals/routing.tsv missing"; else
+        awk -F'\t' -v root="$REPO_DIR" '
+            NR == 1 { if ($0 != "prompt\texpected") print "header must be: prompt<TAB>expected"; next }
+            NF != 2 { print "line " NR ": expected 2 tab-separated fields, got " NF; next }
+            { n[$2]++ }
+            END {
+                cmd = "ls \"" root "/skills\"; ls \"" root "/commands\" | sed -n \"s/\\.md$//p\""
+                while ((cmd | getline name) > 0) { known[name] = 1; if (n[name] < 2) print name ": " n[name] + 0 " row(s), needs 2+" }
+                for (e in n) if (e != "none" && !(e in known)) print "expected \"" e "\" is no skill or command"
+            }' "$_rt"
+    fi
+)"
+if [[ -n "$_rt_out" ]]; then
+    fail "evals/routing.tsv:"
+    echo "$_rt_out" | sed 's/^/      /'
+else
+    pass
+fi
 
 echo
 if [[ $FAILURES -eq 0 ]]; then

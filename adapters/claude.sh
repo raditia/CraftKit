@@ -47,6 +47,12 @@ _CRAFTKIT_DASHBOARD_HOOKS=(
     "craftkit-agent-log.js%SessionEnd%%"
     "craftkit-statusline.js%-%%"
 )
+# Skill usage metrics (opt-in): joins _CRAFTKIT_HOOKS only when CK_skill_metrics=on, so with
+# it off _claude_prune_hooks removes whatever an earlier opted-in sync installed.
+_CRAFTKIT_SKILL_METRICS_HOOKS=(
+    "craftkit-skill-usage.js%PostToolUse%Skill%"
+    "craftkit-skill-usage.js%PostToolUseFailure%Skill%"
+)
 _CLAUDE_SECTION_START="<!-- BEGIN CRAFTKIT (managed: do not edit manually) -->"
 _CLAUDE_SECTION_END="<!-- END CRAFTKIT -->"
 
@@ -362,7 +368,7 @@ _craftkit_hook_unwire_settings() {
     [[ ! -f "$CLAUDE_SETTINGS" ]] && return
     local scripts h
     scripts=""
-    for h in "${_CRAFTKIT_HOOKS[@]}" "${_CRAFTKIT_DASHBOARD_HOOKS[@]}"; do
+    for h in "${_CRAFTKIT_HOOKS[@]}" "${_CRAFTKIT_DASHBOARD_HOOKS[@]}" "${_CRAFTKIT_SKILL_METRICS_HOOKS[@]}"; do
         scripts="$scripts$(echo "$h" | cut -d'%' -f1) "
     done
     python3 - "$CLAUDE_SETTINGS" "$scripts" << 'PYEOF'
@@ -592,6 +598,10 @@ install_claude_craftkit_hook() {
     # flag: CRAFTKIT_DASHBOARD (resolved in sync.sh). off: the table stays as before and prune drops the dashboard rows. remove: if the dashboard ever becomes default-on.
     if [[ "${CRAFTKIT_DASHBOARD_ON:-0}" == 1 ]] && ! printf '%s\n' "${_CRAFTKIT_HOOKS[@]}" | grep -q '^craftkit-agent-log.js%'; then
         _CRAFTKIT_HOOKS+=("${_CRAFTKIT_DASHBOARD_HOOKS[@]}")
+    fi
+    # flag: CRAFTKIT_SKILL_METRICS (config key skill.metrics, resolved in sync.sh). off: no hook registered, no file written, and prune drops the rows an earlier opted-in sync added. remove: if metrics become default-on.
+    if [[ "${CK_skill_metrics:-off}" == on ]] && ! printf '%s\n' "${_CRAFTKIT_HOOKS[@]}" | grep -q '^craftkit-skill-usage.js%'; then
+        _CRAFTKIT_HOOKS+=("${_CRAFTKIT_SKILL_METRICS_HOOKS[@]}")
     fi
     # Before the prune, so settings.json never points at a status line script already deleted.
     _claude_statusline_wire "${CRAFTKIT_DASHBOARD_ON:-0}"

@@ -1,0 +1,117 @@
+prompt	expected
+Record why we picked Postgres over DynamoDB as an ADR so nobody re-litigates it	adr
+Write an architecture decision record for moving checkout state into a reducer	adr
+Check this Android Fragment for TalkBack problems and missing content descriptions	android-a11y
+Audit the Compose screen I changed for accessibility on Android	android-a11y
+Summarize what changed on this Android branch across screens before I review it	android-context
+Give me the change context for my Kotlin branch	android-context
+How does an Activity, Presenter and ViewModel fit together in our Android MVP setup?	android-patterns
+Explain the Android Dynamic Feature Module split and how NavigatorService works	android-patterns
+My RecyclerView on Android is janky when scrolling, what should I look at?	android-performance
+Review this Presenter for memory leaks and slow Android list rendering	android-performance
+Review my Kotlin diff against the Android MVP contract for layer violations	android-review
+Check this Android Presenter change for Dagger DI and coroutine mistakes	android-review
+Scaffold a new Android screen with Activity, Presenter and ViewModel	android-scaffold
+Create the boilerplate for a new Android feature screen called HotelFilter	android-scaffold
+Write MockK unit tests for this Android Presenter	android-test
+Add JUnit tests with Turbine for my StateFlow ViewModel	android-test
+Scaffold the new profile module and wire up the files	build
+Run the sequential build workflow for the settings screen without parallel agents	build
+Scaffold a loyalty points screen	build
+Rewrite this paragraph so it reads clearly without inventing facts	clarity
+Review my release note draft for wordiness and unclear sentences	clarity
+Simplify this working but convoluted function	code-quality
+Do a code quality review of utils/date.ts for correctness and security	code-quality
+Connect our team docs repo so planning checks asks against it	context-source
+Switch the connected team docs repository to the new one	context-source
+Have Claude and Codex both review this diff independently	cross-review
+Run a cross-review on my payment change, it is high-stakes	cross-review
+The login screen crashes with a null pointer after the upgrade, help me debug it	debug
+Reproduce and isolate why this API call returns stale data	debug
+Help me plan a wishlist feature before we build anything	define
+Let us scope out and spec the notifications settings feature first	define
+Write feature documentation for the booking flow for engineers and for stakeholders	docs
+Produce a technical and non-technical doc for the shipped referral feature	docs
+Score how correct that last run was	eval
+What is our success rate on this build? Eval it	eval
+Check this React Native view for accessibility labels and roles	fe-a11y
+Audit focus order and screen reader support in ViewCheckout.tsx	fe-a11y
+Derive the change context for this React Native branch mapped to EVPMR layers	fe-context
+Give me the fe context for my staged changes	fe-context
+This page looks like generic AI template slop, make the design feel intentional	fe-design
+Critique the visual design of my landing page for template look	fe-design
+How should I structure this component and hook composition in EVPMR?	fe-patterns
+Is it right to put this state in the presenter or the view?	fe-patterns
+My Next.js page has a request waterfall and a huge bundle, how do I fix it?	fe-performance
+Find re-render problems in this React Native list screen	fe-performance
+Review my EVPMR files for layer violations and ESLint problems	fe-review
+Check that my View file does not contain useState or API calls	fe-review
+Scaffold the five EVPMR files for a new cart feature	fe-scaffold
+Create a new frontend feature module called PromoBanner with entry view presenter model resource	fe-scaffold
+Write Jest tests for the changed presenter and get coverage above 93 percent	fe-test
+Do my React Native tests need updating after this change?	fe-test
+The checkout button throws an error and crashes the app, fix this bug	fix
+Coverage is failing in CI after my merge, fix it	fix
+Grill my migration plan and poke holes in it	grill
+Stress-test this decision to drop the legacy API, challenge me	grill
+Hand this session off to a fresh agent, compact the state and next steps	handoff
+I am near my context limit, write a handoff document	handoff
+Give me several options for naming this module	ideate
+I have no clear direction on this architecture, brainstorm distinct approaches	ideate
+I want a feature for saving searches but I have not thought it through, ask me questions	interview
+My ask is vague, de-fuzz it by interviewing me one question at a time	interview
+Check this iOS ViewController for VoiceOver issues	ios-a11y
+Audit accessibility labels in my UIKit screen	ios-a11y
+Summarize what changed on my iOS branch before review	ios-context
+Give me the change context for this Swift branch	ios-context
+Explain how Contract, ViewModel and Coordinator work in our iOS MVVM-C screens	ios-patterns
+How does dependency injection with the Dependency struct work on iOS?	ios-patterns
+My iOS table view stutters while scrolling, what is wrong?	ios-performance
+Review this ViewModel and cell code for iOS performance and retain cycles	ios-performance
+Review my Swift diff against the MVVM-C contract	ios-review
+Check this iOS ViewModel change for Coordinator navigation and NSLocalizedString issues	ios-review
+Scaffold a new iOS screen with Contract ViewController View ViewModel and Factory	ios-scaffold
+Create the boilerplate for a new iOS feature screen named SeatPicker	ios-scaffold
+Write Quick and Nimble tests for this iOS ViewModel	ios-test
+Add unit tests for my Swift ViewModel using the Dependency struct mocks	ios-test
+Build a new hotel wishlist feature	parallel-build
+Implement a new payment methods screen	parallel-build
+I want to create a trip itinerary feature	parallel-build
+Help me review the changes on this branch	parallel-review
+Can you check my changes? Something looks off in the diff	parallel-review
+Get this ready to merge	parallel-ship
+Ship this, can I merge it?	parallel-ship
+Break this spec into ordered verifiable tasks	plan
+Turn the approved spec into a task plan with acceptance checks	plan
+Scan the whole repo for over-engineering and bloat	ponytail-audit
+Audit the entire codebase for reinvented stdlib and speculative abstractions	ponytail-audit
+List all the deliberate shortcuts marked ponytail in this repo	ponytail-debt
+Show me the ponytail debt we have accumulated	ponytail-debt
+Is this diff over-engineered? Find what to delete	ponytail-review
+Review this file for speculative abstractions and dead flexibility	ponytail-review
+Follow this PR and address the review comments	pr-followup
+Monitor my PR for CI results and reviewer feedback	pr-followup
+Generate a PR description for this branch	pr-message
+Draft a PR message with test evidence	pr-message
+Research how the Stripe webhook retry policy works using primary sources and write a note	research
+Investigate the official docs for React Server Components caching in the background	research
+Do a quick sequential review of my small diff	review
+Give me a light review without spawning parallel agents	review
+Write a PRD for the saved searches feature	spec
+Turn this discovery brief into a spec with acceptance criteria	spec
+Use agent teams to build the checkout redesign with teammates in parallel	team-build
+Run team-build for the new onboarding flow	team-build
+Generate QA test cases with steps and expected results from the Figma	test-cases
+Create test scenarios for the refund flow and export them to Excel	test-cases
+This system has non-obvious downstream effects, think it through with a systems model	think
+Help me reason about the tradeoffs of splitting this monolith using a structured framework	think
+Untangle this codebase end to end and tell me how the area fits together	untangle-codebase
+Map and clean up the payments area of the repo	untangle-codebase
+Hi, how are you today?	none
+What is the capital of Australia?	none
+Thanks, that makes sense	none
+Explain the difference between a mutex and a semaphore	none
+What does the acronym CRUD stand for?	none
+Tell me a short joke about programmers	none
+Do the simple sequential pre-merge gate, I already know tests pass	ship
+Run the lightweight ship check on this branch	ship
