@@ -6,6 +6,7 @@
 // no Skill call) and compares it with the expected column. Exits 1 when the overall pass
 // rate is under --min (default 0, report only).
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 
@@ -19,10 +20,31 @@ const rows = fs.readFileSync(path.join(__dirname, '..', 'evals', 'routing.tsv'),
   .split('\n').slice(1).filter(Boolean).map((l) => l.split('\t'))
   .filter(([, exp]) => !only || exp === only).slice(0, limit);
 
-function routed(prompt) {
+// The routing hook detects the platform from cwd, so a platform skill only routes inside a
+// project of that platform. Run fe-/android-/ios- rows in a minimal temp project for it.
+const FIXTURES = {
+  fe: { 'package.json': '{"dependencies":{"react-native":"0.76.0"}}', 'src/cart/ViewCart.tsx': 'export const ViewCart = () => null;\n' },
+  android: { 'settings.gradle': 'include ":app"\n', 'app/src/main/java/cart/CartPresenter.kt': 'class CartPresenter\n' },
+  ios: { 'Package.swift': '// swift-tools-version:5.9\n', 'Modules/Cart/CartViewModel.swift': 'final class CartViewModel {}\n' },
+};
+const cwds = {};
+function cwdFor(exp) {
+  const key = Object.keys(FIXTURES).find((k) => exp.startsWith(k + '-'));
+  if (!key) return path.join(__dirname, '..');
+  if (!cwds[key]) {
+    cwds[key] = fs.mkdtempSync(path.join(os.tmpdir(), `skill-evals-${key}-`));
+    for (const [f, body] of Object.entries(FIXTURES[key])) {
+      fs.mkdirSync(path.dirname(path.join(cwds[key], f)), { recursive: true });
+      fs.writeFileSync(path.join(cwds[key], f), body);
+    }
+  }
+  return cwds[key];
+}
+
+function routed(prompt, exp) {
   return new Promise((resolve) => {
     const p = spawn('claude', ['-p', prompt, '--output-format', 'stream-json', '--verbose',
-      '--disallowedTools', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash'], { stdio: ['ignore', 'pipe', 'ignore'] });
+      '--disallowedTools', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash'], { cwd: cwdFor(exp), stdio: ['ignore', 'pipe', 'ignore'] });
     let buf = '';
     let done = false;
     const finish = (v) => { if (!done) { done = true; clearTimeout(timer); p.kill(); resolve(v); } };
@@ -38,26 +60,32 @@ function routed(prompt) {
         for (const b of blocks) {
           if (b.type === 'tool_use' && b.name === 'Skill') return finish(String(b.input.skill).replace(/^.*:/, ''));
         }
-        if (ev.type === 'result') return finish('none');
+        // A failed run (rate limit, auth, crash) is not a routing decision; counting it as none
+        // fails every expected row and falsely passes every none row.
+        if (ev.type === 'result') return finish(ev.is_error ? 'error' : 'none');
       }
     });
-    p.on('close', () => finish('none'));
+    p.on('close', () => finish('error'));
     p.on('error', () => finish('error'));
   });
 }
 
 (async () => {
   const per = {};
+  const fails = {};
   let pass = 0;
   for (const [prompt, exp] of rows) {
-    const got = await routed(prompt);
+    const got = await routed(prompt, exp);
     const ok = got === exp;
     const s = per[exp] || (per[exp] = { pass: 0, n: 0 });
     s.n++;
-    if (ok) { s.pass++; pass++; } else console.log(`FAIL expected=${exp} got=${got}: ${prompt}`);
+    if (ok) { s.pass++; pass++; } else { fails[prompt] = got; console.log(`FAIL expected=${exp} got=${got}: ${prompt}`); }
   }
   for (const k of Object.keys(per).sort()) console.log(`${k}\t${per[k].pass}/${per[k].n}`);
   const rate = rows.length ? (100 * pass) / rows.length : 0;
   console.log(`overall ${pass}/${rows.length} = ${rate.toFixed(1)}%`);
+  const errors = Object.values(fails).filter((g) => g === 'error' || g === 'timeout').length;
+  if (errors) console.log(`${errors} run(s) errored or timed out; their rows are not routing results`);
+  for (const d of Object.values(cwds)) fs.rmSync(d, { recursive: true, force: true });
   process.exit(rate < min ? 1 : 0);
 })();
